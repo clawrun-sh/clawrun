@@ -1,0 +1,49 @@
+{
+  "id": "zeroclaw-basic",
+  "name": "ZeroClaw Basic",
+  "agent": "zeroclaw",
+  "description": "A basic ZeroClaw agent with Telegram integration",
+  "envVars": [
+    {
+      "key": "CLOUDCLAW_LLM_PROVIDER",
+      "prompt": "Select your LLM provider",
+      "required": true,
+      "default": "anthropic",
+      "choices": ["anthropic", "openai", "openrouter"]
+    },
+    {
+      "key": "CLOUDCLAW_LLM_API_KEY",
+      "prompt": "Paste your LLM API key",
+      "required": true
+    },
+    {
+      "key": "CLOUDCLAW_LLM_MODEL",
+      "prompt": "LLM model to use",
+      "required": true,
+      "default": "claude-sonnet-4-20250514"
+    },
+    {
+      "key": "CLOUDCLAW_TELEGRAM_BOT_TOKEN",
+      "prompt": "Paste your Telegram bot token (from @BotFather)",
+      "required": true
+    },
+    {
+      "key": "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET",
+      "prompt": "Telegram webhook secret",
+      "required": true,
+      "autoGenerate": "uuid"
+    },
+    {
+      "key": "CLOUDCLAW_CRON_SECRET",
+      "prompt": "Cron job secret",
+      "required": true,
+      "autoGenerate": "uuid"
+    },
+    {
+      "key": "CLOUDCLAW_NEXTAUTH_SECRET",
+      "prompt": "NextAuth secret",
+      "required": true,
+      "autoGenerate": "uuid"
+    }
+  ]
+}

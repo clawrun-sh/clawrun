@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/webhook/telegram/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
