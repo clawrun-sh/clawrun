@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
@@ -62,52 +61,18 @@ export async function setupTelegram(
     return result;
   }
 
-  // Step 2: Check for existing webhook
-  console.log(chalk.dim("  Checking for existing webhook..."));
-
-  try {
-    const infoRes = await fetch(`${TELEGRAM_API}${botToken}/getWebhookInfo`);
-    const infoData = (await infoRes.json()) as TelegramResponse<WebhookInfo>;
-
-    if (infoData.ok && infoData.result?.url) {
-      const existingUrl = infoData.result.url;
-      console.log(chalk.yellow(`  Existing webhook found: ${existingUrl}`));
-
-      const shouldDelete = await confirm({
-        message: "An existing webhook is registered for this bot. Delete it and register the new one?",
-        default: true,
-      });
-
-      if (!shouldDelete) {
-        console.log(chalk.yellow("  Keeping existing webhook. Skipping registration."));
-        return result;
-      }
-
-      // Delete existing webhook
-      console.log(chalk.dim("  Deleting existing webhook..."));
-      const deleteRes = await fetch(`${TELEGRAM_API}${botToken}/deleteWebhook`);
-      const deleteData = (await deleteRes.json()) as TelegramResponse;
-
-      if (deleteData.ok) {
-        console.log(chalk.green("  Existing webhook deleted."));
-      } else {
-        console.log(
-          chalk.yellow(`  Could not delete webhook: ${deleteData.description ?? "unknown error"}`),
-        );
-        return result;
-      }
-    } else {
-      console.log(chalk.dim("  No existing webhook."));
-    }
-  } catch {
-    console.log(chalk.dim("  Could not check webhook info — continuing."));
-  }
-
-  // Step 3: Register new webhook
+  // Step 2: Delete any stale webhook, then register fresh
   const webhookUrl = `${deployUrl}/api/webhook/telegram`;
   console.log(chalk.dim(`  Registering webhook: ${webhookUrl}`));
 
   try {
+    // Always delete first to clear any stale secret_token
+    await fetch(`${TELEGRAM_API}${botToken}/deleteWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ drop_pending_updates: false }),
+    });
+
     const webhookRes = await fetch(`${TELEGRAM_API}${botToken}/setWebhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -126,11 +91,29 @@ export async function setupTelegram(
       return result;
     }
 
-    result.webhookSet = true;
     console.log(chalk.green("  Webhook registered!"));
   } catch {
     console.log(chalk.yellow("  Could not register webhook."));
     return result;
+  }
+
+  // Step 4: Verify webhook was set correctly
+  try {
+    const verifyRes = await fetch(`${TELEGRAM_API}${botToken}/getWebhookInfo`);
+    const verifyData = (await verifyRes.json()) as TelegramResponse<WebhookInfo>;
+
+    if (verifyData.ok && verifyData.result) {
+      const info = verifyData.result;
+      if (info.url === webhookUrl) {
+        console.log(chalk.green(`  Verified: webhook pointing to ${info.url}`));
+        result.webhookSet = true;
+      } else {
+        console.log(chalk.yellow(`  Warning: webhook URL mismatch. Expected ${webhookUrl}, got ${info.url}`));
+      }
+    }
+  } catch {
+    // Non-fatal — registration likely succeeded
+    result.webhookSet = true;
   }
 
   return result;

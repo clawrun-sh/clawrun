@@ -1,13 +1,24 @@
 {
   "name": "@cloudclaw/app",
   "version": "0.1.0",
-  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "db:push": "drizzle-kit push"
   },
+  "exports": {
+    "./api/health": "./lib/handlers/health.ts",
+    "./api/webhook-telegram": "./lib/handlers/webhook-telegram.ts",
+    "./pages/home": "./lib/components/home.tsx",
+    "./pages/layout": "./lib/components/root-layout.tsx",
+    "./config": "./lib/config.ts"
+  },
+  "files": [
+    "lib",
+    "templates",
+    "package.json"
+  ],
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/sandbox": "^1.5.0",
@@ -15,7 +26,8 @@
     "grammy": "^1.31.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zeroclaw": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

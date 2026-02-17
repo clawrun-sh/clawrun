@@ -1,10 +1,3 @@
-import type { NextConfig } from "next";
+import { createNextConfig } from "./lib/config";
 
-const nextConfig: NextConfig = {
-  serverExternalPackages: ["grammy", "@vercel/sandbox"],
-  outputFileTracingIncludes: {
-    "/api/webhook/telegram": ["./public/bin/**/*"],
-  },
-};
-
-export default nextConfig;
+export default createNextConfig();

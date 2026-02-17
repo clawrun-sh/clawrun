@@ -2,6 +2,8 @@
 
 import { Command } from "commander";
 import { deployCommand } from "./commands/deploy.js";
+import { listCommand } from "./commands/list.js";
+import { destroyCommand } from "./commands/destroy.js";
 
 const program = new Command();
 
@@ -11,10 +13,21 @@ program
   .version("0.1.0");
 
 program
-  .command("deploy <preset>")
-  .description("Deploy an agent using a preset configuration")
+  .command("deploy [name]")
+  .description("Create or upgrade and deploy an instance")
   .option("-y, --yes", "Use defaults and skip prompts (CI mode)")
-  .option("-d, --dir <directory>", "Target directory for the scaffolded app")
+  .option("-p, --preset <preset>", "Preset to use (for new instances)")
   .action(deployCommand);
+
+program
+  .command("list")
+  .description("List all instances")
+  .action(listCommand);
+
+program
+  .command("destroy <name>")
+  .description("Remove an instance")
+  .option("-y, --yes", "Skip confirmation")
+  .action(destroyCommand);
 
 program.parse();

@@ -1,14 +1,8 @@
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
 import { execa } from "execa";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// From dist/deploy/ -> packages/cli/ -> packages/ -> repo root -> packages/app
-const APP_TEMPLATE_DIR = join(__dirname, "..", "..", "..", "..", "packages", "app");
 
 export async function checkPrerequisites(): Promise<void> {
   // Check Node version
@@ -19,15 +13,6 @@ export async function checkPrerequisites(): Promise<void> {
     process.exit(1);
   }
   console.log(chalk.green(`  Node.js v${nodeVersion}`));
-
-  // Check Docker
-  try {
-    const { stdout } = await execa("docker", ["--version"]);
-    console.log(chalk.green(`  ${stdout.trim()}`));
-  } catch {
-    console.error(chalk.red("  Docker not found. Docker is required to build the agent binary."));
-    process.exit(1);
-  }
 
   // Check Vercel CLI
   try {
@@ -60,54 +45,17 @@ export async function checkPrerequisites(): Promise<void> {
   }
 }
 
-export async function scaffoldApp(
-  targetDir: string,
-  envVars: Record<string, string>,
-  useDefaults: boolean
-): Promise<void> {
-  // Check if target directory exists
-  if (existsSync(targetDir)) {
-    if (!useDefaults) {
-      const overwrite = await confirm({
-        message: `Directory ${targetDir} already exists. Overwrite?`,
-        default: false,
-      });
-      if (!overwrite) {
-        console.log(chalk.yellow("Aborted."));
-        process.exit(0);
-      }
-    }
-  }
-
-  console.log(chalk.cyan(`\nScaffolding app to ${targetDir}...`));
-
-  // Copy app template
-  mkdirSync(targetDir, { recursive: true });
-  cpSync(APP_TEMPLATE_DIR, targetDir, {
-    recursive: true,
-    filter: (src) => {
-      const name = src.split("/").pop() ?? "";
-      return !["node_modules", ".next", ".vercel"].includes(name);
-    },
-  });
-
-  // Write .env.local
-  const envContent = Object.entries(envVars)
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
-  writeFileSync(join(targetDir, ".env.local"), envContent + "\n");
-
-  console.log(chalk.green("  App scaffolded successfully."));
-}
-
-async function persistEnvVarsToProject(
+export async function persistEnvVarsToProject(
   targetDir: string,
   envVars: Record<string, string>,
 ): Promise<void> {
+  const entries = Object.entries(envVars);
+  if (entries.length === 0) return;
+
   console.log(chalk.dim("  Persisting env vars to project level..."));
 
   let succeeded = 0;
-  for (const [key, value] of Object.entries(envVars)) {
+  for (const [key, value] of entries) {
     // Remove existing (ignore errors — may not exist yet)
     try {
       await execa("vercel", ["env", "rm", key, "production", "--yes"], {
@@ -130,13 +78,82 @@ async function persistEnvVarsToProject(
   }
 
   console.log(
-    chalk.green(`  ${succeeded}/${Object.keys(envVars).length} env vars persisted to project.`),
+    chalk.green(`  ${succeeded}/${entries.length} env vars persisted to project.`),
   );
+}
+
+function getVercelToken(): string | null {
+  // Vercel CLI stores auth token in platform-specific config dir
+  const paths = [
+    join(homedir(), "Library", "Application Support", "com.vercel.cli", "auth.json"),
+    join(homedir(), ".config", "vercel", "auth.json"),
+    join(homedir(), ".local", "share", "com.vercel.cli", "auth.json"),
+  ];
+
+  for (const p of paths) {
+    try {
+      const data = JSON.parse(readFileSync(p, "utf-8")) as { token?: string };
+      if (data.token) return data.token;
+    } catch {
+      // try next path
+    }
+  }
+  return null;
+}
+
+function readVercelProject(targetDir: string): { projectId: string; orgId: string } | null {
+  try {
+    const data = JSON.parse(
+      readFileSync(join(targetDir, ".vercel", "project.json"), "utf-8"),
+    ) as { projectId?: string; orgId?: string };
+    if (data.projectId && data.orgId) {
+      return { projectId: data.projectId, orgId: data.orgId };
+    }
+  } catch {
+    // .vercel/project.json may not exist yet
+  }
+  return null;
+}
+
+export async function disableDeploymentProtection(targetDir: string): Promise<void> {
+  const token = getVercelToken();
+  if (!token) {
+    console.log(chalk.yellow("  Could not find Vercel auth token — skipping deployment protection config."));
+    return;
+  }
+
+  const project = readVercelProject(targetDir);
+  if (!project) {
+    console.log(chalk.yellow("  Could not read Vercel project config — skipping deployment protection config."));
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.vercel.com/v9/projects/${project.projectId}?teamId=${project.orgId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ssoProtection: null }),
+      },
+    );
+
+    if (res.ok) {
+      console.log(chalk.green("  Deployment protection disabled (SSO bypass)."));
+    } else {
+      console.log(chalk.yellow(`  Could not disable deployment protection (HTTP ${res.status}).`));
+    }
+  } catch {
+    console.log(chalk.yellow("  Could not disable deployment protection."));
+  }
 }
 
 export async function deployToVercel(
   targetDir: string,
-  envVars: Record<string, string>
+  envVars: Record<string, string>,
 ): Promise<string> {
   console.log(chalk.cyan("\nDeploying to Vercel...\n"));
 
@@ -149,20 +166,15 @@ export async function deployToVercel(
   try {
     const { stdout } = await execa(
       "vercel",
-      ["deploy", "--prod", "--yes", ...envArgs],
+      ["deploy", "--prod", "--yes", "--force", ...envArgs],
       {
         cwd: targetDir,
         stdio: ["inherit", "pipe", "inherit"],
-      }
+      },
     );
 
     // The last line of stdout is the deployment URL
     const url = stdout.trim().split("\n").pop()?.trim() ?? "";
-
-    // Also persist env vars at project level so they survive `vercel env pull`
-    // and are available to future deploys without --env flags
-    await persistEnvVarsToProject(targetDir, envVars);
-
     return url;
   } catch (error) {
     console.error(chalk.red("\nDeployment failed."));

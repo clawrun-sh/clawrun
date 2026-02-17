@@ -1,5 +1,5 @@
-import type { AgentAdapter } from "./types";
-import { zeroclawAdapter } from "./zeroclaw";
+import type { AgentAdapter } from "zeroclaw/adapter";
+import { zeroclawAdapter } from "zeroclaw/adapter";
 
 const agents: Record<string, AgentAdapter> = {
   [zeroclawAdapter.id]: zeroclawAdapter,

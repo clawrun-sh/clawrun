@@ -118,11 +118,11 @@ export async function setupDatabase(
 
   console.log(chalk.green("  Database provisioned!"));
 
-  // Step 3: Pull env vars into a TEMP file, extract only DB vars, merge into .env.local
-  // This avoids overwriting .env.local which would wipe CLOUDCLAW_ vars
+  // Step 3: Pull env vars into a TEMP file, extract only DB vars, merge into .env
+  // This avoids overwriting .env which would wipe CLOUDCLAW_ vars
   console.log(chalk.dim("\n  Pulling database environment variables..."));
 
-  const envLocalPath = join(targetDir, ".env.local");
+  const envLocalPath = join(targetDir, ".env");
   const envTempPath = join(targetDir, ".env.pulled.tmp");
 
   try {
@@ -148,13 +148,13 @@ export async function setupDatabase(
       // ignore
     }
 
-    // Read existing .env.local (has CLOUDCLAW_ vars) and merge DB vars in
+    // Read existing .env (has CLOUDCLAW_ vars) and merge DB vars in
     const existing = parseEnvFile(readFileSync(envLocalPath, "utf-8"));
     const merged = { ...existing, ...dbVars };
     writeEnvFile(envLocalPath, merged);
 
     const dbCount = Object.keys(dbVars).length;
-    console.log(chalk.green(`  ${dbCount} database vars added to .env.local (existing vars preserved).`));
+    console.log(chalk.green(`  ${dbCount} database vars added to .env (existing vars preserved).`));
   } catch {
     console.log(
       chalk.yellow("  Could not pull env vars locally — not needed for production."),

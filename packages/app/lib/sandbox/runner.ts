@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { Sandbox } from "@vercel/sandbox";
-import type { AgentAdapter, AgentEnv, AgentResponse } from "../agents/types";
+import type { AgentAdapter, AgentEnv, AgentResponse } from "zeroclaw/adapter";
 import type { ChatMessage } from "../storage/types";
 import { getAgent } from "../agents/registry";
 
@@ -18,6 +18,12 @@ function getAgentEnv(): AgentEnv {
   }
 
   return { llmProvider, llmApiKey, llmModel };
+}
+
+function resolveAssetPath(localPath: string): string {
+  return isAbsolute(localPath)
+    ? localPath
+    : join(process.cwd(), localPath);
 }
 
 export async function runAgent(
@@ -54,7 +60,7 @@ export async function runAgent(
         await sandbox.writeFiles(
           assets.map((asset) => ({
             path: asset.sandboxPath,
-            content: readFileSync(join(process.cwd(), asset.localPath)),
+            content: readFileSync(resolveAssetPath(asset.localPath)),
           })),
         );
       }

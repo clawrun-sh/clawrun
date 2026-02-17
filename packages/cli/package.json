@@ -16,8 +16,10 @@
   "dependencies": {
     "chalk": "^5.4.0",
     "commander": "^13.0.0",
+    "human-id": "^4.1.1",
     "@inquirer/prompts": "^7.2.0",
-    "execa": "^9.5.0"
+    "execa": "^9.5.0",
+    "zeroclaw": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

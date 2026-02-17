@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+.turbo/
+
+# Environment files
+.env
+.env.*
+.env*.local
+
+# Vercel
+.vercel/
+
+# Scaffolded deploy directories
+cloudclaw-*/
+
+# OS files
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Binary artifacts
+packages/app/public/bin/
