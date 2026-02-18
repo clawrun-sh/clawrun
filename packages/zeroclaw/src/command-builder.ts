@@ -1,4 +1,4 @@
-import type { ZeroClawConfig, ChatMessage, CommandSpec } from "./types.js";
+import type { ZeroClawConfig, CommandSpec } from "./types.js";
 
 const PROVIDER_MAP: Record<string, string> = {
   anthropic: "anthropic",
@@ -9,20 +9,10 @@ const PROVIDER_MAP: Record<string, string> = {
 export function buildAgentCommand(
   binaryPath: string,
   message: string,
-  history?: ChatMessage[],
 ): CommandSpec {
-  let prompt = message;
-
-  if (history && history.length > 0) {
-    const historyText = history
-      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-      .join("\n");
-    prompt = `[Conversation history]\n${historyText}\n\n[New message]\n${message}`;
-  }
-
   return {
     cmd: binaryPath,
-    args: ["agent", "-m", prompt],
+    args: ["agent", "-m", message],
     env: { HOME: "/tmp" },
   };
 }
@@ -37,8 +27,11 @@ export function buildOnboardCommand(
     "onboard",
     "--api-key", config.apiKey,
     "--provider", provider,
-    "--memory", config.memory ?? "none",
   ];
+
+  if (config.memory) {
+    args.push("--memory", config.memory);
+  }
 
   return {
     cmd: binaryPath,

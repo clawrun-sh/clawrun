@@ -1,8 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    "build:bin": {
+      "inputs": [
+        "docker/**",
+        "patches/**",
+        "src-rust/**",
+        "scripts/prepare-binary.js"
+      ],
+      "outputs": ["dist/bin/**"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build:bin"],
       "outputs": ["dist/**", ".next/**"]
     },
     "dev": {

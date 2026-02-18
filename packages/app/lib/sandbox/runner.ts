@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { Sandbox } from "@vercel/sandbox";
 import type { AgentAdapter, AgentEnv, AgentResponse } from "zeroclaw/adapter";
-import type { ChatMessage } from "../storage/types";
 import { getAgent } from "../agents/registry";
 
 const SANDBOX_TIMEOUT_MS = 60_000;
@@ -26,9 +25,13 @@ function resolveAssetPath(localPath: string): string {
     : join(process.cwd(), localPath);
 }
 
+function getDatabaseUrl(): string | undefined {
+  return process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+}
+
 export async function runAgent(
   message: string,
-  options?: { agentId?: string; history?: ChatMessage[] },
+  options?: { agentId?: string },
 ): Promise<AgentResponse> {
   const adapter: AgentAdapter = getAgent(options?.agentId);
   let sandbox: Sandbox | null = null;
@@ -36,6 +39,7 @@ export async function runAgent(
   try {
     const env = getAgentEnv();
     const snapshotId = process.env.SANDBOX_SNAPSHOT_ID;
+    const databaseUrl = getDatabaseUrl();
 
     // Create sandbox (function must be in iad1 region — see vercel.json)
     sandbox = snapshotId
@@ -85,10 +89,14 @@ export async function runAgent(
       // Run onboard command if the adapter provides one (generates config)
       if (adapter.onboardCommand) {
         const onboard = adapter.onboardCommand(env);
+        const onboardEnv = {
+          ...onboard.env,
+          ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+        };
         const onboardResult = await sandbox.runCommand({
           cmd: onboard.cmd,
           args: onboard.args,
-          env: onboard.env,
+          env: onboardEnv,
         });
         if (onboardResult.exitCode !== 0) {
           const stderr = await onboardResult.stderr();
@@ -102,9 +110,8 @@ export async function runAgent(
     }
 
     // Write config files (if adapter provides static config instead of onboard)
-    const configFiles = adapter.generateConfig(env, options?.history);
+    const configFiles = adapter.generateConfig(env);
     if (configFiles.length > 0) {
-      // Ensure parent directories exist
       const dirs = new Set(
         configFiles.map((f) => f.path.substring(0, f.path.lastIndexOf("/"))),
       );
@@ -121,7 +128,15 @@ export async function runAgent(
     }
 
     // Run agent command with timeout
-    const command = adapter.buildCommand(message, options?.history);
+    const command = adapter.buildCommand(message);
+
+    // Merge DATABASE_URL into command env so the agent's Postgres memory
+    // backend can connect from inside the sandbox.
+    const commandEnv = {
+      ...command.env,
+      ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+    };
+
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
@@ -133,7 +148,7 @@ export async function runAgent(
       result = await sandbox.runCommand({
         cmd: command.cmd,
         args: command.args,
-        env: command.env,
+        env: commandEnv,
         signal: controller.signal,
       });
     } finally {

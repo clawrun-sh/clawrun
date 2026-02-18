@@ -3,7 +3,7 @@ export interface ZeroClawConfig {
   apiKey: string;
   model?: string;
   temperature?: number;
-  memory?: "sqlite" | "markdown" | "none";
+  memory?: "sqlite" | "markdown" | "postgres" | "none";
   binaryPath?: string;
 }
 

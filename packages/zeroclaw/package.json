@@ -17,12 +17,11 @@
     "dist"
   ],
   "scripts": {
+    "build:bin": "node scripts/prepare-binary.js",
     "build": "tsc",
     "dev": "tsc --watch"
   },
-  "dependencies": {
-    "execa": "^9.5.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

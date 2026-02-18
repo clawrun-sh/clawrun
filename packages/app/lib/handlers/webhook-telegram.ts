@@ -3,7 +3,6 @@ export const fetchCache = "force-no-store";
 
 import { Bot, webhookCallback } from "grammy";
 import { runAgent } from "../sandbox/runner";
-import { getMessageStore } from "../storage";
 
 let _bot: Bot | null = null;
 
@@ -24,24 +23,10 @@ function getBot() {
   });
 
   bot.on("message:text", async (ctx) => {
-    const chatId = ctx.chat.id.toString();
     const message = ctx.message.text;
-    const store = getMessageStore();
 
     try {
-      const history = store
-        ? await store.getRecentMessages(chatId, 20)
-        : undefined;
-
-      if (store) {
-        await store.saveMessage(chatId, "user", message);
-      }
-
-      const response = await runAgent(message, history ? { history } : undefined);
-
-      if (store && response.message) {
-        await store.saveMessage(chatId, "assistant", response.message);
-      }
+      const response = await runAgent(message);
 
       if (response.success) {
         await ctx.reply(response.message.slice(0, 4096));

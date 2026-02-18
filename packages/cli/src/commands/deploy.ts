@@ -1,8 +1,7 @@
-import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { humanId } from "human-id";
-import { ensureBinary } from "zeroclaw";
 import { getPreset, listPresets } from "../presets/index.js";
 import { collectEnvVars } from "../deploy/env.js";
 import {
@@ -126,14 +125,6 @@ async function handleNewInstance(
   // Create instance
   const dir = await createInstance(name, preset.id, preset.agent, envVars);
 
-  // Build agent binary and copy to instance
-  console.log(chalk.cyan("\nBuilding ZeroClaw agent binary...\n"));
-  const binaryPath = await ensureBinary("linux-x64");
-  const binDir = join(dir, "public", "bin");
-  mkdirSync(binDir, { recursive: true });
-  copyFileSync(binaryPath, join(binDir, "zeroclaw-linux-amd64"));
-  console.log(chalk.green("  ZeroClaw binary ready."));
-
   // Initial deploy (creates the Vercel project)
   let url = await deployToVercel(dir, envVars);
 
@@ -229,14 +220,6 @@ async function handleExistingInstance(
 
   // Upgrade instance (reinstall deps, reapply templates)
   await upgradeInstance(name);
-
-  // Ensure binary is present
-  console.log(chalk.cyan("\nEnsuring ZeroClaw agent binary...\n"));
-  const binaryPath = await ensureBinary("linux-x64");
-  const binDir = join(dir, "public", "bin");
-  mkdirSync(binDir, { recursive: true });
-  copyFileSync(binaryPath, join(binDir, "zeroclaw-linux-amd64"));
-  console.log(chalk.green("  ZeroClaw binary ready."));
 
   // Deploy (env vars already persisted at project level from first deploy)
   const url = await deployToVercel(dir, {});

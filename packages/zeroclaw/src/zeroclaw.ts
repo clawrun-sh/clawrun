@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ZeroClawConfig, ZeroClawResult, ChatMessage, CommandSpec } from "./types.js";
+import type { ZeroClawConfig, ZeroClawResult, CommandSpec } from "./types.js";
 import { buildAgentCommand, buildOnboardCommand } from "./command-builder.js";
 import { parseOutput } from "./output-parser.js";
 import { getBinaryPath } from "./binary.js";
@@ -13,41 +13,19 @@ export class ZeroClaw {
 
   constructor(config: ZeroClawConfig) {
     this.config = config;
-
-    if (config.binaryPath) {
-      this.binaryPath = config.binaryPath;
-    } else {
-      const resolved = getBinaryPath();
-      if (!resolved) {
-        throw new Error(
-          "ZeroClaw binary not found. Call ensureBinary() first, " +
-          "or pass binaryPath in the config.",
-        );
-      }
-      this.binaryPath = resolved;
-    }
+    this.binaryPath = config.binaryPath ?? getBinaryPath();
   }
 
-  /**
-   * Returns a CommandSpec for running the agent — does NOT execute.
-   * Use this when you need to run the command in a sandbox, Docker, SSH, etc.
-   */
-  agentCommand(message: string, history?: ChatMessage[]): CommandSpec {
-    return buildAgentCommand(this.binaryPath, message, history);
+  agentCommand(message: string): CommandSpec {
+    return buildAgentCommand(this.binaryPath, message);
   }
 
-  /**
-   * Returns a CommandSpec for onboarding — does NOT execute.
-   */
   onboardCommand(): CommandSpec {
     return buildOnboardCommand(this.binaryPath, this.config);
   }
 
-  /**
-   * Convenience: runs the agent locally via child_process and returns the result.
-   */
-  async run(message: string, history?: ChatMessage[]): Promise<ZeroClawResult> {
-    const cmd = this.agentCommand(message, history);
+  async run(message: string): Promise<ZeroClawResult> {
+    const cmd = this.agentCommand(message);
 
     try {
       const { stdout, stderr } = await execFileAsync(cmd.cmd, cmd.args, {

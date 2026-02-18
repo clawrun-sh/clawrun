@@ -1,7 +1,3 @@
-import type { ChatMessage } from "../types.js";
-
-export type { ChatMessage };
-
 export interface AgentEnv {
   llmProvider: string;
   llmApiKey: string;
@@ -33,8 +29,8 @@ export interface BinaryAsset {
 export interface AgentAdapter {
   readonly id: string;
   readonly name: string;
-  generateConfig(env: AgentEnv, history?: ChatMessage[]): SandboxFile[];
-  buildCommand(message: string, history?: ChatMessage[]): SandboxCommand;
+  generateConfig(env: AgentEnv): SandboxFile[];
+  buildCommand(message: string): SandboxCommand;
   parseResponse(stdout: string, stderr: string, exitCode: number): AgentResponse;
   binaryAssets(): BinaryAsset[];
   installCommands(): SandboxCommand[];

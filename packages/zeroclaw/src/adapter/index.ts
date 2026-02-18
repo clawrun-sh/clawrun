@@ -7,5 +7,4 @@ export type {
   BinaryAsset,
   SandboxCommand,
   SandboxFile,
-  ChatMessage,
 } from "./types.js";
