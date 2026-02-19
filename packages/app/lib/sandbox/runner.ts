@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
-import { Sandbox } from "@vercel/sandbox";
+import type { SandboxProvider, ManagedSandbox } from "@cloudclaw/provider";
+import { VercelSandboxProvider } from "@cloudclaw/provider/vercel";
 import type { AgentAdapter, AgentEnv, AgentResponse } from "zeroclaw/adapter";
 import { getAgent } from "../agents/registry";
 
@@ -25,6 +26,8 @@ function resolveAssetPath(localPath: string): string {
     : join(process.cwd(), localPath);
 }
 
+const provider: SandboxProvider = new VercelSandboxProvider();
+
 function getDatabaseUrl(): string | undefined {
   return process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 }
@@ -34,7 +37,7 @@ export async function runAgent(
   options?: { agentId?: string },
 ): Promise<AgentResponse> {
   const adapter: AgentAdapter = getAgent(options?.agentId);
-  let sandbox: Sandbox | null = null;
+  let sandbox: ManagedSandbox | null = null;
 
   try {
     const env = getAgentEnv();
@@ -42,12 +45,10 @@ export async function runAgent(
     const databaseUrl = getDatabaseUrl();
 
     // Create sandbox (function must be in iad1 region — see vercel.json)
-    sandbox = snapshotId
-      ? await Sandbox.create({
-          source: { type: "snapshot", snapshotId },
-          timeout: SANDBOX_TIMEOUT_MS,
-        })
-      : await Sandbox.create({ timeout: SANDBOX_TIMEOUT_MS });
+    sandbox = await provider.create({
+      timeout: SANDBOX_TIMEOUT_MS,
+      ...(snapshotId ? { snapshotId } : {}),
+    });
 
     // Install agent (skip if resuming from snapshot — binary already there)
     if (!snapshotId) {
@@ -106,6 +107,14 @@ export async function runAgent(
             error: `Onboard failed: ${stderr}`,
           };
         }
+
+        // Patch autonomy: set level to "full" so memory_store and other
+        // tools work in single-shot mode (no human to approve).
+        await sandbox.runCommand("sed", [
+          "-i",
+          's/level = "supervised"/level = "full"/',
+          "/tmp/.zeroclaw/config.toml",
+        ]);
       }
     }
 

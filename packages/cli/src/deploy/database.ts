@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { execa } from "execa";
@@ -16,6 +16,12 @@ const DB_VAR_PREFIXES = [
   "PGDATABASE",
   "NEON_",
 ];
+
+export interface DatabaseProvisionResult {
+  success: boolean;
+  /** DB-related env vars (POSTGRES_URL, etc.). Empty on failure. */
+  dbVars: Record<string, string>;
+}
 
 function parseEnvFile(content: string): Record<string, string> {
   const vars: Record<string, string> = {};
@@ -37,21 +43,11 @@ function parseEnvFile(content: string): Record<string, string> {
   return vars;
 }
 
-function writeEnvFile(
-  filePath: string,
-  vars: Record<string, string>,
-): void {
-  const content = Object.entries(vars)
-    .map(([key, value]) => `${key}="${value}"`)
-    .join("\n");
-  writeFileSync(filePath, content + "\n");
-}
-
 function isDbVar(key: string): boolean {
   return DB_VAR_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
-async function waitForPostgresUrl(targetDir: string): Promise<boolean> {
+async function waitForPostgresUrl(linkedDir: string): Promise<boolean> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
 
   process.stdout.write(
@@ -61,7 +57,7 @@ async function waitForPostgresUrl(targetDir: string): Promise<boolean> {
   while (Date.now() < deadline) {
     try {
       const { stdout } = await execa("vercel", ["env", "ls"], {
-        cwd: targetDir,
+        cwd: linkedDir,
       });
       if (stdout.includes("POSTGRES_URL")) {
         process.stdout.write("\n");
@@ -79,10 +75,19 @@ async function waitForPostgresUrl(targetDir: string): Promise<boolean> {
   return false;
 }
 
-export async function setupDatabase(
-  targetDir: string,
-  envVars: Record<string, string>,
-): Promise<string | null> {
+/**
+ * Provision a Neon Postgres database via the Vercel integration.
+ *
+ * Runs from a directory that has `.vercel/project.json` (a linked project).
+ * No deployment is needed — just the project link.
+ *
+ * Returns `{ success: true, dbVars }` with the database env vars on success,
+ * or `{ success: false, dbVars: {} }` on failure. The caller should treat
+ * failure as fatal and roll back.
+ */
+export async function provisionDatabase(
+  linkedDir: string,
+): Promise<DatabaseProvisionResult> {
   console.log(chalk.cyan("\nSetting up database (Neon Postgres)...\n"));
 
   // Step 1: Add Neon integration (opens browser for marketplace auth)
@@ -95,41 +100,41 @@ export async function setupDatabase(
 
   try {
     await execa("vercel", ["integration", "add", "neon"], {
-      cwd: targetDir,
+      cwd: linkedDir,
       stdio: "inherit",
     });
   } catch {
     console.log(
-      chalk.yellow("  Neon integration command exited — continuing to check..."),
+      chalk.yellow("  Neon integration command exited — checking for database..."),
     );
   }
 
   // Step 2: Poll until POSTGRES_URL appears in project env vars
-  const found = await waitForPostgresUrl(targetDir);
+  const found = await waitForPostgresUrl(linkedDir);
 
   if (!found) {
-    console.log(
-      chalk.yellow(
-        "  Timed out waiting for database. The app will still work without it (no conversation history).",
+    console.error(
+      chalk.red(
+        "\n  Database setup failed: POSTGRES_URL not found after waiting.\n" +
+        "  The database is required. Please ensure the Neon integration\n" +
+        "  completed successfully and try again.",
       ),
     );
-    return null;
+    return { success: false, dbVars: {} };
   }
 
   console.log(chalk.green("  Database provisioned!"));
 
-  // Step 3: Pull env vars into a TEMP file, extract only DB vars, merge into .env
-  // This avoids overwriting .env which would wipe CLOUDCLAW_ vars
+  // Step 3: Pull env vars to extract DB credentials
   console.log(chalk.dim("\n  Pulling database environment variables..."));
 
-  const envLocalPath = join(targetDir, ".env");
-  const envTempPath = join(targetDir, ".env.pulled.tmp");
+  const envTempPath = join(linkedDir, ".env.pulled.tmp");
 
   try {
     await execa(
       "vercel",
       ["env", "pull", envTempPath, "--yes", "--environment=production"],
-      { cwd: targetDir, stdio: "inherit" },
+      { cwd: linkedDir, stdio: "inherit" },
     );
 
     // Parse temp file and extract only DB-related vars
@@ -148,41 +153,26 @@ export async function setupDatabase(
       // ignore
     }
 
-    // Read existing .env (has CLOUDCLAW_ vars) and merge DB vars in
-    const existing = parseEnvFile(readFileSync(envLocalPath, "utf-8"));
-    const merged = { ...existing, ...dbVars };
-    writeEnvFile(envLocalPath, merged);
+    if (Object.keys(dbVars).length === 0) {
+      console.error(
+        chalk.red(
+          "\n  Database setup failed: could not retrieve database credentials.\n" +
+          "  POSTGRES_URL was detected but env pull returned no DB vars.",
+        ),
+      );
+      return { success: false, dbVars: {} };
+    }
 
     const dbCount = Object.keys(dbVars).length;
-    console.log(chalk.green(`  ${dbCount} database vars added to .env (existing vars preserved).`));
+    console.log(chalk.green(`  ${dbCount} database env vars retrieved.`));
+    return { success: true, dbVars };
   } catch {
-    console.log(
-      chalk.yellow("  Could not pull env vars locally — not needed for production."),
-    );
-  }
-
-  // Step 4: Redeploy — Neon vars are project-level, CLOUDCLAW_ vars are project-level
-  // (set by persistEnvVarsToProject in deployToVercel). Just trigger a fresh deploy.
-  console.log(chalk.cyan("\n  Redeploying to activate database connection...\n"));
-
-  try {
-    const { stdout } = await execa(
-      "vercel",
-      ["deploy", "--prod", "--yes"],
-      { cwd: targetDir, stdio: ["inherit", "pipe", "inherit"] },
-    );
-    const url = stdout.trim().split("\n").pop()?.trim() ?? "";
-    console.log(chalk.green("\n  Database is live!"));
-    if (url) {
-      console.log(chalk.dim(`  Updated deployment: ${url}`));
-    }
-    return url || null;
-  } catch {
-    console.log(
-      chalk.yellow(
-        "  Redeployment failed — the next deploy will pick up the database automatically.",
+    console.error(
+      chalk.red(
+        "\n  Database setup failed: could not pull database env vars.\n" +
+        "  Ensure the Neon integration completed and try again.",
       ),
     );
-    return null;
+    return { success: false, dbVars: {} };
   }
 }

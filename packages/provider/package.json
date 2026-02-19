@@ -1,0 +1,20 @@
+{
+  "name": "@cloudclaw/provider",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vercel": "./src/vercel-entry.ts"
+  },
+  "files": [
+    "src",
+    "package.json"
+  ],
+  "dependencies": {
+    "@vercel/sandbox": "^1.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -26,6 +26,12 @@ export interface BinaryAsset {
   localPath: string;
 }
 
+export interface ChannelConfig {
+  telegram?: { botToken: string; allowedUsers?: string[] };
+  discord?: { botToken: string };
+  slack?: { botToken: string; appToken?: string };
+}
+
 export interface AgentAdapter {
   readonly id: string;
   readonly name: string;
@@ -35,4 +41,6 @@ export interface AgentAdapter {
   binaryAssets(): BinaryAsset[];
   installCommands(): SandboxCommand[];
   onboardCommand?(env: AgentEnv): SandboxCommand;
+  buildDaemonCommand?(options?: { port?: number; host?: string }): SandboxCommand;
+  generateDaemonConfig?(env: AgentEnv, channels: ChannelConfig): SandboxFile[];
 }

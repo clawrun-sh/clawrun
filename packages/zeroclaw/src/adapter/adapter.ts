@@ -3,10 +3,12 @@ import type {
   AgentEnv,
   AgentResponse,
   BinaryAsset,
+  ChannelConfig,
   SandboxCommand,
   SandboxFile,
 } from "./types.js";
-import { buildAgentCommand, buildOnboardCommand } from "../command-builder.js";
+import { buildAgentCommand, buildOnboardCommand, buildDaemonCommand } from "../command-builder.js";
+import { generateDaemonToml } from "../config-generator.js";
 import { parseOutput } from "../output-parser.js";
 import { getBinaryPath } from "../binary.js";
 
@@ -58,5 +60,15 @@ export const zeroclawAdapter: AgentAdapter = {
       model: env.llmModel,
       memory: "postgres",
     });
+  },
+
+  buildDaemonCommand(options?: { port?: number; host?: string }): SandboxCommand {
+    return buildDaemonCommand(ZEROCLAW_BIN_PATH, options);
+  },
+
+  generateDaemonConfig(env: AgentEnv, channels: ChannelConfig): SandboxFile[] {
+    const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    const toml = generateDaemonToml(env, channels, { databaseUrl });
+    return [{ path: "/tmp/.zeroclaw/config.toml", content: toml }];
   },
 };

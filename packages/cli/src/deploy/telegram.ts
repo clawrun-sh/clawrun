@@ -118,3 +118,17 @@ export async function setupTelegram(
 
   return result;
 }
+
+export async function teardownTelegramWebhook(botToken: string): Promise<void> {
+  console.log(chalk.dim("  Removing Telegram webhook for daemon mode..."));
+  try {
+    await fetch(`${TELEGRAM_API}${botToken}/deleteWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ drop_pending_updates: false }),
+    });
+    console.log(chalk.green("  Webhook removed — daemon will use long-polling."));
+  } catch {
+    console.log(chalk.yellow("  Could not remove webhook — daemon may still work."));
+  }
+}

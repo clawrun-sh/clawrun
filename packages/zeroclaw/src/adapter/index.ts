@@ -5,6 +5,7 @@ export type {
   AgentEnv,
   AgentResponse,
   BinaryAsset,
+  ChannelConfig,
   SandboxCommand,
   SandboxFile,
 } from "./types.js";

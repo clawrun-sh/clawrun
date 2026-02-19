@@ -39,3 +39,18 @@ export function buildOnboardCommand(
     env: { HOME: "/tmp" },
   };
 }
+
+export function buildDaemonCommand(
+  binaryPath: string,
+  options?: { port?: number; host?: string },
+): CommandSpec {
+  return {
+    cmd: binaryPath,
+    args: [
+      "daemon",
+      "--port", String(options?.port ?? 3000),
+      "--host", options?.host ?? "0.0.0.0",
+    ],
+    env: { HOME: "/tmp" },
+  };
+}

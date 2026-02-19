@@ -2,53 +2,46 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { confirm } from "@inquirer/prompts";
-import { execa } from "execa";
 import {
   instanceExists,
   getInstance,
   destroyInstance,
   instanceDir,
 } from "../instance/index.js";
-
-interface VercelProjectJson {
-  projectId?: string;
-  orgId?: string;
-  projectName?: string;
-}
-
-function getVercelProjectName(dir: string): string | null {
-  const projectJsonPath = join(dir, ".vercel", "project.json");
-  if (!existsSync(projectJsonPath)) return null;
-
-  try {
-    const data = JSON.parse(
-      readFileSync(projectJsonPath, "utf-8"),
-    ) as VercelProjectJson;
-    return data.projectName ?? null;
-  } catch {
-    return null;
-  }
-}
+import { deleteVercelProject as deleteVercelProjectApi } from "../deploy/vercel.js";
 
 async function deleteVercelProject(dir: string): Promise<void> {
-  const projectName = getVercelProjectName(dir);
-
-  if (!projectName) {
+  const projectJsonPath = join(dir, ".vercel", "project.json");
+  if (!existsSync(projectJsonPath)) {
     console.log(
       chalk.yellow("  No Vercel project link found — skipping Vercel project deletion."),
     );
     return;
   }
 
-  console.log(chalk.dim(`  Removing Vercel project "${projectName}"...`));
+  let projectId: string | undefined;
+  let orgId: string | undefined;
+  try {
+    const data = JSON.parse(readFileSync(projectJsonPath, "utf-8")) as {
+      projectId?: string;
+      orgId?: string;
+    };
+    projectId = data.projectId;
+    orgId = data.orgId;
+  } catch {
+    console.log(chalk.yellow("  Could not read Vercel project link — skipping."));
+    return;
+  }
+
+  if (!projectId || !orgId) {
+    console.log(chalk.yellow("  Incomplete Vercel project link — skipping."));
+    return;
+  }
+
+  console.log(chalk.dim(`  Removing Vercel project (${projectId})...`));
 
   try {
-    // vercel project rm requires typing the project name to confirm.
-    // Pipe it as stdin.
-    await execa("vercel", ["project", "rm", projectName], {
-      cwd: dir,
-      input: projectName,
-    });
+    await deleteVercelProjectApi({ projectId, orgId });
     console.log(chalk.green("  Vercel project deleted."));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

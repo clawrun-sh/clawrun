@@ -1,6 +1,6 @@
 {
   "name": "zeroclaw",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "TypeScript/JavaScript wrapper for the ZeroClaw AI agent",
   "type": "module",
   "exports": {

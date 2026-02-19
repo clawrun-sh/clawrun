@@ -16,7 +16,8 @@ function isSensitive(key: string): boolean {
 
 export async function collectEnvVars(
   preset: Preset,
-  useDefaults: boolean
+  useDefaults: boolean,
+  planDefaults?: Record<string, string>,
 ): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
 
@@ -40,7 +41,8 @@ export async function collectEnvVars(
     }
 
     // Resolve dynamic defaults (e.g., LLM_MODEL depends on LLM_PROVIDER)
-    let defaultValue = envVar.default;
+    // Priority: plan defaults > dynamic defaults > preset defaults
+    let defaultValue = planDefaults?.[envVar.key] ?? envVar.default;
     if (envVar.key === "CLOUDCLAW_LLM_MODEL" && env["CLOUDCLAW_LLM_PROVIDER"]) {
       defaultValue = MODEL_DEFAULTS[env["CLOUDCLAW_LLM_PROVIDER"]] ?? defaultValue;
     }

@@ -13,3 +13,9 @@ export const messages = pgTable(
     index("messages_chat_id_created_at_idx").on(table.chatId, table.createdAt),
   ],
 );
+
+export const sandboxState = pgTable("sandbox_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});

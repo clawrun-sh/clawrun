@@ -1,17 +1,21 @@
-import { readFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { humanId } from "human-id";
 import { getPreset, listPresets } from "../presets/index.js";
 import { collectEnvVars } from "../deploy/env.js";
 import {
   checkPrerequisites,
+  createVercelProject,
+  deleteVercelProject,
   deployToVercel,
   disableDeploymentProtection,
   persistEnvVarsToProject,
+  writeVercelLink,
 } from "../deploy/vercel.js";
-import { setupDatabase } from "../deploy/database.js";
-import { setupTelegram } from "../deploy/telegram.js";
+import type { VercelProjectInfo } from "../deploy/vercel.js";
+import { provisionDatabase } from "../deploy/database.js";
 import {
   createInstance,
   instanceExists,
@@ -19,7 +23,10 @@ import {
   instanceDir,
   saveDeployedUrl,
   upgradeInstance,
+  patchVercelJson,
 } from "../instance/index.js";
+import { getPlatformProvider } from "../platform/index.js";
+import type { PlatformTier, PlatformLimits } from "../platform/index.js";
 
 function printBanner(): void {
   console.log(
@@ -74,6 +81,44 @@ export async function deployCommand(
   return handleNewInstance(instanceName, presetId, options);
 }
 
+async function detectAndPrintTier(): Promise<{
+  tier: PlatformTier;
+  limits: PlatformLimits;
+  tierDefaults: Record<string, string>;
+}> {
+  const platform = getPlatformProvider("vercel");
+  const tier = await platform.detectTier();
+  const limits = await platform.getLimits(tier);
+  const tierDefaults = platform.getDefaults(tier);
+
+  if (tier === "hobby") {
+    console.log(chalk.bold("\n  Detected Vercel Hobby (free) plan.\n"));
+    console.log(chalk.dim("  Defaults optimized for the free tier:"));
+    console.log(chalk.dim(`    Heartbeat cron:    ${limits.heartbeatCron} (daily)`));
+    console.log(chalk.dim(`    Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "30"} minutes`));
+    console.log(chalk.dim(`    Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session`));
+    console.log(chalk.dim("    Lifecycle mode:    webhook-driven (sandbox starts on incoming message)"));
+    console.log();
+    console.log(
+      chalk.dim(
+        "  To unlock per-minute heartbeat and always-on mode, upgrade your\n" +
+        "  Vercel plan and run `cloudclaw deploy <instance>` again to pick\n" +
+        "  up the new limits automatically.",
+      ),
+    );
+  } else {
+    console.log(chalk.bold("\n  Detected Vercel Pro plan.\n"));
+    console.log(chalk.dim("  Defaults for the full feature set:"));
+    console.log(chalk.dim(`    Heartbeat cron:    ${limits.heartbeatCron} (every minute)`));
+    console.log(chalk.dim(`    Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "240"} minutes`));
+    console.log(chalk.dim(`    Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5"} minutes (duty-cycle)`));
+    console.log(chalk.dim("    Lifecycle mode:    heartbeat-driven (full cron + always-on support)"));
+  }
+
+  console.log();
+  return { tier, limits, tierDefaults };
+}
+
 async function handleNewInstance(
   instanceName: string | undefined,
   presetId: string | undefined,
@@ -119,53 +164,90 @@ async function handleNewInstance(
   console.log(chalk.bold("Checking prerequisites..."));
   await checkPrerequisites();
 
-  // Collect env vars
-  const envVars = await collectEnvVars(preset, options.yes ?? false);
+  // Detect tier and print plan info
+  const { limits, tierDefaults } = await detectAndPrintTier();
 
-  // Create instance
-  const dir = await createInstance(name, preset.id, preset.agent, envVars);
+  // Collect env vars (tier defaults pre-fill prompts)
+  const envVars = await collectEnvVars(preset, options.yes ?? false, tierDefaults);
 
-  // Initial deploy (creates the Vercel project)
-  let url = await deployToVercel(dir, envVars);
+  // ===================================================================
+  // Phase 1: Provision database (hard gate)
+  //
+  // Create a Vercel project via API (instant, no deploy needed) and
+  // run the Neon integration from a temp directory. If the DB fails,
+  // only an empty project exists — cheap rollback, no instance built.
+  // ===================================================================
+
+  let projectInfo: VercelProjectInfo;
+  try {
+    projectInfo = await createVercelProject(name);
+  } catch (err) {
+    console.error(chalk.red(`\n  Failed to create Vercel project: ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
+  }
+
+  // Temp dir with just .vercel/project.json — enough for vercel CLI commands
+  const tempDir = join(tmpdir(), `cloudclaw-setup-${name}-${Date.now()}`);
+  mkdirSync(tempDir, { recursive: true });
+  writeVercelLink(tempDir, projectInfo);
+
+  const dbResult = await provisionDatabase(tempDir);
+  if (!dbResult.success) {
+    console.error(chalk.red("\nRolling back: removing Vercel project.\n"));
+    await deleteVercelProject(projectInfo);
+    rmSync(tempDir, { recursive: true, force: true });
+    process.exit(1);
+  }
+
+  // Clean up temp dir (we'll write the link into the real instance dir)
+  rmSync(tempDir, { recursive: true, force: true });
+
+  // ===================================================================
+  // Phase 2: Build instance + deploy
+  //
+  // DB is healthy — merge DB vars into env and build the full instance.
+  // ===================================================================
+
+  const allEnvVars = { ...envVars, ...dbResult.dbVars };
+
+  // Create instance (scaffold, npm install, templates)
+  const dir = await createInstance(name, preset.id, preset.agent, allEnvVars);
+
+  // Write the Vercel project link into the instance dir
+  writeVercelLink(dir, projectInfo);
+
+  // Patch vercel.json with plan-aware cron schedule
+  patchVercelJson(dir, limits.heartbeatCron);
 
   // Disable Vercel Deployment Protection (SSO) so webhooks can reach the app
   await disableDeploymentProtection(dir);
 
-  // Persist env vars to Vercel project level (needed for runtime — --env only sets build-time vars)
-  await persistEnvVarsToProject(dir, envVars);
+  // Persist all env vars to Vercel project level
+  await persistEnvVarsToProject(dir, allEnvVars);
 
-  // Save URL to instance metadata
+  // Deploy
+  let url = await deployToVercel(dir, allEnvVars);
   saveDeployedUrl(name, url);
 
-  // Setup database (may redeploy, returning updated URL)
-  let redeployed = false;
-  const redeployUrl = await setupDatabase(dir, envVars);
-  if (redeployUrl) {
-    url = redeployUrl;
-    redeployed = true;
-    saveDeployedUrl(name, url);
-  }
-
-  // If database setup didn't trigger a redeploy, we must redeploy now
-  // so that project-level env vars are available at runtime
-  if (!redeployed) {
-    console.log(chalk.cyan("\nRedeploying with project-level env vars...\n"));
-    url = await deployToVercel(dir, {});
-    saveDeployedUrl(name, url);
-  }
-
-  // Setup Telegram webhook
-  let botUsername: string | null = null;
-  const botToken = envVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
-  const webhookSecret = envVars["CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"];
-
-  if (botToken && webhookSecret) {
-    const telegramResult = await setupTelegram(url, botToken, webhookSecret);
-    botUsername = telegramResult.botUsername;
+  // Start sandbox — user can chat immediately.
+  // Extend loop handles lifecycle. Heartbeat manages hooks.
+  console.log(chalk.cyan("\nStarting sandbox...\n"));
+  const cronSecret = allEnvVars["CLOUDCLAW_CRON_SECRET"];
+  if (cronSecret) {
+    try {
+      const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
+        headers: { Authorization: `Bearer ${cronSecret}` },
+      });
+      const result = await res.json() as Record<string, unknown>;
+      console.log(chalk.dim(`  Sandbox: ${result.action ?? "ok"}`));
+    } catch (err) {
+      console.log(chalk.yellow("  Could not start sandbox — it will start on first message."));
+    }
   }
 
   // Success
-  printSuccess(name, url, botUsername, botToken);
+  const botToken = allEnvVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
+  printSuccess(name, url, botToken);
 }
 
 function readInstanceEnv(dir: string): Record<string, string> {
@@ -218,34 +300,57 @@ async function handleExistingInstance(
   console.log(chalk.bold("Checking prerequisites..."));
   await checkPrerequisites();
 
+  // Detect tier (may have changed since last deploy)
+  const { limits } = await detectAndPrintTier();
+
   // Upgrade instance (reinstall deps, reapply templates)
   await upgradeInstance(name);
 
-  // Deploy (env vars already persisted at project level from first deploy)
-  const url = await deployToVercel(dir, {});
+  // Patch vercel.json with plan-aware cron schedule
+  patchVercelJson(dir, limits.heartbeatCron);
+
+  // Read env vars — pass CLOUDCLAW_* to deploy so new vars are always available
+  const envVars = readInstanceEnv(dir);
+  const cloudclawEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(envVars)) {
+    if (key.startsWith("CLOUDCLAW_")) {
+      cloudclawEnv[key] = value;
+    }
+  }
+
+  // Persist any new CLOUDCLAW_ vars to project level
+  await persistEnvVarsToProject(dir, cloudclawEnv);
+
+  // Deploy with CLOUDCLAW_ env vars
+  const url = await deployToVercel(dir, cloudclawEnv);
 
   // Save URL
   saveDeployedUrl(name, url);
 
-  // Re-register Telegram webhook with the new deployment URL
-  const envVars = readInstanceEnv(dir);
-  let botUsername: string | null = null;
-  const botToken = envVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
-  const webhookSecret = envVars["CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"];
-
-  if (botToken && webhookSecret) {
-    const telegramResult = await setupTelegram(url, botToken, webhookSecret);
-    botUsername = telegramResult.botUsername;
+  // Restart sandbox with new code — extend loop handles lifecycle, heartbeat manages hooks.
+  console.log(chalk.cyan("\nRestarting sandbox...\n"));
+  const cronSecret = envVars["CLOUDCLAW_CRON_SECRET"];
+  if (cronSecret) {
+    try {
+      const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
+        headers: { Authorization: `Bearer ${cronSecret}` },
+      });
+      const result = await res.json() as Record<string, unknown>;
+      console.log(chalk.dim(`  Sandbox: ${result.action ?? "ok"}`));
+    } catch (err) {
+      console.log(chalk.yellow("  Could not restart sandbox — it will start on first message."));
+      console.log(chalk.dim(`  ${err instanceof Error ? err.message : String(err)}`));
+    }
   }
 
   // Success
-  printSuccess(name, url, botUsername, botToken ?? null);
+  const botToken = envVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
+  printSuccess(name, url, botToken ?? null);
 }
 
 function printSuccess(
   name: string,
   url: string,
-  botUsername: string | null,
   botToken: string | null,
 ): void {
   console.log(chalk.bold.green("\nDeployment successful!\n"));
@@ -253,19 +358,10 @@ function printSuccess(
   console.log(`  ${chalk.bold("URL:")} ${chalk.cyan(url)}`);
   console.log(`  ${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/health`)}`);
 
-  if (botUsername) {
-    console.log(
-      `\n  ${chalk.bold("Telegram:")} ${chalk.cyan(`https://t.me/${botUsername}`)}`,
-    );
+  if (botToken) {
     console.log(
       chalk.dim(
-        `\n  Your agent is live! Message @${botUsername} on Telegram to start chatting.`,
-      ),
-    );
-  } else if (botToken) {
-    console.log(
-      chalk.dim(
-        "\n  Next step: Message your Telegram bot to start chatting with your agent.",
+        "\n  Your agent is live! Message your Telegram bot to start chatting.",
       ),
     );
   }

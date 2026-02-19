@@ -32,9 +32,10 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   return {
     ...(isMonorepo ? { outputFileTracingRoot: monorepoRoot } : {}),
     transpilePackages: ["@cloudclaw/app"],
-    serverExternalPackages: ["grammy", "@vercel/sandbox"],
+    serverExternalPackages: ["grammy", "@cloudclaw/provider", "@vercel/sandbox"],
     outputFileTracingIncludes: {
       "/api/webhook/telegram": zeroclawBinPaths,
+      "/api/cron/heartbeat": zeroclawBinPaths,
     },
     ...overrides,
   };

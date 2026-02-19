@@ -309,7 +309,11 @@ impl Memory for PostgresMemory {
     ) -> Result<()> {
         self.ensure_schema().await?;
 
-        let embedding = self.get_or_compute_embedding(content).await?;
+        // Embedding failure is non-fatal — store the entry without an embedding.
+        let embedding = match self.get_or_compute_embedding(content).await {
+            Ok(v) => v,
+            Err(_) => None,
+        };
         let id = uuid::Uuid::new_v4().to_string();
         let cat = category_to_string(&category);
         let client = self.pool.get().await?;
@@ -364,67 +368,95 @@ impl Memory for PostgresMemory {
 
         let client = self.pool.get().await?;
         let limit_i64 = limit as i64;
+        let fetch_limit = (limit * 2) as i64;
 
-        // --- Vector search ---
-        let vector_results = if let Some(ref vec) = self.get_or_compute_embedding(query).await? {
-            let pgvec = Vector::from(vec.clone());
-            let rows = match session_id {
-                Some(sid) => {
-                    client
-                        .query(
-                            "SELECT id, 1.0 - (embedding <=> $1::vector) AS score
-                             FROM memories
-                             WHERE embedding IS NOT NULL AND session_id = $3
-                             ORDER BY embedding <=> $1::vector LIMIT $2",
-                            &[&pgvec, &limit_i64, &sid],
-                        )
-                        .await?
-                }
-                None => {
-                    client
-                        .query(
-                            "SELECT id, 1.0 - (embedding <=> $1::vector) AS score
-                             FROM memories WHERE embedding IS NOT NULL
-                             ORDER BY embedding <=> $1::vector LIMIT $2",
-                            &[&pgvec, &limit_i64],
-                        )
-                        .await?
-                }
-            };
-            rows.iter()
-                .map(|r| {
-                    let score: f64 = r.get("score");
-                    (r.get::<_, String>("id"), score as f32)
-                })
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
+        // --- Vector search (non-fatal if embedding fails) ---
+        let vector_results = match self.get_or_compute_embedding(query).await {
+            Ok(Some(ref vec)) => {
+                let pgvec = Vector::from(vec.clone());
+                let rows = match session_id {
+                    Some(sid) => {
+                        client
+                            .query(
+                                "SELECT id, 1.0 - (embedding <=> $1::vector) AS score
+                                 FROM memories
+                                 WHERE embedding IS NOT NULL AND session_id = $3
+                                 ORDER BY embedding <=> $1::vector LIMIT $2",
+                                &[&pgvec, &fetch_limit, &sid],
+                            )
+                            .await?
+                    }
+                    None => {
+                        client
+                            .query(
+                                "SELECT id, 1.0 - (embedding <=> $1::vector) AS score
+                                 FROM memories WHERE embedding IS NOT NULL
+                                 ORDER BY embedding <=> $1::vector LIMIT $2",
+                                &[&pgvec, &fetch_limit],
+                            )
+                            .await?
+                    }
+                };
+                let results: Vec<_> = rows.iter()
+                    .map(|r| {
+                        let score: f64 = r.get("score");
+                        (r.get::<_, String>("id"), score as f32)
+                    })
+                    .collect();
+                results
+            }
+            Ok(None) | Err(_) => vec![]
         };
 
-        // --- Keyword (FTS) search ---
-        let keyword_results = {
-            let rows = match session_id {
-                Some(sid) => {
-                    client
-                        .query(
-                            "SELECT id, ts_rank(tsv, plainto_tsquery('english', $1)) AS score
-                             FROM memories
-                             WHERE tsv @@ plainto_tsquery('english', $1) AND session_id = $3
-                             ORDER BY score DESC LIMIT $2",
-                            &[&query, &limit_i64, &sid],
-                        )
-                        .await?
-                }
-                None => {
-                    client
-                        .query(
-                            "SELECT id, ts_rank(tsv, plainto_tsquery('english', $1)) AS score
-                             FROM memories WHERE tsv @@ plainto_tsquery('english', $1)
-                             ORDER BY score DESC LIMIT $2",
-                            &[&query, &limit_i64],
-                        )
-                        .await?
-                }
+        // --- Keyword (FTS) search using OR logic ---
+        // Split query into individual terms and build an OR tsquery so matching
+        // ANY term returns results (plainto_tsquery's default is AND which is
+        // too strict for multi-topic queries like "name and favorite color").
+        // Each word is a parameterized $N — no string interpolation.
+        let fts_words: Vec<String> = query
+            .split_whitespace()
+            .map(|w| w.to_string())
+            .collect();
+
+        let keyword_results = if fts_words.is_empty() {
+            vec![]
+        } else {
+            // Build: plainto_tsquery('english', $1) || plainto_tsquery('english', $2) || ...
+            let tsquery_expr: String = (1..=fts_words.len())
+                .map(|i| format!("plainto_tsquery('english', ${i})"))
+                .collect::<Vec<_>>()
+                .join(" || ");
+
+            let mut fts_params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = fts_words
+                .iter()
+                .map(|w| w as &(dyn tokio_postgres::types::ToSql + Sync))
+                .collect();
+
+            let sql = if let Some(ref sid) = session_id {
+                let sp = fts_words.len() + 1;
+                let lp = fts_words.len() + 2;
+                fts_params.push(sid as &(dyn tokio_postgres::types::ToSql + Sync));
+                fts_params.push(&fetch_limit as &(dyn tokio_postgres::types::ToSql + Sync));
+                format!(
+                    "SELECT id, ts_rank(tsv, {tsquery_expr}) AS score
+                     FROM memories
+                     WHERE tsv @@ ({tsquery_expr}) AND session_id = ${sp}
+                     ORDER BY score DESC LIMIT ${lp}"
+                )
+            } else {
+                let lp = fts_words.len() + 1;
+                fts_params.push(&fetch_limit as &(dyn tokio_postgres::types::ToSql + Sync));
+                format!(
+                    "SELECT id, ts_rank(tsv, {tsquery_expr}) AS score
+                     FROM memories WHERE tsv @@ ({tsquery_expr})
+                     ORDER BY score DESC LIMIT ${lp}"
+                )
+            };
+
+            // Fix 7: FTS errors are non-fatal — fall through to ILIKE fallback
+            let rows = match client.query(&sql, &fts_params).await {
+                Ok(r) => r,
+                Err(_) => vec![],
             };
             rows.iter()
                 .map(|r| {
@@ -435,19 +467,38 @@ impl Memory for PostgresMemory {
         };
 
         // --- Hybrid merge ---
-        let merged = vector::hybrid_merge(
-            &vector_results,
-            &keyword_results,
-            self.vector_weight,
-            self.keyword_weight,
-            limit,
-        );
-
+        // When vector results are empty (no embeddings available), bypass
+        // hybrid_merge and use keyword scores directly — matching SQLite behavior.
+        // hybrid_merge would multiply by keyword_weight (0.3), reducing scores.
+        let merged = if vector_results.is_empty() {
+            // Normalize keyword scores the same way hybrid_merge does
+            let max_kw = keyword_results
+                .iter()
+                .map(|(_, s)| *s)
+                .fold(0.0_f32, f32::max);
+            let max_kw = if max_kw < f32::EPSILON { 1.0 } else { max_kw };
+            keyword_results
+                .iter()
+                .map(|(id, score)| vector::ScoredResult {
+                    id: id.clone(),
+                    vector_score: None,
+                    keyword_score: Some(score / max_kw),
+                    final_score: score / max_kw,
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vector::hybrid_merge(
+                &vector_results,
+                &keyword_results,
+                self.vector_weight,
+                self.keyword_weight,
+                limit,
+            )
+        };
         // If both searches returned empty, fall back to ILIKE per-keyword
         let scored_ids: Vec<(String, f64)> = if merged.is_empty() {
             let keywords: Vec<String> = query
                 .split_whitespace()
-                .filter(|w| w.len() >= 2)
                 .map(|w| format!("%{}%", w))
                 .collect();
 
@@ -478,13 +529,14 @@ impl Memory for PostgresMemory {
                 };
 
                 let rows = client.query(&sql, &params).await?;
-                rows.iter()
+                let results: Vec<_> = rows.iter()
                     .enumerate()
                     .map(|(i, r)| {
                         let id: String = r.get("id");
                         (id, 1.0 / (i as f64 + 1.0))
                     })
-                    .collect()
+                    .collect();
+                results
             }
         } else {
             merged
@@ -528,6 +580,8 @@ impl Memory for PostgresMemory {
             }
         }
 
+        // Safety net — ensure we never return more than requested
+        results.truncate(limit);
         Ok(results)
     }
 

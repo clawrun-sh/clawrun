@@ -17,12 +17,12 @@ importers:
 
   packages/app:
     dependencies:
+      '@cloudclaw/provider':
+        specifier: workspace:*
+        version: link:../provider
       '@neondatabase/serverless':
         specifier: ^0.10.0
         version: 0.10.4
-      '@vercel/sandbox':
-        specifier: ^1.5.0
-        version: 1.5.0
       drizzle-orm:
         specifier: ^0.38.0
         version: 0.38.4(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(@types/react@19.2.14)(react@19.2.4)
@@ -86,11 +86,20 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/zeroclaw:
+  packages/provider:
     dependencies:
-      execa:
-        specifier: ^9.5.0
-        version: 9.6.1
+      '@vercel/sandbox':
+        specifier: ^1.5.0
+        version: 1.5.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/zeroclaw:
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

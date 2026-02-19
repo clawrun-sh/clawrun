@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { execa } from "execa";
+
+export interface VercelProjectInfo {
+  projectId: string;
+  orgId: string;
+}
 
 export async function checkPrerequisites(): Promise<void> {
   // Check Node version
@@ -45,10 +49,66 @@ export async function checkPrerequisites(): Promise<void> {
   }
 }
 
+/**
+ * Create a Vercel project via the API. Returns { projectId, orgId }.
+ * The project is created in the CLI's current team scope.
+ */
+export async function createVercelProject(name: string): Promise<VercelProjectInfo> {
+  console.log(chalk.dim(`  Creating Vercel project "${name}"...`));
+
+  const { stdout } = await execa("vercel", [
+    "api", "/v9/projects",
+    "-X", "POST",
+    "-f", `name=${name}`,
+    "--raw",
+  ]);
+  const project = JSON.parse(stdout) as {
+    id?: string;
+    accountId?: string;
+  };
+
+  if (!project.id || !project.accountId) {
+    throw new Error("Vercel API returned an unexpected response (missing id or accountId).");
+  }
+
+  console.log(chalk.green(`  Vercel project created: ${name}`));
+  return { projectId: project.id, orgId: project.accountId };
+}
+
+/**
+ * Delete a Vercel project by ID. Throws on failure.
+ */
+export async function deleteVercelProject(info: VercelProjectInfo): Promise<void> {
+  await execa("vercel", [
+    "api", `/v9/projects/${info.projectId}?teamId=${info.orgId}`,
+    "-X", "DELETE",
+    "--raw",
+    "--dangerously-skip-permissions",
+  ]);
+}
+
+/**
+ * Write a `.vercel/project.json` in the given directory so that Vercel CLI
+ * commands (env, integration, deploy) know which project to target.
+ */
+export function writeVercelLink(dir: string, info: VercelProjectInfo): void {
+  const vercelDir = join(dir, ".vercel");
+  mkdirSync(vercelDir, { recursive: true });
+  writeFileSync(
+    join(vercelDir, "project.json"),
+    JSON.stringify({ projectId: info.projectId, orgId: info.orgId }) + "\n",
+  );
+}
+
 export async function persistEnvVarsToProject(
   targetDir: string,
   envVars: Record<string, string>,
 ): Promise<void> {
+  // Vercel Cron requires CRON_SECRET (exact name) to set the Authorization header
+  if (envVars["CLOUDCLAW_CRON_SECRET"] && !envVars["CRON_SECRET"]) {
+    envVars = { ...envVars, CRON_SECRET: envVars["CLOUDCLAW_CRON_SECRET"] };
+  }
+
   const entries = Object.entries(envVars);
   if (entries.length === 0) return;
 
@@ -82,26 +142,7 @@ export async function persistEnvVarsToProject(
   );
 }
 
-function getVercelToken(): string | null {
-  // Vercel CLI stores auth token in platform-specific config dir
-  const paths = [
-    join(homedir(), "Library", "Application Support", "com.vercel.cli", "auth.json"),
-    join(homedir(), ".config", "vercel", "auth.json"),
-    join(homedir(), ".local", "share", "com.vercel.cli", "auth.json"),
-  ];
-
-  for (const p of paths) {
-    try {
-      const data = JSON.parse(readFileSync(p, "utf-8")) as { token?: string };
-      if (data.token) return data.token;
-    } catch {
-      // try next path
-    }
-  }
-  return null;
-}
-
-function readVercelProject(targetDir: string): { projectId: string; orgId: string } | null {
+function readVercelProject(targetDir: string): VercelProjectInfo | null {
   try {
     const data = JSON.parse(
       readFileSync(join(targetDir, ".vercel", "project.json"), "utf-8"),
@@ -116,12 +157,6 @@ function readVercelProject(targetDir: string): { projectId: string; orgId: strin
 }
 
 export async function disableDeploymentProtection(targetDir: string): Promise<void> {
-  const token = getVercelToken();
-  if (!token) {
-    console.log(chalk.yellow("  Could not find Vercel auth token — skipping deployment protection config."));
-    return;
-  }
-
   const project = readVercelProject(targetDir);
   if (!project) {
     console.log(chalk.yellow("  Could not read Vercel project config — skipping deployment protection config."));
@@ -129,23 +164,18 @@ export async function disableDeploymentProtection(targetDir: string): Promise<vo
   }
 
   try {
-    const res = await fetch(
-      `https://api.vercel.com/v9/projects/${project.projectId}?teamId=${project.orgId}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ssoProtection: null }),
-      },
-    );
-
-    if (res.ok) {
-      console.log(chalk.green("  Deployment protection disabled (SSO bypass)."));
-    } else {
-      console.log(chalk.yellow(`  Could not disable deployment protection (HTTP ${res.status}).`));
-    }
+    // Use `vercel api` with PATCH method — the CLI handles auth,
+    // so we never need to read token files from disk.
+    await execa("vercel", [
+      "api",
+      `/v9/projects/${project.projectId}?teamId=${project.orgId}`,
+      "-X", "PATCH",
+      "--input", "-",
+      "--raw",
+    ], {
+      input: JSON.stringify({ ssoProtection: null }),
+    });
+    console.log(chalk.green("  Deployment protection disabled (SSO bypass)."));
   } catch {
     console.log(chalk.yellow("  Could not disable deployment protection."));
   }

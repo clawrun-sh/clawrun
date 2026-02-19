@@ -1,0 +1,71 @@
+// --- Command execution ---
+
+export interface RunCommandOptions {
+  cmd: string;
+  args?: string[];
+  env?: Record<string, string>;
+  detached?: boolean;
+  signal?: AbortSignal;
+}
+
+export interface CommandResult {
+  exitCode: number;
+  stdout(): Promise<string>;
+  stderr(): Promise<string>;
+}
+
+// --- Sandbox instance ---
+
+export interface ManagedSandbox {
+  readonly id: string;
+  readonly status: string;
+
+  runCommand(cmd: string, args?: string[]): Promise<CommandResult>;
+  runCommand(opts: RunCommandOptions): Promise<CommandResult>;
+
+  writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
+  stop(): Promise<void>;
+  snapshot(): Promise<SnapshotRef>;
+  extendTimeout(ms: number): Promise<void>;
+}
+
+export interface SnapshotRef {
+  readonly id: string;
+}
+
+// --- Sandbox listing info ---
+
+export interface SandboxInfo {
+  id: string;
+  status: string;
+  createdAt: number;
+  startedAt?: number;
+  stoppedAt?: number;
+  timeout: number;
+  sourceSnapshotId?: string;
+}
+
+// --- Snapshot listing info ---
+
+export interface SnapshotInfo {
+  id: string;
+  createdAt: number;
+  sandboxId?: string;
+}
+
+// --- Provider ---
+
+export interface CreateSandboxOptions {
+  timeout: number;
+  ports?: number[];
+  snapshotId?: string;
+}
+
+export interface SandboxProvider {
+  create(opts: CreateSandboxOptions): Promise<ManagedSandbox>;
+  get(id: string): Promise<ManagedSandbox>;
+  list(): Promise<SandboxInfo[]>;
+
+  listSnapshots(): Promise<SnapshotInfo[]>;
+  deleteSnapshot(id: string): Promise<void>;
+}

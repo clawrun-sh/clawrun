@@ -4,24 +4,24 @@ import { sql, desc, eq } from "drizzle-orm";
 import { messages } from "./schema";
 import type { ChatMessage, MessageStore } from "./types";
 
+let _db: ReturnType<typeof drizzle> | null = null;
 let tableInitialized = false;
 
-export class NeonMessageStore implements MessageStore {
-  private db: ReturnType<typeof drizzle> | null = null;
-
-  private getDb() {
-    if (this.db) return this.db;
-    const url = process.env.POSTGRES_URL;
-    if (!url) {
-      throw new Error("POSTGRES_URL environment variable is required");
-    }
-    this.db = drizzle(neon(url));
-    return this.db;
+/** Shared Drizzle db instance. Reused by NeonMessageStore and PostgresStateStore. */
+export function getDb(): ReturnType<typeof drizzle> {
+  if (_db) return _db;
+  const url = process.env.POSTGRES_URL;
+  if (!url) {
+    throw new Error("POSTGRES_URL environment variable is required");
   }
+  _db = drizzle(neon(url));
+  return _db;
+}
 
+export class NeonMessageStore implements MessageStore {
   private async ensureTable(): Promise<void> {
     if (tableInitialized) return;
-    const db = this.getDb();
+    const db = getDb();
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -44,7 +44,7 @@ export class NeonMessageStore implements MessageStore {
     content: string,
   ): Promise<void> {
     await this.ensureTable();
-    await this.getDb().insert(messages).values({ chatId, role, content });
+    await getDb().insert(messages).values({ chatId, role, content });
   }
 
   async getRecentMessages(
@@ -52,7 +52,7 @@ export class NeonMessageStore implements MessageStore {
     limit = 20,
   ): Promise<ChatMessage[]> {
     await this.ensureTable();
-    const rows = await this.getDb()
+    const rows = await getDb()
       .select({
         role: messages.role,
         content: messages.content,

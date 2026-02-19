@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-import { Bot, webhookCallback } from "grammy";
-import { runAgent } from "../sandbox/runner";
+import { Bot } from "grammy";
+import { deleteTelegramWakeWebhook } from "../channels/telegram-wake";
+import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 
 let _bot: Bot | null = null;
 
@@ -14,47 +15,84 @@ function getBot() {
     throw new Error("CLOUDCLAW_TELEGRAM_BOT_TOKEN environment variable not found.");
   }
 
-  const bot = new Bot(token);
-
-  bot.command("start", async (ctx) => {
-    await ctx.reply(
-      "Hello! I'm your CloudClaw agent powered by ZeroClaw. Send me a message and I'll respond.",
-    );
-  });
-
-  bot.on("message:text", async (ctx) => {
-    const message = ctx.message.text;
-
-    try {
-      const response = await runAgent(message);
-
-      if (response.success) {
-        await ctx.reply(response.message.slice(0, 4096));
-      } else {
-        console.error("[CloudClaw] Agent error:", response.error ?? response.message);
-        const errorDetail = response.error
-          ? `Error: ${response.error.slice(0, 200)}`
-          : "Unknown error";
-        await ctx.reply(
-          `Something went wrong running the agent.\n\n${errorDetail}`,
-        );
-      }
-    } catch (err) {
-      console.error("[CloudClaw] Webhook handler error:", err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      await ctx.reply(
-        `Internal error: ${errMsg.slice(0, 300)}`,
-      );
-    }
-  });
-
-  _bot = bot;
-  return bot;
+  _bot = new Bot(token);
+  return _bot;
 }
 
+/**
+ * Telegram webhook handler — wake signal + sandbox trigger.
+ *
+ * On hobby tier (no per-minute cron), this webhook is the primary lifecycle
+ * trigger. On paid tier, the heartbeat cron handles it.
+ *
+ * Flow:
+ *   1. Deletes the webhook — Telegram stops delivering further messages
+ *   2. Sends a "Waking up..." courtesy message to the user
+ *   3. Calls heartbeat() to trigger sandbox creation (idempotent — safe
+ *      even if the per-minute cron is also running on paid tier)
+ *   4. Returns 503 — update stays unconfirmed in Telegram's queue
+ *
+ * ZeroClaw picks up the queued messages via getUpdates once it starts.
+ */
 export async function POST(req: Request) {
-  const bot = getBot();
+  // Gate on bot token — if Telegram is configured, the wake webhook should work
+  // regardless of always-on mode. On hobby tier, this webhook is the primary
+  // lifecycle trigger since there's no per-minute cron.
+  if (!process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
+    return new Response("Telegram not configured", { status: 200 });
+  }
+
+  // Verify webhook secret
   const secretToken = process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET;
-  const handler = webhookCallback(bot, "std/http", { secretToken });
-  return handler(req);
+  if (secretToken) {
+    const header = req.headers.get("x-telegram-bot-api-secret-token");
+    if (header !== secretToken) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
+  let update: Record<string, unknown>;
+  try {
+    update = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return new Response("Bad Request", { status: 400 });
+  }
+
+  const message = update.message as Record<string, unknown> | undefined;
+  if (!message) {
+    return new Response(null, { status: 200 });
+  }
+
+  const chatId = (message.chat as Record<string, unknown>)?.id as
+    | number
+    | undefined;
+
+  // Step 1: Delete webhook — Telegram stops sending messages.
+  // Idempotent — safe if multiple in-flight requests call this concurrently.
+  await deleteTelegramWakeWebhook();
+
+  // Step 2: Send courtesy message.
+  if (chatId) {
+    const bot = getBot();
+    try {
+      await bot.api.sendMessage(chatId, "Waking up, one moment...");
+    } catch {
+      // Best-effort
+    }
+  }
+
+  // Step 3: Start sandbox if not running (safe — wake() is idempotent).
+  // On hobby tier this is the primary lifecycle trigger since there's no
+  // per-minute cron. On paid tier the heartbeat cron handles it too, but
+  // calling wake() here is harmless and makes wake-up faster.
+  try {
+    const manager = new SandboxLifecycleManager();
+    await manager.wake();
+  } catch (err) {
+    console.error("[CloudClaw] Webhook-triggered wake failed:", err);
+  }
+
+  // Return 503: update stays unconfirmed in Telegram's queue.
+  // ZeroClaw picks it up via getUpdates once the sandbox starts.
+  return new Response(null, { status: 503 });
 }
