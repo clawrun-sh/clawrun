@@ -14,6 +14,9 @@ import { getBinaryPath } from "../binary.js";
 
 const ZEROCLAW_BIN_PATH = "/tmp/zeroclaw";
 
+/** Home directory for ZeroClaw inside the sandbox (HOME=/tmp). */
+export const ZEROCLAW_HOME = "/tmp/.zeroclaw";
+
 export const zeroclawAdapter: AgentAdapter = {
   id: "zeroclaw",
   name: "ZeroClaw",
@@ -58,7 +61,7 @@ export const zeroclawAdapter: AgentAdapter = {
       provider: env.llmProvider,
       apiKey: env.llmApiKey,
       model: env.llmModel,
-      memory: "postgres",
+      memory: env.memoryBackend ?? "sqlite",
     });
   },
 
@@ -68,7 +71,7 @@ export const zeroclawAdapter: AgentAdapter = {
 
   generateDaemonConfig(env: AgentEnv, channels: ChannelConfig): SandboxFile[] {
     const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-    const toml = generateDaemonToml(env, channels, { databaseUrl });
-    return [{ path: "/tmp/.zeroclaw/config.toml", content: toml }];
+    const toml = generateDaemonToml(env, channels, { databaseUrl, memoryBackend: env.memoryBackend });
+    return [{ path: `${ZEROCLAW_HOME}/config.toml`, content: toml }];
   },
 };

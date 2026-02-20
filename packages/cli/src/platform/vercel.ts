@@ -91,13 +91,11 @@ export class VercelPlatformProvider implements PlatformProvider {
   getDefaults(tier: PlatformTier): Record<string, string> {
     if (tier === "hobby") {
       return {
-        CLOUDCLAW_SANDBOX_WAKE_INTERVAL: "0", // webhook-driven only
         CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "10", // 10 min
         CLOUDCLAW_SANDBOX_TIMEOUT: "30", // 30 min safety net
       };
     }
     return {
-      CLOUDCLAW_SANDBOX_WAKE_INTERVAL: "60", // duty-cycle
       CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "5",
       CLOUDCLAW_SANDBOX_TIMEOUT: "240", // 4 hr
     };

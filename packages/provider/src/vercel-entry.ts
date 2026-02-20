@@ -1,1 +1,1 @@
-export { VercelSandboxProvider } from "./vercel.js";
+export { VercelSandboxProvider } from "./vercel";

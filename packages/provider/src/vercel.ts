@@ -8,7 +8,7 @@ import type {
   RunCommandOptions,
   CommandResult,
   SnapshotRef,
-} from "./types.js";
+} from "./types";
 
 class VercelManagedSandbox implements ManagedSandbox {
   constructor(private sandbox: Sandbox) {}
@@ -77,7 +77,14 @@ export class VercelSandboxProvider implements SandboxProvider {
   }
 
   async deleteSnapshot(id: string): Promise<void> {
-    const snapshot = await Snapshot.get({ snapshotId: id });
-    await snapshot.delete();
+    try {
+      const snapshot = await Snapshot.get({ snapshotId: id });
+      await snapshot.delete();
+    } catch (err) {
+      // Snapshot already expired or deleted — treat as success
+      const text = (err as { text?: string }).text ?? "";
+      if (text.includes("expired or deleted")) return;
+      throw err;
+    }
   }
 }

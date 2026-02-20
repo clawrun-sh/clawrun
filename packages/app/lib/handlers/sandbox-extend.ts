@@ -2,13 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
+import type { ExtendPayload } from "../sandbox/lifecycle";
 
 /**
- * Sandbox extend endpoint — called by the sandbox's internal extend loop.
+ * Sandbox extend endpoint — called by the sandbox's internal reporter loop.
  *
- * Every 60s, a background script inside the sandbox POST's here with its
- * sandbox ID. The lifecycle manager decides whether to extend the timeout
- * (keep alive) or snapshot+stop (idle).
+ * Every 60s, a background script inside the sandbox POST's here with
+ * filesystem mtime data and next cron schedule. The lifecycle manager
+ * decides whether to extend the timeout or snapshot+stop.
  */
 export async function POST(req: Request) {
   // Verify cron secret (same auth as heartbeat)
@@ -20,21 +21,31 @@ export async function POST(req: Request) {
     }
   }
 
-  let body: { sandboxId?: string };
+  let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as { sandboxId?: string };
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ action: "error", error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sandboxId } = body;
-  if (!sandboxId) {
+  const { sandboxId, prevMtime, currMtime, nextCronAt } = body;
+  if (!sandboxId || typeof sandboxId !== "string") {
     return NextResponse.json({ action: "error", error: "Missing sandboxId" }, { status: 400 });
   }
+  if (typeof prevMtime !== "number" || typeof currMtime !== "number") {
+    return NextResponse.json({ action: "error", error: "Missing or invalid mtime fields" }, { status: 400 });
+  }
+
+  const payload: ExtendPayload = {
+    sandboxId,
+    prevMtime,
+    currMtime,
+    nextCronAt: typeof nextCronAt === "string" ? nextCronAt : null,
+  };
 
   try {
     const manager = new SandboxLifecycleManager();
-    const result = await manager.handleExtend(sandboxId);
+    const result = await manager.handleExtend(payload);
     return NextResponse.json(result);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);

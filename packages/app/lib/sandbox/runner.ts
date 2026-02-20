@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import type { SandboxProvider, ManagedSandbox } from "@cloudclaw/provider";
 import { VercelSandboxProvider } from "@cloudclaw/provider/vercel";
+import { ZEROCLAW_HOME } from "zeroclaw/adapter";
 import type { AgentAdapter, AgentEnv, AgentResponse } from "zeroclaw/adapter";
 import { getAgent } from "../agents/registry";
 
@@ -12,12 +13,13 @@ function getAgentEnv(): AgentEnv {
   const llmProvider = process.env.CLOUDCLAW_LLM_PROVIDER ?? "anthropic";
   const llmApiKey = process.env.CLOUDCLAW_LLM_API_KEY;
   const llmModel = process.env.CLOUDCLAW_LLM_MODEL ?? "claude-sonnet-4-20250514";
+  const memoryBackend = (process.env.CLOUDCLAW_MEMORY_BACKEND ?? "sqlite") as AgentEnv["memoryBackend"];
 
   if (!llmApiKey) {
     throw new Error("CLOUDCLAW_LLM_API_KEY environment variable is required");
   }
 
-  return { llmProvider, llmApiKey, llmModel };
+  return { llmProvider, llmApiKey, llmModel, memoryBackend };
 }
 
 function resolveAssetPath(localPath: string): string {
@@ -113,7 +115,7 @@ export async function runAgent(
         await sandbox.runCommand("sed", [
           "-i",
           's/level = "supervised"/level = "full"/',
-          "/tmp/.zeroclaw/config.toml",
+          `${ZEROCLAW_HOME}/config.toml`,
         ]);
       }
     }

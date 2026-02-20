@@ -2,6 +2,7 @@ export interface AgentEnv {
   llmProvider: string;
   llmApiKey: string;
   llmModel: string;
+  memoryBackend?: "sqlite" | "markdown" | "postgres";
 }
 
 export interface SandboxFile {

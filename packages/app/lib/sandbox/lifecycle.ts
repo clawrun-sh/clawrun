@@ -3,17 +3,14 @@ import { isAbsolute, join } from "node:path";
 import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@cloudclaw/provider";
 import { CountBasedRetention } from "@cloudclaw/provider";
 import { VercelSandboxProvider } from "@cloudclaw/provider/vercel";
+import { ZEROCLAW_HOME } from "zeroclaw/adapter";
 import type { AgentAdapter, AgentEnv, ChannelConfig } from "zeroclaw/adapter";
 import { getAgent } from "../agents/registry";
-import { hasAnyAlwaysOn } from "../channels/types";
 import { registerTelegramWakeWebhook } from "../channels/telegram-wake";
 import { getStateStore } from "../storage/state";
 import type { StateStore } from "../storage/state-types";
 
 // --- Constants ---
-
-// Short initial timeout — enough for boot + first extend call
-const INITIAL_SANDBOX_TIMEOUT_MS = 5 * 60 * 1000;
 
 // How much time each extend call adds
 const EXTEND_DURATION_MS = 3 * 60 * 1000;
@@ -21,23 +18,23 @@ const EXTEND_DURATION_MS = 3 * 60 * 1000;
 // Sandbox calls extend every 60s
 const EXTEND_INTERVAL_S = 60;
 
-// Default active duration — how long sandbox stays alive after last activity
-const DEFAULT_ACTIVE_DURATION_MS = 10 * 60 * 1000;
-
 // How long to keep sandbox alive when a cron job is due soon
 const CRON_KEEP_ALIVE_WINDOW_MS = 15 * 60 * 1000;
 
 // Wait for daemon to initialize after starting
 const DAEMON_INIT_WAIT_MS = 3_000;
 
+// ZeroClaw binary path inside the sandbox
+const ZEROCLAW_BIN = "/tmp/zeroclaw";
+
 // --- State keys ---
 
 const STATE_SNAPSHOT_ID = "latest_snapshot_id";
 const STATE_NEXT_WAKE_AT = "next_wake_at";
 
-interface ScheduleConfig {
-  wakeIntervalMs: number;
-  activeDurationMs: number;
+function getInitialTimeoutMs(): number {
+  const minutes = parseInt(process.env.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5", 10);
+  return (minutes > 0 ? minutes : 5) * 60 * 1000;
 }
 
 export interface HeartbeatResult {
@@ -45,6 +42,13 @@ export interface HeartbeatResult {
   sandboxId?: string;
   error?: string;
   nextWakeAt?: string;
+}
+
+export interface ExtendPayload {
+  sandboxId: string;
+  prevMtime: number;
+  currMtime: number;
+  nextCronAt: string | null;
 }
 
 export interface ExtendResult {
@@ -64,12 +68,13 @@ function getAgentEnv(): AgentEnv {
   const llmProvider = process.env.CLOUDCLAW_LLM_PROVIDER ?? "anthropic";
   const llmApiKey = process.env.CLOUDCLAW_LLM_API_KEY;
   const llmModel = process.env.CLOUDCLAW_LLM_MODEL ?? "claude-sonnet-4-20250514";
+  const memoryBackend = (process.env.CLOUDCLAW_MEMORY_BACKEND ?? "sqlite") as AgentEnv["memoryBackend"];
 
   if (!llmApiKey) {
     throw new Error("CLOUDCLAW_LLM_API_KEY environment variable is required");
   }
 
-  return { llmProvider, llmApiKey, llmModel };
+  return { llmProvider, llmApiKey, llmModel, memoryBackend };
 }
 
 function getChannelConfig(): ChannelConfig {
@@ -109,19 +114,6 @@ export class SandboxLifecycleManager {
   private state: StateStore | null = getStateStore();
   private provider: SandboxProvider = new VercelSandboxProvider();
   private retention = new CountBasedRetention(3);
-
-  private getScheduleConfig(): ScheduleConfig {
-    const wakeInterval = parseInt(process.env.CLOUDCLAW_SANDBOX_WAKE_INTERVAL ?? "60", 10);
-    const activeDuration = parseInt(
-      process.env.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10",
-      10,
-    );
-
-    return {
-      wakeIntervalMs: wakeInterval * 60 * 1000,
-      activeDurationMs: activeDuration * 60 * 1000 || DEFAULT_ACTIVE_DURATION_MS,
-    };
-  }
 
   /** List sandboxes for this project (newest-first from API). */
   private async listSandboxes(): Promise<SandboxInfo[]> {
@@ -193,65 +185,16 @@ export class SandboxLifecycleManager {
     }
   }
 
-  /**
-   * Query ZeroClaw's cron schedule inside the sandbox.
-   * Returns the earliest next_run among all enabled jobs, or null.
-   */
-  private async getNextCronRun(sandbox: ManagedSandbox): Promise<Date | null> {
-    try {
-      const result = await sandbox.runCommand({
-        cmd: "zeroclaw",
-        args: ["cron", "list", "--json"],
-        signal: AbortSignal.timeout(5000),
-      });
-      if (result.exitCode !== 0) return null;
-
-      const stdout = await result.stdout();
-      const jobs = JSON.parse(stdout);
-      const nextRuns = jobs
-        .filter((j: { enabled?: boolean }) => j.enabled)
-        .map((j: { next_run?: string }) => new Date(j.next_run ?? "").getTime())
-        .filter((t: number) => !isNaN(t));
-
-      if (nextRuns.length === 0) return null;
-      return new Date(Math.min(...nextRuns));
-    } catch {
-      return null;
+  /** Register wake hooks for all configured channels. */
+  private async registerWakeHooks(): Promise<void> {
+    if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
+      await registerTelegramWakeWebhook();
     }
-  }
-
-  /**
-   * Decide whether a running sandbox should stay alive.
-   *
-   * Note: ZeroClaw's health endpoint does NOT expose a "last user message"
-   * metric — channels.last_ok updates on every long-poll restart (~30s),
-   * not on actual messages. So we rely on activeDurationMs as the session
-   * length. When a user messages after stop, the webhook wakes it back up.
-   */
-  private async shouldKeepAlive(
-    _sandbox: ManagedSandbox,
-    schedule: ScheduleConfig,
-    startedAt: number,
-  ): Promise<boolean> {
-    // 1. Always-on (channel-level, e.g. CLOUDCLAW_TELEGRAM_ALWAYS_ON=true)
-    if (hasAnyAlwaysOn()) return true;
-
-    // 2. Still within active duration (default 10 min)
-    const elapsed = Date.now() - startedAt;
-    if (elapsed < schedule.activeDurationMs) return true;
-
-    // 3. Cron job due soon — no point sleeping if we'd wake right back up
-    const nextCron = await this.getNextCronRun(_sandbox);
-    if (nextCron) {
-      const timeUntilJob = nextCron.getTime() - Date.now();
-      if (timeUntilJob <= CRON_KEEP_ALIVE_WINDOW_MS) return true;
-    }
-
-    return false;
+    // if (process.env.CLOUDCLAW_DISCORD_BOT_TOKEN) await registerDiscordWakeHook();
+    // if (process.env.CLOUDCLAW_SLACK_BOT_TOKEN)   await registerSlackWakeHook();
   }
 
   async heartbeat(): Promise<HeartbeatResult> {
-    const schedule = this.getScheduleConfig();
     const sandboxes = await this.listSandboxes();
 
     // Find all non-terminal sandboxes
@@ -272,47 +215,13 @@ export class SandboxLifecycleManager {
       await this.stopSandboxes(duplicates);
     }
 
-    // 2. RUNNING SANDBOX: decide keep-alive vs sleep
+    // 2. RUNNING SANDBOX: extend loop owns keep-alive decisions
     if (active.length > 0) {
       const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
-
-      if (newest.status === "running") {
-        const sandbox = await this.provider.get(newest.id);
-        const startedAt = newest.startedAt ?? newest.createdAt;
-        const elapsed = Date.now() - startedAt;
-        const remaining = newest.timeout - elapsed;
-
-        // Should it keep running?
-        if (await this.shouldKeepAlive(sandbox, schedule, startedAt)) {
-          return { action: "running", sandboxId: newest.id };
-        }
-
-        // Time to sleep: query cron, snapshot, stop
-        const nextCron = await this.getNextCronRun(sandbox);
-        const snapshotId = await this.snapshotAndStop(newest.id);
-        if (snapshotId) {
-          await this.state?.set(STATE_SNAPSHOT_ID, snapshotId);
-        }
-        if (nextCron) {
-          await this.state?.set(STATE_NEXT_WAKE_AT, nextCron.toISOString());
-        }
-        return {
-          action: "sleeping",
-          sandboxId: newest.id,
-          nextWakeAt: nextCron?.toISOString(),
-        };
-      }
-
-      // pending/stopping — don't interfere
       return { action: "running", sandboxId: newest.id };
     }
 
     // 3. NO SANDBOX: decide whether to wake
-    if (hasAnyAlwaysOn()) {
-      console.log("[CloudClaw] Always-on channel detected, creating sandbox");
-      return this.startNew(sandboxes);
-    }
-
     // Check for cron-triggered wake
     const nextWakeAtStr = await this.state?.get(STATE_NEXT_WAKE_AT);
     if (nextWakeAtStr) {
@@ -324,28 +233,21 @@ export class SandboxLifecycleManager {
       }
     }
 
-    // Duty-cycle: check wake interval
+    // First boot: no sandbox has ever existed
+    const hasEverRun = sandboxes.some((s) => s.stoppedAt || s.status === "running");
+    if (!hasEverRun && sandboxes.length === 0) {
+      return this.startNew(sandboxes);
+    }
+
+    // Sleeping — waiting for event-driven wake (webhook or cron)
     const lastStopped = sandboxes
       .filter((s) => s.stoppedAt)
       .sort((a, b) => (b.stoppedAt ?? 0) - (a.stoppedAt ?? 0))[0];
 
-    if (!lastStopped?.stoppedAt) {
-      // No sandbox has ever run — first boot
-      return this.startNew(sandboxes);
-    }
-
-    const elapsed = Date.now() - lastStopped.stoppedAt;
-    if (schedule.wakeIntervalMs > 0 && elapsed >= schedule.wakeIntervalMs) {
-      return this.startNew(sandboxes);
-    }
-
-    const nextWakeAt = schedule.wakeIntervalMs > 0
-      ? new Date(lastStopped.stoppedAt + schedule.wakeIntervalMs)
-      : undefined;
     return {
       action: "sleeping",
-      sandboxId: lastStopped.id,
-      nextWakeAt: nextWakeAt?.toISOString() ?? nextWakeAtStr ?? undefined,
+      sandboxId: lastStopped?.id,
+      nextWakeAt: nextWakeAtStr ?? undefined,
     };
   }
 
@@ -370,15 +272,16 @@ export class SandboxLifecycleManager {
   }
 
   /**
-   * Handle an extend request from the sandbox's internal loop.
+   * Handle an extend request from the sandbox's internal reporter loop.
    *
-   * Called every 60s by a background curl inside the sandbox. Decides
-   * whether to extend the sandbox timeout or let it stop gracefully.
+   * Called every 60s by a background script inside the sandbox. The script
+   * reports filesystem mtime data and next cron schedule. The parent decides
+   * whether to extend based on actual activity or upcoming work.
    */
-  async handleExtend(sandboxId: string): Promise<ExtendResult> {
+  async handleExtend(payload: ExtendPayload): Promise<ExtendResult> {
     let sandbox: ManagedSandbox;
     try {
-      sandbox = await this.provider.get(sandboxId);
+      sandbox = await this.provider.get(payload.sandboxId);
     } catch (err) {
       return { action: "error", error: `Cannot get sandbox: ${err instanceof Error ? err.message : String(err)}` };
     }
@@ -387,13 +290,21 @@ export class SandboxLifecycleManager {
       return { action: "error", error: `Sandbox not running (status: ${sandbox.status})` };
     }
 
-    const schedule = this.getScheduleConfig();
-    const info = (await this.listSandboxes()).find((s) => s.id === sandboxId);
-    const startedAt = info?.startedAt ?? info?.createdAt ?? Date.now();
+    const filesChanged = payload.prevMtime !== payload.currMtime;
+    const cronDueSoon = payload.nextCronAt &&
+      (new Date(payload.nextCronAt).getTime() - Date.now()) < CRON_KEEP_ALIVE_WINDOW_MS;
 
-    if (await this.shouldKeepAlive(sandbox, schedule, startedAt)) {
+    console.log(
+      `[CloudClaw] Extend: sandbox=${payload.sandboxId},` +
+      ` mtime prev=${payload.prevMtime} curr=${payload.currMtime},` +
+      ` nextCronAt=${payload.nextCronAt ?? "none"}`,
+    );
+
+    if (filesChanged || cronDueSoon) {
+      const reason = filesChanged ? "files changed" : "cron due soon";
       try {
         await sandbox.extendTimeout(EXTEND_DURATION_MS);
+        console.log(`[CloudClaw] Extended sandbox ${payload.sandboxId} (+${EXTEND_DURATION_MS / 1000}s, reason: ${reason})`);
         return { action: "extended" };
       } catch (err) {
         // Extension failed (plan ceiling, API error) — fall through to
@@ -402,18 +313,15 @@ export class SandboxLifecycleManager {
       }
     }
 
-    // Idle or extend failed: snapshot + stop + register webhook
-    const nextCron = await this.getNextCronRun(sandbox);
-    const snapshotId = await this.snapshotAndStop(sandboxId);
+    // No activity, no upcoming cron (or extend failed) → snapshot + stop
+    console.log(`[CloudClaw] No activity, stopping sandbox ${payload.sandboxId}`);
+    const snapshotId = await this.snapshotAndStop(payload.sandboxId);
     if (snapshotId) await this.state?.set(STATE_SNAPSHOT_ID, snapshotId);
-    if (nextCron) await this.state?.set(STATE_NEXT_WAKE_AT, nextCron.toISOString());
+    if (payload.nextCronAt) await this.state?.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
 
-    // Register wake hooks — sandbox is now stopped
-    if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
-      await registerTelegramWakeWebhook();
-    }
+    await this.registerWakeHooks();
 
-    return { action: "stopped", nextWakeAt: nextCron?.toISOString() };
+    return { action: "stopped", nextWakeAt: payload.nextCronAt ?? undefined };
   }
 
   async forceRestart(): Promise<HeartbeatResult> {
@@ -459,7 +367,7 @@ export class SandboxLifecycleManager {
   private async startNew(
     _sandboxes: SandboxInfo[],
   ): Promise<HeartbeatResult> {
-    const timeoutMs = INITIAL_SANDBOX_TIMEOUT_MS;
+    const timeoutMs = getInitialTimeoutMs();
 
     try {
       // 1. Try resuming from stored snapshot (StateStore)
@@ -525,9 +433,9 @@ export class SandboxLifecycleManager {
   }
 
   /**
-   * Start a background loop inside the sandbox that calls the parent's
-   * /api/sandbox/extend endpoint every 60s. The parent decides whether
-   * to extend the timeout or let the sandbox stop gracefully.
+   * Start a background reporter inside the sandbox that calls the parent's
+   * /api/sandbox/extend endpoint every 60s with filesystem mtime data and
+   * next cron schedule. The parent decides whether to extend or stop.
    */
   private async startSandboxExtendLoop(sandbox: ManagedSandbox): Promise<void> {
     const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -541,30 +449,70 @@ export class SandboxLifecycleManager {
     const id = sandbox.id;
 
     const script = [
+      `import { readdirSync, statSync } from "node:fs";`,
+      `import { join } from "node:path";`,
+      `import { execSync } from "node:child_process";`,
+      ``,
       `const URL = ${JSON.stringify(url)};`,
       `const SECRET = ${JSON.stringify(secret)};`,
-      `const BODY = JSON.stringify({ sandboxId: ${JSON.stringify(id)} });`,
+      `const SANDBOX_ID = ${JSON.stringify(id)};`,
+      `const ZEROCLAW_HOME = ${JSON.stringify(ZEROCLAW_HOME)};`,
+      `const ZEROCLAW_BIN = ${JSON.stringify(ZEROCLAW_BIN)};`,
       `const INTERVAL = ${EXTEND_INTERVAL_S} * 1000;`,
       ``,
-      `async function extend() {`,
+      `// Daemon housekeeping files — changes to these don't indicate user activity`,
+      `const IGNORE_FILES = new Set(["daemon_state.json"]);`,
+      ``,
+      `function getMaxMtime(dir) {`,
+      `  let max = 0;`,
+      `  function walk(d) {`,
+      `    try {`,
+      `      for (const e of readdirSync(d, { withFileTypes: true })) {`,
+      `        if (IGNORE_FILES.has(e.name)) continue;`,
+      `        const p = join(d, e.name);`,
+      `        if (e.isDirectory()) walk(p);`,
+      `        else try { const m = statSync(p).mtimeMs; if (m > max) max = m; } catch {}`,
+      `      }`,
+      `    } catch {}`,
+      `  }`,
+      `  walk(dir);`,
+      `  return max;`,
+      `}`,
+      ``,
+      `function getNextCronAt() {`,
       `  try {`,
-      `    const res = await fetch(URL, {`,
-      `      method: "POST",`,
-      `      headers: {`,
-      `        "Authorization": "Bearer " + SECRET,`,
-      `        "Content-Type": "application/json",`,
-      `      },`,
-      `      body: BODY,`,
-      `    });`,
-      `    const data = await res.json();`,
-      `    console.log("[extend-loop]", JSON.stringify(data));`,
+      `    const out = execSync(ZEROCLAW_BIN + " cron list", { env: { HOME: "/tmp" }, timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }).toString();`,
+      `    // Parse "next=<ISO timestamp>" from each line of text output`,
+      `    const matches = [...out.matchAll(/next=([\\d-]+T[\\d:.+]+)/g)];`,
+      `    const times = matches.map(m => new Date(m[1]).getTime()).filter(t => !isNaN(t));`,
+      `    return times.length ? new Date(Math.min(...times)).toISOString() : null;`,
       `  } catch (err) {`,
-      `    console.error("[extend-loop] error:", err.message);`,
+      `    const stderr = err.stderr ? err.stderr.toString().trim() : "";`,
+      `    console.error("[extend-loop] cron list failed:", err.message, stderr ? "| " + stderr : "");`,
+      `    return null;`,
       `  }`,
       `}`,
       ``,
-      `extend();`,
-      `setInterval(extend, INTERVAL);`,
+      `// Start at 0 so the first tick always sees "files changed" — gives the`,
+      `// sandbox its initial grace period before any idle-stop decision.`,
+      `let prevMtime = 0;`,
+      ``,
+      `async function tick() {`,
+      `  const currMtime = getMaxMtime(ZEROCLAW_HOME);`,
+      `  const nextCronAt = getNextCronAt();`,
+      `  try {`,
+      `    const res = await fetch(URL, {`,
+      `      method: "POST",`,
+      `      headers: { "Authorization": "Bearer " + SECRET, "Content-Type": "application/json" },`,
+      `      body: JSON.stringify({ sandboxId: SANDBOX_ID, prevMtime, currMtime, nextCronAt }),`,
+      `    });`,
+      `    console.log("[extend-loop]", await res.text());`,
+      `  } catch (err) { console.error("[extend-loop]", err.message); }`,
+      `  prevMtime = currMtime;`,
+      `}`,
+      ``,
+      `tick();`,
+      `setInterval(tick, INTERVAL);`,
     ].join("\n");
 
     const scriptPath = "/tmp/cloudclaw-extend-loop.mjs";
@@ -621,7 +569,7 @@ export class SandboxLifecycleManager {
     const env = getAgentEnv();
     const channels = getChannelConfig();
     const databaseUrl = getDatabaseUrl();
-    const configPath = "/tmp/.zeroclaw/config.toml";
+    const configPath = `${ZEROCLAW_HOME}/config.toml`;
 
     // Step 1: Run onboard to generate a valid base config with all required fields
     if (this.adapter.onboardCommand) {

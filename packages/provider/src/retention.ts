@@ -1,4 +1,4 @@
-import type { SnapshotInfo } from "./types.js";
+import type { SnapshotInfo } from "./types";
 
 export interface SnapshotRetentionPolicy {
   /** Given all snapshots, return the IDs that should be deleted. */

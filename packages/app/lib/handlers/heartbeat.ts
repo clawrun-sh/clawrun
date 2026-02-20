@@ -8,12 +8,9 @@ import {
 } from "../channels/telegram-wake";
 
 /**
- * Toggle wake hooks for all configured channels.
- *
- * Register a Telegram webhook whenever a bot token exists — not just when
- * "always-on" is enabled. On hobby tier the webhook is the primary lifecycle
- * trigger (no per-minute cron), so it must be active whenever the sandbox
- * is stopped.
+ * Toggle wake hooks based on sandbox state:
+ * - running → delete webhook so ZeroClaw can long-poll Telegram
+ * - sleeping/failed → register webhook so incoming messages trigger a wake
  */
 async function registerWakeHooks(): Promise<void> {
   if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) await registerTelegramWakeWebhook();
@@ -46,9 +43,7 @@ export async function GET(req: Request) {
       ? await manager.forceRestart()
       : await manager.heartbeat();
 
-    // Toggle wake hooks based on sandbox state:
-    // - running → delete webhook so ZeroClaw can long-poll Telegram
-    // - sleeping/failed → register webhook so incoming messages trigger a wake
+    // Toggle wake hooks based on sandbox state
     if (result.action === "running") {
       await teardownWakeHooks();
     } else {

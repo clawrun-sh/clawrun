@@ -1,4 +1,4 @@
-export { zeroclawAdapter } from "./adapter.js";
+export { zeroclawAdapter, ZEROCLAW_HOME } from "./adapter.js";
 
 export type {
   AgentAdapter,

@@ -5,12 +5,6 @@
   "description": "A basic ZeroClaw agent with Telegram integration",
   "envVars": [
     {
-      "key": "CLOUDCLAW_SANDBOX_WAKE_INTERVAL",
-      "prompt": "Minutes between sandbox wake cycles (0 = always on)",
-      "required": false,
-      "default": "60"
-    },
-    {
       "key": "CLOUDCLAW_SANDBOX_ACTIVE_DURATION",
       "prompt": "Minutes to keep sandbox alive per wake cycle",
       "required": false,
@@ -35,6 +29,13 @@
       "default": "claude-sonnet-4-20250514"
     },
     {
+      "key": "CLOUDCLAW_MEMORY_BACKEND",
+      "prompt": "Select agent memory backend",
+      "required": false,
+      "default": "sqlite",
+      "choices": ["sqlite", "markdown", "postgres"]
+    },
+    {
       "key": "CLOUDCLAW_TELEGRAM_BOT_TOKEN",
       "prompt": "Paste your Telegram bot token (from @BotFather)",
       "required": true
@@ -44,13 +45,6 @@
       "prompt": "Telegram webhook secret",
       "required": true,
       "autoGenerate": "uuid"
-    },
-    {
-      "key": "CLOUDCLAW_TELEGRAM_ALWAYS_ON",
-      "prompt": "Wake sandbox instantly when a Telegram message arrives",
-      "required": false,
-      "default": "false",
-      "choices": ["true", "false"]
     },
     {
       "key": "CLOUDCLAW_CRON_SECRET",
