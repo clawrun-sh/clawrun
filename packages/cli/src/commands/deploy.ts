@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
@@ -16,6 +16,7 @@ import {
 } from "../deploy/vercel.js";
 import type { VercelProjectInfo } from "../deploy/vercel.js";
 import { provisionDatabase } from "../deploy/database.js";
+import { provisionRedis } from "../deploy/redis.js";
 import {
   createInstance,
   instanceExists,
@@ -24,6 +25,9 @@ import {
   saveDeployedUrl,
   upgradeInstance,
   patchVercelJson,
+  buildConfig,
+  toEnvVars,
+  readConfig,
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type { PlatformTier, PlatformLimits } from "../platform/index.js";
@@ -191,13 +195,24 @@ async function handleNewInstance(
   mkdirSync(tempDir, { recursive: true });
   writeVercelLink(tempDir, projectInfo);
 
-  const dbResult = await provisionDatabase(tempDir);
-  if (!dbResult.success) {
-    console.error(chalk.red("\nRolling back: removing Vercel project.\n"));
-    await deleteVercelProject(projectInfo);
-    rmSync(tempDir, { recursive: true, force: true });
-    process.exit(1);
+  const memoryBackend = envVars["CLOUDCLAW_MEMORY_BACKEND"] ?? "sqlite";
+  let dbVars: Record<string, string> = {};
+
+  if (memoryBackend === "postgres") {
+    const dbResult = await provisionDatabase(tempDir);
+    if (!dbResult.success) {
+      console.error(chalk.red("\nRolling back: removing Vercel project.\n"));
+      await deleteVercelProject(projectInfo);
+      rmSync(tempDir, { recursive: true, force: true });
+      process.exit(1);
+    }
+    dbVars = dbResult.dbVars;
+  } else {
+    console.log(chalk.dim(`\n  Skipping database (memory backend: ${memoryBackend})\n`));
   }
+
+  // Always provision shared Redis for state store (non-fatal if it fails)
+  const redisResult = await provisionRedis(tempDir);
 
   // Clean up temp dir (we'll write the link into the real instance dir)
   rmSync(tempDir, { recursive: true, force: true });
@@ -205,13 +220,19 @@ async function handleNewInstance(
   // ===================================================================
   // Phase 2: Build instance + deploy
   //
-  // DB is healthy — merge DB vars into env and build the full instance.
+  // Merge provisioned vars into env and build the full instance.
   // ===================================================================
 
-  const allEnvVars = { ...envVars, ...dbResult.dbVars };
+  const allEnvVars: Record<string, string> = {
+    ...envVars,
+    ...dbVars,
+    ...(redisResult.success ? redisResult.redisVars : {}),
+    CLOUDCLAW_INSTANCE_NAME: name,
+  };
 
-  // Create instance (scaffold, npm install, templates)
-  const dir = await createInstance(name, preset.id, preset.agent, allEnvVars);
+  // Build structured config, then create instance
+  const config = buildConfig(name, preset.id, preset.agent, allEnvVars);
+  const dir = await createInstance(name, config);
 
   // Write the Vercel project link into the instance dir
   writeVercelLink(dir, projectInfo);
@@ -250,32 +271,6 @@ async function handleNewInstance(
   printSuccess(name, url, botToken);
 }
 
-function readInstanceEnv(dir: string): Record<string, string> {
-  const envPath = join(dir, ".env");
-  const vars: Record<string, string> = {};
-  try {
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx);
-      let value = trimmed.slice(eqIdx + 1);
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      vars[key] = value;
-    }
-  } catch {
-    // .env might not exist
-  }
-  return vars;
-}
-
 async function handleExistingInstance(
   name: string,
   options: { yes?: boolean },
@@ -309,14 +304,13 @@ async function handleExistingInstance(
   // Patch vercel.json with plan-aware cron schedule
   patchVercelJson(dir, limits.heartbeatCron);
 
-  // Read env vars — pass CLOUDCLAW_* to deploy so new vars are always available
-  const envVars = readInstanceEnv(dir);
-  const cloudclawEnv: Record<string, string> = {};
-  for (const [key, value] of Object.entries(envVars)) {
-    if (key.startsWith("CLOUDCLAW_")) {
-      cloudclawEnv[key] = value;
-    }
+  // Read structured config and derive env vars
+  const config = readConfig(name);
+  if (!config) {
+    console.error(chalk.red(`No cloudclaw.json found for instance "${name}".`));
+    process.exit(1);
   }
+  const cloudclawEnv = toEnvVars(config);
 
   // Persist any new CLOUDCLAW_ vars to project level
   await persistEnvVarsToProject(dir, cloudclawEnv);
@@ -329,7 +323,7 @@ async function handleExistingInstance(
 
   // Restart sandbox with new code — extend loop handles lifecycle, heartbeat manages hooks.
   console.log(chalk.cyan("\nRestarting sandbox...\n"));
-  const cronSecret = envVars["CLOUDCLAW_CRON_SECRET"];
+  const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
   if (cronSecret) {
     try {
       const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
@@ -344,7 +338,7 @@ async function handleExistingInstance(
   }
 
   // Success
-  const botToken = envVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
+  const botToken = cloudclawEnv["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken ?? null);
 }
 

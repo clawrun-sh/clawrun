@@ -28,19 +28,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ action: "error", error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sandboxId, prevMtime, currMtime, nextCronAt } = body;
+  const { sandboxId, lastChangedAt, nextCronAt } = body;
   if (!sandboxId || typeof sandboxId !== "string") {
     return NextResponse.json({ action: "error", error: "Missing sandboxId" }, { status: 400 });
   }
-  if (typeof prevMtime !== "number" || typeof currMtime !== "number") {
-    return NextResponse.json({ action: "error", error: "Missing or invalid mtime fields" }, { status: 400 });
+  if (typeof lastChangedAt !== "number") {
+    return NextResponse.json({ action: "error", error: "Missing or invalid lastChangedAt" }, { status: 400 });
   }
+
+  const cronJobCount = typeof body.cronJobCount === "number" ? body.cronJobCount : undefined;
+  const sandboxCreatedAt = typeof body.sandboxCreatedAt === "number" ? body.sandboxCreatedAt : undefined;
 
   const payload: ExtendPayload = {
     sandboxId,
-    prevMtime,
-    currMtime,
+    lastChangedAt,
     nextCronAt: typeof nextCronAt === "string" ? nextCronAt : null,
+    cronJobCount,
+    sandboxCreatedAt,
   };
 
   try {

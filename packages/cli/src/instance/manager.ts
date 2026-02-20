@@ -13,6 +13,8 @@ import chalk from "chalk";
 import { execa } from "execa";
 import { instanceDir, instancesDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
+import type { CloudClawConfig } from "./config.js";
+import { toEnvVars, readConfig, writeConfig } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,11 +30,6 @@ interface InstancePackageJson {
   name: string;
   private: boolean;
   dependencies: Record<string, string>;
-  cloudclaw: {
-    preset: string;
-    agent: string;
-    deployedUrl?: string;
-  };
 }
 
 export function isDevMode(): boolean {
@@ -89,8 +86,6 @@ const INSTANCE_PEER_DEPS: Record<string, string> = {
 
 function buildPackageJson(
   name: string,
-  preset: string,
-  agent: string,
   deps: Record<string, string>,
 ): InstancePackageJson {
   return {
@@ -99,10 +94,6 @@ function buildPackageJson(
     dependencies: {
       ...INSTANCE_PEER_DEPS,
       ...deps,
-    },
-    cloudclaw: {
-      preset,
-      agent,
     },
   };
 }
@@ -119,9 +110,7 @@ function writeEnvFile(
 
 export async function createInstance(
   name: string,
-  preset: string,
-  agent: string,
-  envVars: Record<string, string>,
+  config: CloudClawConfig,
 ): Promise<string> {
   const dir = instanceDir(name);
   const devMode = isDevMode();
@@ -150,11 +139,15 @@ export async function createInstance(
     };
   }
 
-  // Write package.json
-  const pkg = buildPackageJson(name, preset, agent, deps);
+  // Write package.json (no cloudclaw metadata — that lives in cloudclaw.json)
+  const pkg = buildPackageJson(name, deps);
   writeFileSync(join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
-  // Write .env
+  // Write cloudclaw.json (canonical config)
+  writeConfig(name, config);
+
+  // Write .env (derived from config, for Next.js runtime)
+  const envVars = toEnvVars(config);
   writeEnvFile(dir, envVars);
 
   // Install dependencies
@@ -188,16 +181,16 @@ export function listInstances(): InstanceMetadata[] {
     if (!existsSync(pkgPath)) continue;
 
     try {
-      const pkg = JSON.parse(
-        readFileSync(pkgPath, "utf-8"),
-      ) as InstancePackageJson;
+      const config = readConfig(entry.name);
+      if (!config) continue;
 
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
       instances.push({
         name: entry.name,
-        preset: pkg.cloudclaw?.preset ?? "unknown",
-        agent: pkg.cloudclaw?.agent ?? "unknown",
+        preset: config.instance.preset,
+        agent: config.instance.agent,
         appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
-        deployedUrl: pkg.cloudclaw?.deployedUrl,
+        deployedUrl: config.instance.deployedUrl,
       });
     } catch {
       // skip malformed instances
@@ -214,16 +207,16 @@ export function getInstance(name: string): InstanceMetadata | null {
   if (!existsSync(pkgPath)) return null;
 
   try {
-    const pkg = JSON.parse(
-      readFileSync(pkgPath, "utf-8"),
-    ) as InstancePackageJson;
+    const config = readConfig(name);
+    if (!config) return null;
 
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
     return {
       name,
-      preset: pkg.cloudclaw?.preset ?? "unknown",
-      agent: pkg.cloudclaw?.agent ?? "unknown",
+      preset: config.instance.preset,
+      agent: config.instance.agent,
       appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
-      deployedUrl: pkg.cloudclaw?.deployedUrl,
+      deployedUrl: config.instance.deployedUrl,
     };
   } catch {
     return null;
@@ -235,11 +228,12 @@ export function instanceExists(name: string): boolean {
 }
 
 export function saveDeployedUrl(name: string, url: string): void {
-  const dir = instanceDir(name);
-  const pkgPath = join(dir, "package.json");
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-  pkg.cloudclaw.deployedUrl = url;
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+  const config = readConfig(name);
+  if (!config) {
+    throw new Error(`No cloudclaw.json found for instance "${name}"`);
+  }
+  config.instance.deployedUrl = url;
+  writeConfig(name, config);
 }
 
 export async function upgradeInstance(name: string): Promise<void> {
