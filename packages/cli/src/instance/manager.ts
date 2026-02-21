@@ -180,21 +180,17 @@ export function listInstances(): InstanceMetadata[] {
     const pkgPath = join(dir, entry.name, "package.json");
     if (!existsSync(pkgPath)) continue;
 
-    try {
-      const config = readConfig(entry.name);
-      if (!config) continue;
+    const config = readConfig(entry.name);
+    if (!config) continue;
 
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-      instances.push({
-        name: entry.name,
-        preset: config.instance.preset,
-        agent: config.instance.agent,
-        appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
-        deployedUrl: config.instance.deployedUrl,
-      });
-    } catch {
-      // skip malformed instances
-    }
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
+    instances.push({
+      name: entry.name,
+      preset: config.instance.preset,
+      agent: config.instance.agent,
+      appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
+      deployedUrl: config.instance.deployedUrl,
+    });
   }
 
   return instances;
@@ -206,21 +202,17 @@ export function getInstance(name: string): InstanceMetadata | null {
 
   if (!existsSync(pkgPath)) return null;
 
-  try {
-    const config = readConfig(name);
-    if (!config) return null;
+  const config = readConfig(name);
+  if (!config) return null;
 
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-    return {
-      name,
-      preset: config.instance.preset,
-      agent: config.instance.agent,
-      appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
-      deployedUrl: config.instance.deployedUrl,
-    };
-  } catch {
-    return null;
-  }
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
+  return {
+    name,
+    preset: config.instance.preset,
+    agent: config.instance.agent,
+    appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
+    deployedUrl: config.instance.deployedUrl,
+  };
 }
 
 export function instanceExists(name: string): boolean {

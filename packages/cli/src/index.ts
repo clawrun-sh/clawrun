@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { deployCommand } from "./commands/deploy.js";
 import { listCommand } from "./commands/list.js";
 import { destroyCommand } from "./commands/destroy.js";
+import { agentCommand } from "./commands/agent.js";
 
 const program = new Command();
 
@@ -29,5 +30,11 @@ program
   .description("Remove an instance")
   .option("-y, --yes", "Skip confirmation")
   .action(destroyCommand);
+
+program
+  .command("agent <instance>")
+  .description("Chat with the agent running in an instance")
+  .option("-m, --message <message>", "Send a single message (non-interactive)")
+  .action(agentCommand);
 
 program.parse();

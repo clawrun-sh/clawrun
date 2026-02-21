@@ -14,7 +14,13 @@ import { FileActivityReason, CronScheduleReason } from "./extend-reasons";
 
 // --- Constants ---
 
-// How much time each extend call adds
+// Dead-man's switch multiplier: native TTL = activeDuration * this factor.
+// Gives ~10 extend loop ticks worth of buffer before the sandbox dies
+// from communication failure. Under normal operation the TTL is pushed
+// forward on every extend tick so it never fires.
+const NATIVE_TTL_MULTIPLIER = 10;
+
+// How much time each extend call pushes the native TTL forward
 const EXTEND_DURATION_MS = 3 * 60 * 1000;
 
 // Sandbox calls extend every 60s
@@ -39,7 +45,8 @@ const ZEROCLAW_WORKSPACE = ZEROCLAW_HOME;
 
 const STATE_NEXT_WAKE_AT = "next_wake_at";
 
-function getInitialTimeoutMs(): number {
+/** Active duration: grace period before idle-stop decisions + idle threshold. */
+function getActiveDurationMs(): number {
   const minutes = parseInt(process.env.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5", 10);
   return (minutes > 0 ? minutes : 5) * 60 * 1000;
 }
@@ -126,7 +133,7 @@ export class SandboxLifecycleManager {
   private provider: SandboxProvider = new VercelSandboxProvider();
   private retention = new CountBasedRetention(3);
   private extendReasons: ExtendReason[] = [
-    new FileActivityReason(getInitialTimeoutMs()),
+    new FileActivityReason(getActiveDurationMs()),
     new CronScheduleReason(CRON_KEEP_ALIVE_WINDOW_MS),
   ];
 
@@ -307,25 +314,26 @@ export class SandboxLifecycleManager {
 
     const now = Date.now();
     const idleMs = now - payload.lastChangedAt;
-    const activeDurationMs = getInitialTimeoutMs();
+    const activeDurationMs = getActiveDurationMs();
 
     console.log(
       `[CloudClaw] Extend: sandbox=${payload.sandboxId},` +
-      ` lastChanged=${Math.round(idleMs / 1000)}s ago (threshold=${activeDurationMs / 1000}s),` +
+      ` idle=${Math.round(idleMs / 1000)}s (threshold=${activeDurationMs / 1000}s),` +
       ` nextCronAt=${payload.nextCronAt ?? "none"},` +
       ` cronJobs=${payload.cronJobCount ?? "?"}`,
     );
 
-    // Grace period: don't extend while initial static timeout is still active
+    // Grace period: the sandbox is still within its initial native TTL.
+    // Don't extend, don't evaluate stop — just acknowledge.
     if (payload.sandboxCreatedAt) {
       const elapsed = now - payload.sandboxCreatedAt;
       if (elapsed < activeDurationMs) {
-        console.log(`[CloudClaw] Within initial timeout (${Math.round(elapsed / 1000)}s / ${activeDurationMs / 1000}s), skipping extend`);
+        console.log(`[CloudClaw] Grace period (${Math.round(elapsed / 1000)}s / ${activeDurationMs / 1000}s), no action`);
         return { action: "extended" };
       }
     }
 
-    // Evaluate extend reasons (first match wins)
+    // Past grace period — evaluate extend reasons (first match wins)
     let reason: string | null = null;
     for (const r of this.extendReasons) {
       reason = r.evaluate(payload, now);
@@ -397,8 +405,6 @@ export class SandboxLifecycleManager {
   private async startNew(
     _sandboxes: SandboxInfo[],
   ): Promise<HeartbeatResult> {
-    const timeoutMs = getInitialTimeoutMs();
-
     try {
       let sandbox: ManagedSandbox | null = null;
 
@@ -410,7 +416,7 @@ export class SandboxLifecycleManager {
           try {
             sandbox = await this.provider.create({
               snapshotId: latest.id,
-              timeout: timeoutMs,
+              timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
               ports: [3000],
             });
             console.log(`[CloudClaw] Resumed from latest snapshot: ${latest.id}`);
@@ -425,7 +431,7 @@ export class SandboxLifecycleManager {
       // 2. Fresh sandbox — install binary
       if (!sandbox) {
         sandbox = await this.provider.create({
-          timeout: timeoutMs,
+          timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
           ports: [3000],
         });
         await this.installBinary(sandbox);

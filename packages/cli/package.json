@@ -14,12 +14,14 @@
     "dist"
   ],
   "dependencies": {
+    "@inquirer/prompts": "^7.2.0",
     "chalk": "^5.4.0",
     "commander": "^13.0.0",
-    "human-id": "^4.1.1",
-    "@inquirer/prompts": "^7.2.0",
     "execa": "^9.5.0",
-    "zeroclaw": "workspace:*"
+    "human-id": "^4.1.1",
+    "ora": "^9.3.0",
+    "zeroclaw": "workspace:*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
