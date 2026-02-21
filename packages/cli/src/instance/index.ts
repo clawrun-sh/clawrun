@@ -12,5 +12,5 @@ export {
 } from "./manager.js";
 export type { InstanceMetadata } from "./manager.js";
 export { applyTemplates } from "./templates.js";
-export { cloudClawConfigSchema, buildConfig, toEnvVars, readConfig, writeConfig } from "./config.js";
+export { cloudClawConfigSchema, buildConfig, toEnvVars, readConfig, writeConfig, readAgentConfigJson } from "./config.js";
 export type { CloudClawConfig } from "./config.js";

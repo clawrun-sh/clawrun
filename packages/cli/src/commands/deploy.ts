@@ -30,10 +30,12 @@ import {
   buildConfig,
   toEnvVars,
   readConfig,
+  readAgentConfigJson,
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type { PlatformTier, PlatformLimits } from "../platform/index.js";
 import { yes } from "../args/yes.js";
+import { startAgentChat } from "./agent.js";
 
 function printBanner(): void {
   console.log(
@@ -149,6 +151,12 @@ async function handleNewInstance(
     process.exit(1);
   }
 
+  // Redirect ZeroClaw config to instance directory (never touch ~/.zeroclaw/)
+  const zcConfigDir = join(instanceDir(name), "zeroclaw");
+  mkdirSync(zcConfigDir, { recursive: true });
+  const prevConfigDir = process.env.ZEROCLAW_CONFIG_DIR;
+  process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+
   // Memory backend
   let memoryBackend = "sqlite";
   const backends = napi.getMemoryBackends();
@@ -203,6 +211,10 @@ async function handleNewInstance(
   // Read the full assembled config from ZeroClaw
   const agentConfigJson = await napi.getSavedConfig();
 
+  // Restore ZEROCLAW_CONFIG_DIR
+  if (prevConfigDir !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prevConfigDir;
+  else delete process.env.ZEROCLAW_CONFIG_DIR;
+
   // CloudClaw-specific settings
   const activeDuration = defaultActiveDuration;
   const cronSecret = randomUUID();
@@ -249,7 +261,7 @@ async function handleNewInstance(
   // Phase 2: Build instance + deploy
   // ============================================================
 
-  const config = buildConfig(name, preset.id, preset.agent, agentConfigJson, {
+  const config = buildConfig(name, preset.id, preset.agent, {
     memoryBackend,
     activeDuration,
     cronSecret,
@@ -257,7 +269,16 @@ async function handleNewInstance(
     webhookSecret,
   });
 
-  const dir = await createInstance(name, config);
+  // Derive env vars from config + agent config JSON
+  const cloudclawEnv = toEnvVars(config, agentConfigJson);
+  const allEnvVars: Record<string, string> = {
+    ...cloudclawEnv,
+    ...dbVars,
+    ...(redisResult.success ? redisResult.redisVars : {}),
+    CLOUDCLAW_INSTANCE_NAME: name,
+  };
+
+  const dir = await createInstance(name, config, allEnvVars);
 
   // Write the Vercel project link
   writeVercelLink(dir, projectInfo);
@@ -267,15 +288,6 @@ async function handleNewInstance(
 
   // Disable Vercel Deployment Protection
   await disableDeploymentProtection(dir);
-
-  // Derive env vars from config + merge provisioned vars
-  const cloudclawEnv = toEnvVars(config);
-  const allEnvVars: Record<string, string> = {
-    ...cloudclawEnv,
-    ...dbVars,
-    ...(redisResult.success ? redisResult.redisVars : {}),
-    CLOUDCLAW_INSTANCE_NAME: name,
-  };
 
   // Persist all env vars to Vercel project
   await persistEnvVarsToProject(dir, allEnvVars);
@@ -301,6 +313,8 @@ async function handleNewInstance(
   // Success
   const botToken = allEnvVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken);
+
+  await offerChat(name);
 }
 
 async function handleExistingInstance(
@@ -328,19 +342,99 @@ async function handleExistingInstance(
   // Detect tier
   const { limits } = await detectAndPrintTier();
 
+  // Offer reconfiguration — two separate yes/no prompts
+  if (!options.yes) {
+    const zcConfigDir = join(instanceDir(name), "zeroclaw");
+    mkdirSync(zcConfigDir, { recursive: true });
+
+    let napiLoaded = false;
+    let napi: typeof import("zeroclaw-napi");
+
+    const loadNapi = async () => {
+      if (napiLoaded) return;
+      try {
+        napi = await import("zeroclaw-napi");
+        napiLoaded = true;
+      } catch (err) {
+        clack.log.error(
+          `ZeroClaw native bridge is required but could not be loaded.\n` +
+          chalk.dim(`  ${err instanceof Error ? err.message : String(err)}`),
+        );
+        process.exit(1);
+      }
+    };
+
+    const reconfigureProvider = await clack.confirm({
+      message: "Reconfigure LLM provider & model?",
+      initialValue: false,
+    });
+
+    if (!clack.isCancel(reconfigureProvider) && reconfigureProvider) {
+      await loadNapi();
+      const prev = process.env.ZEROCLAW_CONFIG_DIR;
+      process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+      const result = await napi!.runProviderWizard();
+      clack.log.success(
+        `Provider: ${chalk.green(result.provider)} | Model: ${chalk.green(result.model)}`,
+      );
+      if (prev !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prev;
+      else delete process.env.ZEROCLAW_CONFIG_DIR;
+    }
+
+    const reconfigureChannels = await clack.confirm({
+      message: "Reconfigure messaging channels?",
+      initialValue: false,
+    });
+
+    if (!clack.isCancel(reconfigureChannels) && reconfigureChannels) {
+      await loadNapi();
+      const prev = process.env.ZEROCLAW_CONFIG_DIR;
+      process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+
+      // Show currently configured channels before the wizard
+      // (the upstream wizard always starts from a blank slate)
+      try {
+        const currentJson = await napi!.getSavedConfig();
+        const current = JSON.parse(currentJson);
+        const cc = current.channels_config;
+        if (cc) {
+          const active = Object.entries(cc)
+            .filter(([k, v]) => v != null && typeof v === "object" && k !== "cli")
+            .map(([k]) => k);
+          if (active.length > 0) {
+            clack.log.info(
+              `Currently configured: ${active.map((c) => chalk.green(c)).join(", ")}\n` +
+              chalk.dim("  These will be preserved unless you reconfigure them."),
+            );
+          }
+        }
+      } catch {
+        // non-fatal — proceed with wizard
+      }
+
+      await napi!.runChannelWizard();
+      clack.log.success("Channel configuration saved.");
+      if (prev !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prev;
+      else delete process.env.ZEROCLAW_CONFIG_DIR;
+    }
+  }
+
   // Upgrade instance
   await upgradeInstance(name);
 
   // Patch vercel.json
   patchVercelJson(dir, limits.heartbeatCron);
 
-  // Read config and derive env vars
+  // Read config
   const config = readConfig(name);
   if (!config) {
     clack.log.error(`No cloudclaw.json found for instance "${name}".`);
     process.exit(1);
   }
-  const cloudclawEnv = toEnvVars(config);
+
+  // Read fresh agent config from config.toml (picks up edits + reconfiguration)
+  const agentConfigJson = await readAgentConfigJson(name);
+  const cloudclawEnv = toEnvVars(config, agentConfigJson);
 
   // Persist env vars
   await persistEnvVarsToProject(dir, cloudclawEnv);
@@ -368,6 +462,8 @@ async function handleExistingInstance(
   // Success
   const botToken = cloudclawEnv["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken ?? null);
+
+  await offerChat(name);
 }
 
 function printSuccess(
@@ -389,6 +485,23 @@ function printSuccess(
   }
 
   clack.outro("Done!");
+}
+
+async function offerChat(name: string): Promise<void> {
+  const chat = await clack.confirm({
+    message: "Start chatting with your agent?",
+    initialValue: true,
+  });
+
+  if (clack.isCancel(chat) || !chat) return;
+
+  const freshConfig = readConfig(name);
+  if (!freshConfig) {
+    console.error(chalk.red(`Could not read config for "${name}".`));
+    return;
+  }
+
+  await startAgentChat(name, freshConfig);
 }
 
 export const deploy = command({

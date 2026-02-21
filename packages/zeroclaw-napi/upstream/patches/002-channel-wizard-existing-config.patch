@@ -1,0 +1,46 @@
+diff --git a/src/onboard/wizard.rs b/src/onboard/wizard.rs
+index fab053c..825e2de 100644
+--- a/src/onboard/wizard.rs
++++ b/src/onboard/wizard.rs
+@@ -134,7 +134,7 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
+     let (provider, api_key, model, provider_api_url) = setup_provider(&workspace_dir).await?;
+
+     print_step(3, 9, "Channels (How You Talk to ZeroClaw)");
+-    let channels_config = setup_channels()?;
++    let channels_config = setup_channels(ChannelsConfig::default())?;
+
+     print_step(4, 9, "Tunnel (Expose to Internet)");
+     let tunnel_config = setup_tunnel()?;
+@@ -261,7 +261,7 @@ pub async fn run_channels_repair_wizard() -> Result<Config> {
+     let mut config = Config::load_or_init().await?;
+
+     print_step(1, 1, "Channels (How You Talk to ZeroClaw)");
+-    config.channels_config = setup_channels()?;
++    config.channels_config = setup_channels(config.channels_config.clone())?;
+     config.save().await?;
+     persist_workspace_selection(&config.config_path).await?;
+
+@@ -1900,7 +1900,7 @@ async fn setup_workspace() -> Result<(PathBuf, PathBuf)> {
+ // ── Step 2: Provider & API Key ───────────────────────────────────
+
+ #[allow(clippy::too_many_lines)]
+-async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String, Option<String>)> {
++pub async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String, Option<String>)> {
+     // ── Tier selection ──
+     let tiers = vec![
+         "⭐ Recommended (OpenRouter, Venice, Anthropic, OpenAI, Gemini)",
+@@ -3103,12 +3103,12 @@ fn channel_menu_choices() -> &'static [ChannelMenuChoice] {
+ }
+
+ #[allow(clippy::too_many_lines)]
+-fn setup_channels() -> Result<ChannelsConfig> {
++fn setup_channels(existing: ChannelsConfig) -> Result<ChannelsConfig> {
+     print_bullet("Channels let you talk to ZeroClaw from anywhere.");
+     print_bullet("CLI is always available. Connect more channels now.");
+     println!();
+
+-    let mut config = ChannelsConfig::default();
++    let mut config = existing;
+     let menu_choices = channel_menu_choices();
+
+     loop {

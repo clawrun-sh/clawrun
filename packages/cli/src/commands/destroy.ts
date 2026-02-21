@@ -85,6 +85,15 @@ export const destroy = command({
         console.log(chalk.yellow("  Aborted."));
         return;
       }
+
+      const confirmation = await clack.text({
+        message: `Type ${chalk.bold("delete my project")} to confirm:`,
+      });
+
+      if (clack.isCancel(confirmation) || confirmation !== "delete my project") {
+        console.log(chalk.yellow("  Aborted."));
+        return;
+      }
     }
 
     // Delete Vercel project first (needs .vercel/ dir to still exist)

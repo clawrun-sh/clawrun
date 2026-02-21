@@ -6,6 +6,49 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 NPM_DIR="$SCRIPT_DIR/npm"
 
 # ============================================================
+# Upstream source preparation
+# ============================================================
+
+UPSTREAM_DIR="$SCRIPT_DIR/upstream"
+ZEROCLAW_SHA=$(cat "$UPSTREAM_DIR/COMMIT" | tr -d '[:space:]')
+ZEROCLAW_SRC="/tmp/zeroclaw-patch"
+
+apply_patches() {
+  # Apply .patch files in order
+  for patch in "$UPSTREAM_DIR"/patches/*.patch; do
+    [ -f "$patch" ] || continue
+    echo "  Applying $(basename "$patch")..."
+    git -C "$ZEROCLAW_SRC" apply "$patch"
+  done
+
+  # Copy overlay files (new files that aren't patches)
+  if [ -d "$UPSTREAM_DIR/overlay" ]; then
+    echo "  Copying overlay files..."
+    cp -r "$UPSTREAM_DIR/overlay/"* "$ZEROCLAW_SRC/"
+  fi
+}
+
+prepare_source() {
+  # Reuse existing checkout if it's at the right commit
+  if [ -d "$ZEROCLAW_SRC/.git" ]; then
+    CURRENT_SHA=$(git -C "$ZEROCLAW_SRC" rev-parse HEAD 2>/dev/null || echo "")
+    if [ "$CURRENT_SHA" = "$ZEROCLAW_SHA" ]; then
+      echo "  Reusing cached zeroclaw source at $ZEROCLAW_SHA"
+      # Re-apply patches (checkout may be dirty from previous build)
+      git -C "$ZEROCLAW_SRC" checkout -- .
+      apply_patches
+      return
+    fi
+    rm -rf "$ZEROCLAW_SRC"
+  fi
+
+  echo "  Cloning zeroclaw at $ZEROCLAW_SHA..."
+  git clone --filter=blob:none https://github.com/zeroclaw-labs/zeroclaw.git "$ZEROCLAW_SRC"
+  git -C "$ZEROCLAW_SRC" checkout "$ZEROCLAW_SHA"
+  apply_patches
+}
+
+# ============================================================
 # Phase 1: Linux targets (Docker)
 # ============================================================
 
@@ -13,11 +56,14 @@ echo "=========================================="
 echo "  Phase 1: Linux targets (Docker)"
 echo "=========================================="
 
+# Prepare upstream source
+prepare_source
+
 # Prepare build context
 CONTEXT_DIR=$(mktemp -d)
 trap "rm -rf $CONTEXT_DIR" EXIT
 
-cp -r /tmp/zeroclaw-patch "$CONTEXT_DIR/zeroclaw-patch"
+cp -r "$ZEROCLAW_SRC" "$CONTEXT_DIR/zeroclaw-patch"
 mkdir -p "$CONTEXT_DIR/packages"
 cp -r "$SCRIPT_DIR" "$CONTEXT_DIR/packages/zeroclaw-napi"
 cp "$SCRIPT_DIR/Dockerfile" "$CONTEXT_DIR/Dockerfile"

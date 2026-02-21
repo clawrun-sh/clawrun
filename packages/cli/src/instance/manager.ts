@@ -14,7 +14,7 @@ import { execa } from "execa";
 import { instanceDir, instancesDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
 import type { CloudClawConfig } from "./config.js";
-import { toEnvVars, readConfig, writeConfig } from "./config.js";
+import { readConfig, writeConfig } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -111,11 +111,13 @@ function writeEnvFile(
 export async function createInstance(
   name: string,
   config: CloudClawConfig,
+  envVars: Record<string, string>,
 ): Promise<string> {
   const dir = instanceDir(name);
   const devMode = isDevMode();
 
-  if (existsSync(dir)) {
+  // Tolerate pre-existing dir (wizard may have already created zeroclaw/ subdir)
+  if (existsSync(join(dir, "cloudclaw.json"))) {
     throw new Error(`Instance "${name}" already exists at ${dir}`);
   }
 
@@ -146,8 +148,7 @@ export async function createInstance(
   // Write cloudclaw.json (canonical config)
   writeConfig(name, config);
 
-  // Write .env (derived from config, for Next.js runtime)
-  const envVars = toEnvVars(config);
+  // Write .env (derived from config + agent config, for Next.js runtime)
   writeEnvFile(dir, envVars);
 
   // Install dependencies
@@ -187,7 +188,7 @@ export function listInstances(): InstanceMetadata[] {
     instances.push({
       name: entry.name,
       preset: config.instance.preset,
-      agent: config.instance.agent,
+      agent: config.agent.name,
       appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
       deployedUrl: config.instance.deployedUrl,
     });
@@ -209,7 +210,7 @@ export function getInstance(name: string): InstanceMetadata | null {
   return {
     name,
     preset: config.instance.preset,
-    agent: config.instance.agent,
+    agent: config.agent.name,
     appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
     deployedUrl: config.instance.deployedUrl,
   };
