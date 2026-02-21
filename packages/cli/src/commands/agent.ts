@@ -1,29 +1,22 @@
-import { command, positional, option, optional, string } from "cmd-ts";
+import { command, option, optional, string } from "cmd-ts";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { zeroclawAdapter } from "zeroclaw/adapter";
 import { createSandboxClient } from "../sandbox/index.js";
-import {
-  instanceExists,
-  readConfig,
-} from "../instance/index.js";
+import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
+import { instance } from "../args/instance.js";
 
 export const agent = command({
   name: "agent",
   description: "Chat with the agent running in an instance",
   args: {
-    instance: positional({ type: string, displayName: "instance", description: "The instance name" }),
+    instance,
     message: option({ long: "message", short: "m", type: optional(string), description: "Single message (non-interactive)" }),
   },
   async handler({ instance: instanceName, message }) {
-    if (!instanceExists(instanceName)) {
-      console.error(chalk.red(`Instance "${instanceName}" not found.`));
-      process.exit(1);
-    }
-
     const config = readConfig(instanceName);
     if (!config) {
       console.error(chalk.red(`Could not read config for "${instanceName}".`));

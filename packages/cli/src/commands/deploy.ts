@@ -1,4 +1,4 @@
-import { command, positional, option, flag, optional, string } from "cmd-ts";
+import { command, positional, option, optional, string } from "cmd-ts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -33,6 +33,7 @@ import {
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type { PlatformTier, PlatformLimits } from "../platform/index.js";
+import { yes } from "../args/yes.js";
 
 function printBanner(): void {
   console.log(
@@ -395,7 +396,7 @@ export const deploy = command({
   description: "Create or upgrade and deploy an instance",
   args: {
     nameOrPreset: positional({ type: optional(string), displayName: "name", description: "Instance name or preset" }),
-    yes: flag({ long: "yes", short: "y", description: "Use defaults, skip prompts (CI mode)" }),
+    yes,
     preset: option({ long: "preset", short: "p", type: optional(string), description: "Preset to use" }),
   },
   async handler({ nameOrPreset, yes, preset }) {

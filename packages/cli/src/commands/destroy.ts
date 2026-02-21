@@ -1,4 +1,4 @@
-import { command, flag } from "cmd-ts";
+import { command } from "cmd-ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
@@ -10,6 +10,7 @@ import {
 } from "../instance/index.js";
 import { deleteVercelProject as deleteVercelProjectApi } from "../deploy/vercel.js";
 import { instance } from "../args/instance.js";
+import { yes } from "../args/yes.js";
 
 async function deleteVercelProject(dir: string): Promise<void> {
   const projectJsonPath = join(dir, ".vercel", "project.json");
@@ -58,7 +59,7 @@ export const destroy = command({
   description: "Remove an instance",
   args: {
     name: instance,
-    yes: flag({ long: "yes", short: "y", description: "Skip confirmation" }),
+    yes,
   },
   async handler({ name, yes }) {
     const meta = getInstance(name);

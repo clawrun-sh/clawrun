@@ -1,25 +1,18 @@
-import { command, positional, string } from "cmd-ts";
+import { command } from "cmd-ts";
 import chalk from "chalk";
 import { createSandboxClient } from "../sandbox/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
-import {
-  instanceExists,
-  readConfig,
-} from "../instance/index.js";
+import { readConfig } from "../instance/index.js";
+import { instance } from "../args/instance.js";
 
 export const connect = command({
   name: "connect",
   aliases: ["ssh"],
   description: "Open an interactive shell in the instance's sandbox",
   args: {
-    instance: positional({ type: string, displayName: "instance", description: "The instance name" }),
+    instance,
   },
   async handler({ instance: instanceName }) {
-    if (!instanceExists(instanceName)) {
-      console.error(chalk.red(`Instance "${instanceName}" not found.`));
-      process.exit(1);
-    }
-
     const config = readConfig(instanceName);
     if (!config) {
       console.error(chalk.red(`Could not read config for "${instanceName}".`));

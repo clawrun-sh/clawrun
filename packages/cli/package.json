@@ -4,7 +4,7 @@
   "description": "CLI for deploying CloudClaw AI agent hosting",
   "type": "module",
   "bin": {
-    "cloudclaw": "./dist/index.js"
+    "cloudclaw": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
