@@ -1,14 +1,15 @@
+import { command, flag } from "cmd-ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import {
-  instanceExists,
   getInstance,
   destroyInstance,
   instanceDir,
 } from "../instance/index.js";
 import { deleteVercelProject as deleteVercelProjectApi } from "../deploy/vercel.js";
+import { instance } from "../args/instance.js";
 
 async function deleteVercelProject(dir: string): Promise<void> {
   const projectJsonPath = join(dir, ".vercel", "project.json");
@@ -51,43 +52,44 @@ async function deleteVercelProject(dir: string): Promise<void> {
   }
 }
 
-export async function destroyCommand(
-  name: string,
-  options: { yes?: boolean },
-): Promise<void> {
-  if (!instanceExists(name)) {
-    console.error(chalk.red(`Instance "${name}" not found.`));
-    process.exit(1);
-  }
+export const destroy = command({
+  name: "destroy",
+  aliases: ["rm"],
+  description: "Remove an instance",
+  args: {
+    name: instance,
+    yes: flag({ long: "yes", short: "y", description: "Skip confirmation" }),
+  },
+  async handler({ name, yes }) {
+    const meta = getInstance(name);
+    const dir = instanceDir(name);
 
-  const meta = getInstance(name);
-  const dir = instanceDir(name);
-
-  console.log(chalk.bold(`\nInstance: ${name}`));
-  if (meta) {
-    console.log(chalk.dim(`  Preset: ${meta.preset}`));
-    console.log(chalk.dim(`  Agent: ${meta.agent}`));
-    if (meta.deployedUrl) {
-      console.log(chalk.dim(`  URL: ${meta.deployedUrl}`));
+    console.log(chalk.bold(`\nInstance: ${name}`));
+    if (meta) {
+      console.log(chalk.dim(`  Preset: ${meta.preset}`));
+      console.log(chalk.dim(`  Agent: ${meta.agent}`));
+      if (meta.deployedUrl) {
+        console.log(chalk.dim(`  URL: ${meta.deployedUrl}`));
+      }
     }
-  }
-  console.log(chalk.dim(`  Path: ${dir}`));
+    console.log(chalk.dim(`  Path: ${dir}`));
 
-  if (!options.yes) {
-    const confirmed = await clack.confirm({
-      message: `Are you sure you want to destroy instance "${name}"? This will delete the Vercel project and cannot be undone.`,
-      initialValue: false,
-    });
+    if (!yes) {
+      const confirmed = await clack.confirm({
+        message: `Are you sure you want to destroy instance "${name}"? This will delete the Vercel project and cannot be undone.`,
+        initialValue: false,
+      });
 
-    if (clack.isCancel(confirmed) || !confirmed) {
-      console.log(chalk.yellow("  Aborted."));
-      return;
+      if (clack.isCancel(confirmed) || !confirmed) {
+        console.log(chalk.yellow("  Aborted."));
+        return;
+      }
     }
-  }
 
-  // Delete Vercel project first (needs .vercel/ dir to still exist)
-  await deleteVercelProject(dir);
+    // Delete Vercel project first (needs .vercel/ dir to still exist)
+    await deleteVercelProject(dir);
 
-  // Remove local instance directory
-  destroyInstance(name);
-}
+    // Remove local instance directory
+    destroyInstance(name);
+  },
+});

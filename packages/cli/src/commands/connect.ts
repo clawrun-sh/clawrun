@@ -1,3 +1,4 @@
+import { command, positional, string } from "cmd-ts";
 import chalk from "chalk";
 import { createSandboxClient } from "../sandbox/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
@@ -6,30 +7,38 @@ import {
   readConfig,
 } from "../instance/index.js";
 
-export async function connectCommand(instance: string): Promise<void> {
-  if (!instanceExists(instance)) {
-    console.error(chalk.red(`Instance "${instance}" not found.`));
-    process.exit(1);
-  }
+export const connect = command({
+  name: "connect",
+  aliases: ["ssh"],
+  description: "Open an interactive shell in the instance's sandbox",
+  args: {
+    instance: positional({ type: string, displayName: "instance", description: "The instance name" }),
+  },
+  async handler({ instance: instanceName }) {
+    if (!instanceExists(instanceName)) {
+      console.error(chalk.red(`Instance "${instanceName}" not found.`));
+      process.exit(1);
+    }
 
-  const config = readConfig(instance);
-  if (!config) {
-    console.error(chalk.red(`Could not read config for "${instance}".`));
-    process.exit(1);
-  }
+    const config = readConfig(instanceName);
+    if (!config) {
+      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      process.exit(1);
+    }
 
-  const { deployedUrl } = config.instance;
-  const { cronSecret } = config.secrets;
-  if (!deployedUrl || !cronSecret) {
-    console.error(chalk.red(`Instance "${instance}" is not fully deployed. Run "cloudclaw deploy ${instance}" first.`));
-    process.exit(1);
-  }
+    const { deployedUrl } = config.instance;
+    const { cronSecret } = config.secrets;
+    if (!deployedUrl || !cronSecret) {
+      console.error(chalk.red(`Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`));
+      process.exit(1);
+    }
 
-  const client = createSandboxClient(instance, config);
-  const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
+    const client = createSandboxClient(instanceName, config);
+    const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
 
-  console.log(chalk.dim(`Sandbox: ${sandboxId}`));
-  console.log(chalk.bold(`Connecting to ${chalk.cyan(instance)}...\n`));
+    console.log(chalk.dim(`Sandbox: ${sandboxId}`));
+    console.log(chalk.bold(`Connecting to ${chalk.cyan(instanceName)}...\n`));
 
-  await client.connect(sandboxId);
-}
+    await client.connect(sandboxId);
+  },
+});

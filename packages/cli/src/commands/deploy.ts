@@ -1,3 +1,4 @@
+import { command, positional, option, flag, optional, string } from "cmd-ts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -49,36 +50,6 @@ function printBanner(): void {
 
 function generateInstanceName(): string {
   return humanId({ separator: "-", capitalize: false });
-}
-
-export async function deployCommand(
-  nameOrPreset?: string,
-  options: { yes?: boolean; preset?: string } = {},
-): Promise<void> {
-  printBanner();
-
-  // Determine if the argument is a preset name or an instance name.
-  const presetNames = listPresets().map((p) => p.id);
-  let instanceName: string | undefined;
-  let presetId: string | undefined = options.preset;
-
-  if (nameOrPreset) {
-    if (instanceExists(nameOrPreset)) {
-      instanceName = nameOrPreset;
-    } else if (presetNames.includes(nameOrPreset)) {
-      presetId = nameOrPreset;
-    } else {
-      instanceName = nameOrPreset;
-    }
-  }
-
-  // PATH B: Existing instance — upgrade + redeploy
-  if (instanceName && instanceExists(instanceName)) {
-    return handleExistingInstance(instanceName, options);
-  }
-
-  // PATH A: New instance
-  return handleNewInstance(instanceName, presetId, options);
 }
 
 async function detectAndPrintTier(): Promise<{
@@ -418,3 +389,39 @@ function printSuccess(
 
   clack.outro("Done!");
 }
+
+export const deploy = command({
+  name: "deploy",
+  description: "Create or upgrade and deploy an instance",
+  args: {
+    nameOrPreset: positional({ type: optional(string), displayName: "name", description: "Instance name or preset" }),
+    yes: flag({ long: "yes", short: "y", description: "Use defaults, skip prompts (CI mode)" }),
+    preset: option({ long: "preset", short: "p", type: optional(string), description: "Preset to use" }),
+  },
+  async handler({ nameOrPreset, yes, preset }) {
+    printBanner();
+
+    // Determine if the argument is a preset name or an instance name.
+    const presetNames = listPresets().map((p) => p.id);
+    let instanceName: string | undefined;
+    let presetId: string | undefined = preset;
+
+    if (nameOrPreset) {
+      if (instanceExists(nameOrPreset)) {
+        instanceName = nameOrPreset;
+      } else if (presetNames.includes(nameOrPreset)) {
+        presetId = nameOrPreset;
+      } else {
+        instanceName = nameOrPreset;
+      }
+    }
+
+    // PATH B: Existing instance — upgrade + redeploy
+    if (instanceName && instanceExists(instanceName)) {
+      return handleExistingInstance(instanceName, { yes });
+    }
+
+    // PATH A: New instance
+    return handleNewInstance(instanceName, presetId, { yes });
+  },
+});
