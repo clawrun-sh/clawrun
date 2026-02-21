@@ -3,50 +3,12 @@ import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { zeroclawAdapter } from "zeroclaw/adapter";
-import type { SandboxClient } from "../sandbox/types.js";
 import { createSandboxClient } from "../sandbox/index.js";
 import {
   instanceExists,
   readConfig,
 } from "../instance/index.js";
-
-/** Find the running sandbox ID, or null. */
-async function getRunningId(client: SandboxClient): Promise<string | null> {
-  const sandboxes = await client.list();
-  const running = sandboxes.find((s) => s.status === "running");
-  return running?.id ?? null;
-}
-
-/** Trigger heartbeat to start a sandbox, then poll until one is running. */
-async function ensureRunning(
-  client: SandboxClient,
-  deployedUrl: string,
-  cronSecret: string,
-): Promise<string> {
-  process.stdout.write(chalk.dim("Starting sandbox..."));
-
-  await fetch(`${deployedUrl}/api/cron/heartbeat?restart=true`, {
-    headers: { Authorization: `Bearer ${cronSecret}` },
-  });
-
-  const POLL_INTERVAL_MS = 3_000;
-  const POLL_TIMEOUT_MS = 90_000;
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const id = await getRunningId(client);
-    if (id) {
-      process.stdout.write("\n");
-      return id;
-    }
-    process.stdout.write(".");
-  }
-
-  process.stdout.write("\n");
-  console.error(chalk.red("Sandbox did not start within 90s."));
-  process.exit(1);
-}
+import { resolveRunningId } from "../sandbox/resolve.js";
 
 export async function agentCommand(
   instance: string,
@@ -73,16 +35,13 @@ export async function agentCommand(
   const client = createSandboxClient(instance, config);
   const adapter = zeroclawAdapter;
 
-  let sandboxId = await getRunningId(client);
-  if (!sandboxId) {
-    sandboxId = await ensureRunning(client, deployedUrl, cronSecret);
-  }
+  const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
 
   console.log(chalk.dim(`Sandbox: ${sandboxId}\n`));
 
   async function sendMessage(message: string): Promise<{ success: boolean; output: string }> {
     const command = adapter.buildCommand(message);
-    const result = await client.exec(sandboxId!, command.cmd, command.args, command.env);
+    const result = await client.exec(sandboxId, command.cmd, command.args, command.env);
     const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
     return { success: response.success, output: response.message || response.error || "" };
   }
@@ -98,27 +57,42 @@ export async function agentCommand(
   }
 
   // Interactive REPL mode
+  // clack's spinner takes over stdout with ANSI cursor control which
+  // corrupts a live readline. The fix: close readline before each
+  // spinner, then recreate it after.
   console.log(chalk.bold(`Connected to ${chalk.cyan(instance)}.`));
   console.log(chalk.dim("Type a message (Ctrl+C to exit).\n"));
 
-  const rl = createInterface({ input: stdin, output: stdout });
-
   try {
     while (true) {
-      const message = await rl.question(chalk.bold("you> "));
+      const rl = createInterface({ input: stdin, output: stdout });
+      let message: string;
+      try {
+        message = await rl.question(chalk.bold("you> "));
+      } catch {
+        // Ctrl+C / Ctrl+D during input
+        rl.close();
+        break;
+      }
+      rl.close();
+
       if (!message.trim()) continue;
 
       const s = clack.spinner();
       s.start("Thinking...");
-      const { success, output } = await sendMessage(message);
-      s.stop(success ? "Done" : "Error");
-      console.log(success ? chalk.green(output) : chalk.red(output));
+      try {
+        const { success, output } = await sendMessage(message);
+        s.stop("");
+        console.log(success ? chalk.green(output) : chalk.red(output));
+      } catch (err) {
+        s.stop("");
+        console.log(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      }
       console.log();
     }
   } catch {
-    // readline close (Ctrl+C / Ctrl+D)
-  } finally {
-    rl.close();
-    console.log(chalk.dim("\nDisconnected."));
+    // unexpected
   }
+
+  console.log(chalk.dim("\nDisconnected."));
 }

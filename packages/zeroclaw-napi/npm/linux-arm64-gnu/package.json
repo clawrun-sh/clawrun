@@ -1,0 +1,8 @@
+{
+  "name": "zeroclaw-napi-linux-arm64-gnu",
+  "version": "0.0.1",
+  "private": true,
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "main": "zeroclaw-napi.linux-arm64-gnu.node"
+}

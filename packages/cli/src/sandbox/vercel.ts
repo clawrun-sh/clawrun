@@ -62,4 +62,11 @@ export class VercelSandboxClient implements SandboxClient {
       };
     }
   }
+
+  async connect(sandboxId: string): Promise<void> {
+    await execa("npx", [
+      "sandbox", "connect", sandboxId,
+      ...this.scopeArgs(),
+    ], { stdio: "inherit" });
+  }
 }

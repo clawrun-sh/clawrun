@@ -5,12 +5,23 @@
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
-    "name": "zeroclaw-napi",
-    "triples": {}
+    "binaryName": "zeroclaw-napi",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
   },
   "scripts": {
     "build": "napi build --release --platform",
     "build:debug": "napi build --platform"
+  },
+  "optionalDependencies": {
+    "zeroclaw-napi-darwin-arm64": "workspace:*",
+    "zeroclaw-napi-darwin-x64": "workspace:*",
+    "zeroclaw-napi-linux-x64-gnu": "workspace:*",
+    "zeroclaw-napi-linux-arm64-gnu": "workspace:*"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0"

@@ -122,10 +122,31 @@ importers:
       '@clack/prompts':
         specifier: ^0.10.0
         version: 0.10.1
+    optionalDependencies:
+      zeroclaw-napi-darwin-arm64:
+        specifier: workspace:*
+        version: link:npm/darwin-arm64
+      zeroclaw-napi-darwin-x64:
+        specifier: workspace:*
+        version: link:npm/darwin-x64
+      zeroclaw-napi-linux-arm64-gnu:
+        specifier: workspace:*
+        version: link:npm/linux-arm64-gnu
+      zeroclaw-napi-linux-x64-gnu:
+        specifier: workspace:*
+        version: link:npm/linux-x64-gnu
     devDependencies:
       '@napi-rs/cli':
         specifier: ^3.0.0
         version: 3.5.1(@emnapi/runtime@1.8.1)(@types/node@22.19.11)
+
+  packages/zeroclaw-napi/npm/darwin-arm64: {}
+
+  packages/zeroclaw-napi/npm/darwin-x64: {}
+
+  packages/zeroclaw-napi/npm/linux-arm64-gnu: {}
+
+  packages/zeroclaw-napi/npm/linux-x64-gnu: {}
 
 packages:
 
