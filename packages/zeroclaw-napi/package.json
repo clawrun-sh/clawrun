@@ -1,0 +1,21 @@
+{
+  "name": "zeroclaw-napi",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "zeroclaw-napi",
+    "triples": {}
+  },
+  "scripts": {
+    "build": "napi build --release --platform",
+    "build:debug": "napi build --platform"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  }
+}

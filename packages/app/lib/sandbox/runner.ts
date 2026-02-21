@@ -10,16 +10,17 @@ const SANDBOX_TIMEOUT_MS = 60_000;
 const COMMAND_TIMEOUT_MS = 45_000;
 
 function getAgentEnv(): AgentEnv {
+  const configJson = process.env.CLOUDCLAW_AGENT_CONFIG_JSON ?? "{}";
   const llmProvider = process.env.CLOUDCLAW_LLM_PROVIDER ?? "anthropic";
   const llmApiKey = process.env.CLOUDCLAW_LLM_API_KEY;
   const llmModel = process.env.CLOUDCLAW_LLM_MODEL ?? "claude-sonnet-4-20250514";
-  const memoryBackend = (process.env.CLOUDCLAW_MEMORY_BACKEND ?? "sqlite") as AgentEnv["memoryBackend"];
+  const memoryBackend = process.env.CLOUDCLAW_MEMORY_BACKEND ?? "sqlite";
 
   if (!llmApiKey) {
     throw new Error("CLOUDCLAW_LLM_API_KEY environment variable is required");
   }
 
-  return { llmProvider, llmApiKey, llmModel, memoryBackend };
+  return { configJson, llmProvider, llmApiKey, llmModel, memoryBackend };
 }
 
 function resolveAssetPath(localPath: string): string {

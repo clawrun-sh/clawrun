@@ -8,7 +8,7 @@ import type {
   SandboxFile,
 } from "./types.js";
 import { buildAgentCommand, buildOnboardCommand, buildDaemonCommand } from "../command-builder.js";
-import { generateDaemonToml } from "../config-generator.js";
+import { generateDaemonToml, generateDaemonTomlFromJson } from "../config-generator.js";
 import { parseOutput } from "../output-parser.js";
 import { getBinaryPath } from "../binary.js";
 
@@ -61,7 +61,7 @@ export const zeroclawAdapter: AgentAdapter = {
       provider: env.llmProvider,
       apiKey: env.llmApiKey,
       model: env.llmModel,
-      memory: env.memoryBackend ?? "sqlite",
+      memory: (env.memoryBackend ?? "sqlite") as "sqlite" | "markdown" | "postgres" | "none",
     });
   },
 
@@ -70,6 +70,12 @@ export const zeroclawAdapter: AgentAdapter = {
   },
 
   generateDaemonConfig(env: AgentEnv, channels: ChannelConfig): SandboxFile[] {
+    // If we have the full agent config JSON from napi, convert it to TOML directly
+    if (env.configJson && env.configJson !== "{}") {
+      const toml = generateDaemonTomlFromJson(env.configJson);
+      return [{ path: `${ZEROCLAW_HOME}/config.toml`, content: toml }];
+    }
+    // Fallback: build TOML from individual fields
     const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
     const toml = generateDaemonToml(env, channels, { databaseUrl, memoryBackend: env.memoryBackend });
     return [{ path: `${ZEROCLAW_HOME}/config.toml`, content: toml }];

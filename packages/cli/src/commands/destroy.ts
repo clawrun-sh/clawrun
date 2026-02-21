@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
+import * as clack from "@clack/prompts";
 import {
   instanceExists,
   getInstance,
@@ -74,12 +74,12 @@ export async function destroyCommand(
   console.log(chalk.dim(`  Path: ${dir}`));
 
   if (!options.yes) {
-    const confirmed = await confirm({
+    const confirmed = await clack.confirm({
       message: `Are you sure you want to destroy instance "${name}"? This will delete the Vercel project and cannot be undone.`,
-      default: false,
+      initialValue: false,
     });
 
-    if (!confirmed) {
+    if (clack.isCancel(confirmed) || !confirmed) {
       console.log(chalk.yellow("  Aborted."));
       return;
     }

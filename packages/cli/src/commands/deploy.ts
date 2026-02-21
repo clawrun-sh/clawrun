@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { humanId } from "human-id";
+import * as clack from "@clack/prompts";
 import { getPreset, listPresets } from "../presets/index.js";
-import { collectEnvVars } from "../deploy/env.js";
 import {
   checkPrerequisites,
   createVercelProject,
@@ -41,7 +42,7 @@ function printBanner(): void {
  | |    | |/ _ \\| | | |/ _\` | |    | |/ _\` \\ \\ /\\ / /
  | |____| | (_) | |_| | (_| | |____| | (_| |\\ V  V /
   \\_____|_|\\___/ \\__,_|\\__,_|\\_____|_|\\__,_| \\_/\\_/
-`)
+`),
   );
   console.log(chalk.dim("  AI agent hosting, simplified.\n"));
 }
@@ -57,21 +58,16 @@ export async function deployCommand(
   printBanner();
 
   // Determine if the argument is a preset name or an instance name.
-  // If it matches a known preset and no instance with that name exists,
-  // treat it as "create new instance with this preset".
   const presetNames = listPresets().map((p) => p.id);
   let instanceName: string | undefined;
   let presetId: string | undefined = options.preset;
 
   if (nameOrPreset) {
     if (instanceExists(nameOrPreset)) {
-      // Existing instance — redeploy/upgrade path
       instanceName = nameOrPreset;
     } else if (presetNames.includes(nameOrPreset)) {
-      // Argument matches a preset — create new instance with auto-generated name
       presetId = nameOrPreset;
     } else {
-      // Argument is a new instance name
       instanceName = nameOrPreset;
     }
   }
@@ -96,30 +92,23 @@ async function detectAndPrintTier(): Promise<{
   const tierDefaults = platform.getDefaults(tier);
 
   if (tier === "hobby") {
-    console.log(chalk.bold("\n  Detected Vercel Hobby (free) plan.\n"));
-    console.log(chalk.dim("  Defaults optimized for the free tier:"));
-    console.log(chalk.dim(`    Heartbeat cron:    ${limits.heartbeatCron} (daily)`));
-    console.log(chalk.dim(`    Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "30"} minutes`));
-    console.log(chalk.dim(`    Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session`));
-    console.log(chalk.dim("    Lifecycle mode:    webhook-driven (sandbox starts on incoming message)"));
-    console.log();
-    console.log(
-      chalk.dim(
-        "  To unlock per-minute heartbeat and always-on mode, upgrade your\n" +
-        "  Vercel plan and run `cloudclaw deploy <instance>` again to pick\n" +
-        "  up the new limits automatically.",
-      ),
+    clack.log.info(
+      `${chalk.bold("Vercel Hobby (free) plan detected")}\n` +
+      chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (daily)\n`) +
+      chalk.dim(`  Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "30"} minutes\n`) +
+      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session\n`) +
+      chalk.dim("  Lifecycle mode:    webhook-driven"),
     );
   } else {
-    console.log(chalk.bold("\n  Detected Vercel Pro plan.\n"));
-    console.log(chalk.dim("  Defaults for the full feature set:"));
-    console.log(chalk.dim(`    Heartbeat cron:    ${limits.heartbeatCron} (every minute)`));
-    console.log(chalk.dim(`    Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "240"} minutes`));
-    console.log(chalk.dim(`    Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5"} minutes (duty-cycle)`));
-    console.log(chalk.dim("    Lifecycle mode:    heartbeat-driven (full cron + always-on support)"));
+    clack.log.info(
+      `${chalk.bold("Vercel Pro plan detected")}\n` +
+      chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (every minute)\n`) +
+      chalk.dim(`  Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "240"} minutes\n`) +
+      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5"} minutes (duty-cycle)\n`) +
+      chalk.dim("  Lifecycle mode:    heartbeat-driven"),
+    );
   }
 
-  console.log();
   return { tier, limits, tierDefaults };
 }
 
@@ -128,7 +117,7 @@ async function handleNewInstance(
   presetId: string | undefined,
   options: { yes?: boolean },
 ): Promise<void> {
-  // Resolve preset (default to zeroclaw-basic if only one exists)
+  // Resolve preset
   if (!presetId) {
     const presets = listPresets();
     if (presets.length === 1) {
@@ -157,112 +146,183 @@ async function handleNewInstance(
     process.exit(1);
   }
 
-  // Generate instance name if not provided
-  const name = instanceName ?? generateInstanceName();
+  clack.intro(chalk.bold.cyan("CloudClaw Setup"));
 
-  console.log(chalk.bold(`Creating new instance: ${name}`));
-  console.log(chalk.dim(`  Preset: ${preset.name}`));
-  console.log(chalk.dim(`  ${preset.description}\n`));
+  // Instance name
+  const name = instanceName ?? generateInstanceName();
+  clack.log.step(`Instance: ${chalk.bold(name)}`);
+  clack.log.info(`Preset: ${preset.name} — ${preset.description}`);
 
   // Check prerequisites
-  console.log(chalk.bold("Checking prerequisites..."));
+  clack.log.step("Checking prerequisites...");
   await checkPrerequisites();
 
-  // Detect tier and print plan info
+  // Detect tier
   const { limits, tierDefaults } = await detectAndPrintTier();
+  const defaultActiveDuration = parseInt(tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5", 10);
 
-  // Collect env vars (tier defaults pre-fill prompts)
-  const envVars = await collectEnvVars(preset, options.yes ?? false, tierDefaults);
+  // ============================================================
+  // Agent config via napi-rs (required — no fallback)
+  // ============================================================
 
-  // ===================================================================
+  let napi: typeof import("zeroclaw-napi");
+  try {
+    napi = await import("zeroclaw-napi");
+  } catch (err) {
+    clack.log.error(
+      `ZeroClaw native bridge is required but could not be loaded.\n` +
+      chalk.dim(`  ${err instanceof Error ? err.message : String(err)}\n`) +
+      chalk.dim("  Run: cd packages/zeroclaw-napi && bash build-docker.sh"),
+    );
+    process.exit(1);
+  }
+
+  // Memory backend
+  let memoryBackend = "sqlite";
+  const backends = napi.getMemoryBackends();
+
+  if (!options.yes) {
+    const selected = await clack.select({
+      message: "Select agent memory backend",
+      options: backends.map((b: { key: string; label: string }) => ({
+        value: b.key,
+        label: b.label,
+      })),
+      initialValue: "sqlite",
+    });
+
+    if (clack.isCancel(selected)) {
+      clack.cancel("Setup cancelled.");
+      process.exit(0);
+    }
+
+    memoryBackend = selected as string;
+  }
+
+  // Provider setup via ZeroClaw's interactive wizard
+  clack.log.step("Configuring LLM provider...");
+  clack.log.info(chalk.dim("ZeroClaw's provider wizard will guide you through setup.\n"));
+
+  const providerResult = await napi.runProviderWizard();
+  clack.log.success(
+    `Provider: ${chalk.green(providerResult.provider)} | Model: ${chalk.green(providerResult.model)}`,
+  );
+
+  // Channel setup via ZeroClaw's interactive wizard
+  if (!options.yes) {
+    const configureChannels = await clack.confirm({
+      message: "Configure messaging channels? (Telegram, Discord, Slack, etc.)",
+      initialValue: true,
+    });
+
+    if (clack.isCancel(configureChannels)) {
+      clack.cancel("Setup cancelled.");
+      process.exit(0);
+    }
+
+    if (configureChannels) {
+      clack.log.step("Configuring channels...");
+      clack.log.info(chalk.dim("ZeroClaw's channel wizard will guide you through setup.\n"));
+      await napi.runChannelWizard();
+      clack.log.success("Channel configuration saved.");
+    }
+  }
+
+  // Read the full assembled config from ZeroClaw
+  const agentConfigJson = await napi.getSavedConfig();
+
+  // CloudClaw-specific settings
+  const activeDuration = defaultActiveDuration;
+  const cronSecret = randomUUID();
+  const nextAuthSecret = randomUUID();
+  const webhookSecret = randomUUID();
+
+  // ============================================================
   // Phase 1: Provision database (hard gate)
-  //
-  // Create a Vercel project via API (instant, no deploy needed) and
-  // run the Neon integration from a temp directory. If the DB fails,
-  // only an empty project exists — cheap rollback, no instance built.
-  // ===================================================================
+  // ============================================================
 
   let projectInfo: VercelProjectInfo;
   try {
     projectInfo = await createVercelProject(name);
   } catch (err) {
-    console.error(chalk.red(`\n  Failed to create Vercel project: ${err instanceof Error ? err.message : String(err)}`));
+    clack.log.error(`Failed to create Vercel project: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
-  // Temp dir with just .vercel/project.json — enough for vercel CLI commands
+  // Temp dir for DB provisioning
   const tempDir = join(tmpdir(), `cloudclaw-setup-${name}-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   writeVercelLink(tempDir, projectInfo);
 
-  const memoryBackend = envVars["CLOUDCLAW_MEMORY_BACKEND"] ?? "sqlite";
   let dbVars: Record<string, string> = {};
 
   if (memoryBackend === "postgres") {
     const dbResult = await provisionDatabase(tempDir);
     if (!dbResult.success) {
-      console.error(chalk.red("\nRolling back: removing Vercel project.\n"));
+      clack.log.error("Database provisioning failed. Rolling back Vercel project.");
       await deleteVercelProject(projectInfo);
       rmSync(tempDir, { recursive: true, force: true });
       process.exit(1);
     }
     dbVars = dbResult.dbVars;
   } else {
-    console.log(chalk.dim(`\n  Skipping database (memory backend: ${memoryBackend})\n`));
+    clack.log.info(chalk.dim(`Skipping database (memory backend: ${memoryBackend})`));
   }
 
-  // Always provision shared Redis for state store (non-fatal if it fails)
+  // Redis for state store
   const redisResult = await provisionRedis(tempDir);
-
-  // Clean up temp dir (we'll write the link into the real instance dir)
   rmSync(tempDir, { recursive: true, force: true });
 
-  // ===================================================================
+  // ============================================================
   // Phase 2: Build instance + deploy
-  //
-  // Merge provisioned vars into env and build the full instance.
-  // ===================================================================
+  // ============================================================
 
-  const allEnvVars: Record<string, string> = {
-    ...envVars,
-    ...dbVars,
-    ...(redisResult.success ? redisResult.redisVars : {}),
-    CLOUDCLAW_INSTANCE_NAME: name,
-  };
+  const config = buildConfig(name, preset.id, preset.agent, agentConfigJson, {
+    memoryBackend,
+    activeDuration,
+    cronSecret,
+    nextAuthSecret,
+    webhookSecret,
+  });
 
-  // Build structured config, then create instance
-  const config = buildConfig(name, preset.id, preset.agent, allEnvVars);
   const dir = await createInstance(name, config);
 
-  // Write the Vercel project link into the instance dir
+  // Write the Vercel project link
   writeVercelLink(dir, projectInfo);
 
   // Patch vercel.json with plan-aware cron schedule
   patchVercelJson(dir, limits.heartbeatCron);
 
-  // Disable Vercel Deployment Protection (SSO) so webhooks can reach the app
+  // Disable Vercel Deployment Protection
   await disableDeploymentProtection(dir);
 
-  // Persist all env vars to Vercel project level
+  // Derive env vars from config + merge provisioned vars
+  const cloudclawEnv = toEnvVars(config);
+  const allEnvVars: Record<string, string> = {
+    ...cloudclawEnv,
+    ...dbVars,
+    ...(redisResult.success ? redisResult.redisVars : {}),
+    CLOUDCLAW_INSTANCE_NAME: name,
+  };
+
+  // Persist all env vars to Vercel project
   await persistEnvVarsToProject(dir, allEnvVars);
 
   // Deploy
-  let url = await deployToVercel(dir, allEnvVars);
+  const url = await deployToVercel(dir, allEnvVars);
   saveDeployedUrl(name, url);
 
-  // Start sandbox — user can chat immediately.
-  // Extend loop handles lifecycle. Heartbeat manages hooks.
-  console.log(chalk.cyan("\nStarting sandbox...\n"));
-  const cronSecret = allEnvVars["CLOUDCLAW_CRON_SECRET"];
+  // Start sandbox
+  clack.log.step("Starting sandbox...");
   if (cronSecret) {
     try {
       const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
       const result = await res.json() as Record<string, unknown>;
-      console.log(chalk.dim(`  Sandbox: ${result.action ?? "ok"}`));
-    } catch (err) {
-      console.log(chalk.yellow("  Could not start sandbox — it will start on first message."));
+      clack.log.success(`Sandbox: ${result.action ?? "ok"}`);
+    } catch {
+      clack.log.warn("Could not start sandbox — it will start on first message.");
     }
   }
 
@@ -283,46 +343,42 @@ async function handleExistingInstance(
 
   const dir = instanceDir(name);
 
-  console.log(chalk.bold(`Redeploying instance: ${name}`));
-  console.log(chalk.dim(`  Preset: ${meta.preset}`));
-  console.log(chalk.dim(`  @cloudclaw/app: ${meta.appVersion}`));
+  clack.intro(chalk.bold.cyan(`Redeploying: ${name}`));
+  clack.log.info(`Preset: ${meta.preset} | App: ${meta.appVersion}`);
   if (meta.deployedUrl) {
-    console.log(chalk.dim(`  Last deployed to: ${meta.deployedUrl}`));
+    clack.log.info(`Last deployed to: ${meta.deployedUrl}`);
   }
-  console.log();
 
   // Check prerequisites
-  console.log(chalk.bold("Checking prerequisites..."));
+  clack.log.step("Checking prerequisites...");
   await checkPrerequisites();
 
-  // Detect tier (may have changed since last deploy)
+  // Detect tier
   const { limits } = await detectAndPrintTier();
 
-  // Upgrade instance (reinstall deps, reapply templates)
+  // Upgrade instance
   await upgradeInstance(name);
 
-  // Patch vercel.json with plan-aware cron schedule
+  // Patch vercel.json
   patchVercelJson(dir, limits.heartbeatCron);
 
-  // Read structured config and derive env vars
+  // Read config and derive env vars
   const config = readConfig(name);
   if (!config) {
-    console.error(chalk.red(`No cloudclaw.json found for instance "${name}".`));
+    clack.log.error(`No cloudclaw.json found for instance "${name}".`);
     process.exit(1);
   }
   const cloudclawEnv = toEnvVars(config);
 
-  // Persist any new CLOUDCLAW_ vars to project level
+  // Persist env vars
   await persistEnvVarsToProject(dir, cloudclawEnv);
 
-  // Deploy with CLOUDCLAW_ env vars
+  // Deploy
   const url = await deployToVercel(dir, cloudclawEnv);
-
-  // Save URL
   saveDeployedUrl(name, url);
 
-  // Restart sandbox with new code — extend loop handles lifecycle, heartbeat manages hooks.
-  console.log(chalk.cyan("\nRestarting sandbox...\n"));
+  // Restart sandbox
+  clack.log.step("Restarting sandbox...");
   const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
   if (cronSecret) {
     try {
@@ -330,10 +386,10 @@ async function handleExistingInstance(
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
       const result = await res.json() as Record<string, unknown>;
-      console.log(chalk.dim(`  Sandbox: ${result.action ?? "ok"}`));
+      clack.log.success(`Sandbox: ${result.action ?? "ok"}`);
     } catch (err) {
-      console.log(chalk.yellow("  Could not restart sandbox — it will start on first message."));
-      console.log(chalk.dim(`  ${err instanceof Error ? err.message : String(err)}`));
+      clack.log.warn("Could not restart sandbox — it will start on first message.");
+      clack.log.info(chalk.dim(`${err instanceof Error ? err.message : String(err)}`));
     }
   }
 
@@ -347,7 +403,7 @@ function printSuccess(
   url: string,
   botToken: string | null,
 ): void {
-  console.log(chalk.bold.green("\nDeployment successful!\n"));
+  clack.log.success(chalk.bold.green("Deployment successful!"));
   console.log(`  ${chalk.bold("Instance:")} ${chalk.cyan(name)}`);
   console.log(`  ${chalk.bold("URL:")} ${chalk.cyan(url)}`);
   console.log(`  ${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/health`)}`);
@@ -360,5 +416,5 @@ function printSuccess(
     );
   }
 
-  console.log();
+  clack.outro("Done!");
 }

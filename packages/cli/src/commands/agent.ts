@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import chalk from "chalk";
-import ora from "ora";
+import * as clack from "@clack/prompts";
 import { zeroclawAdapter } from "zeroclaw/adapter";
 import type { SandboxClient } from "../sandbox/types.js";
 import { createSandboxClient } from "../sandbox/index.js";
@@ -89,9 +89,10 @@ export async function agentCommand(
 
   // Single-shot mode
   if (options.message) {
-    const spinner = ora("Thinking...").start();
+    const s = clack.spinner();
+    s.start("Thinking...");
     const { success, output } = await sendMessage(options.message);
-    spinner.stop();
+    s.stop(success ? "Done" : "Error");
     console.log(success ? chalk.green(output) : chalk.red(output));
     process.exit(success ? 0 : 1);
   }
@@ -107,9 +108,10 @@ export async function agentCommand(
       const message = await rl.question(chalk.bold("you> "));
       if (!message.trim()) continue;
 
-      const spinner = ora("Thinking...").start();
+      const s = clack.spinner();
+      s.start("Thinking...");
       const { success, output } = await sendMessage(message);
-      spinner.stop();
+      s.stop(success ? "Done" : "Error");
       console.log(success ? chalk.green(output) : chalk.red(output));
       console.log();
     }

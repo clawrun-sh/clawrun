@@ -1,8 +1,9 @@
 export interface AgentEnv {
-  llmProvider: string;
+  configJson: string; // Full agent config as JSON (from napi getSavedConfig)
+  llmProvider: string; // Extracted for CloudClaw's own use
   llmApiKey: string;
   llmModel: string;
-  memoryBackend?: "sqlite" | "markdown" | "postgres";
+  memoryBackend?: string;
 }
 
 export interface SandboxFile {
