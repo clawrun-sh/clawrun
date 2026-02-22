@@ -36,20 +36,7 @@ import { getPlatformProvider } from "../platform/index.js";
 import type { PlatformTier, PlatformLimits } from "../platform/index.js";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
-
-function printBanner(): void {
-  console.log(
-    chalk.bold.cyan(`
-   _____ _                 _  _____ _
-  / ____| |               | |/ ____| |
- | |    | | ___  _   _  __| | |    | | __ ___      __
- | |    | |/ _ \\| | | |/ _\` | |    | |/ _\` \\ \\ /\\ / /
- | |____| | (_) | |_| | (_| | |____| | (_| |\\ V  V /
-  \\_____|_|\\___/ \\__,_|\\__,_|\\_____|_|\\__,_| \\_/\\_/
-`),
-  );
-  console.log(chalk.dim("  AI agent hosting, simplified.\n"));
-}
+import { printBanner } from "../banner.js";
 
 function generateInstanceName(): string {
   return humanId({ separator: "-", capitalize: false });
