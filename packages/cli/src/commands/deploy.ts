@@ -44,7 +44,6 @@ async function detectAndPrintTier(): Promise<{
     clack.log.info(
       `${chalk.bold("Vercel Hobby (free) plan detected")}\n` +
       chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (daily)\n`) +
-      chalk.dim(`  Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "30"} minutes\n`) +
       chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session\n`) +
       chalk.dim("  Lifecycle mode:    webhook-driven"),
     );
@@ -52,8 +51,7 @@ async function detectAndPrintTier(): Promise<{
     clack.log.info(
       `${chalk.bold("Vercel Pro plan detected")}\n` +
       chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (every minute)\n`) +
-      chalk.dim(`  Sandbox timeout:   ${tierDefaults.CLOUDCLAW_SANDBOX_TIMEOUT ?? "240"} minutes\n`) +
-      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5"} minutes (duty-cycle)\n`) +
+      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session\n`) +
       chalk.dim("  Lifecycle mode:    heartbeat-driven"),
     );
   }

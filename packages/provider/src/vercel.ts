@@ -21,6 +21,14 @@ class VercelManagedSandbox implements ManagedSandbox {
     return this.sandbox.status as string;
   }
 
+  get timeout(): number {
+    return this.sandbox.timeout;
+  }
+
+  get createdAt(): number {
+    return this.sandbox.createdAt.getTime();
+  }
+
   runCommand(cmdOrOpts: string | RunCommandOptions, args?: string[]): Promise<CommandResult> {
     if (typeof cmdOrOpts === "string") {
       return this.sandbox.runCommand(cmdOrOpts, args);

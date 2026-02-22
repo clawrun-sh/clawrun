@@ -1,8 +1,6 @@
 export type PlatformTier = "hobby" | "paid";
 
 export interface PlatformLimits {
-  /** Max sandbox timeout in milliseconds. */
-  maxSandboxTimeoutMs: number;
   /** Cron expression for the heartbeat job. */
   heartbeatCron: string;
   /** CPU hours per month, or null if unlimited. */

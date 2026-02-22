@@ -50,10 +50,14 @@ const ZEROCLAW_WORKSPACE = ZEROCLAW_HOME;
 
 const STATE_NEXT_WAKE_AT = "next_wake_at";
 
+// Only extend when the native TTL is within this buffer of expiring.
+// ~5 ticks of runway (at 60s intervals) before the sandbox would die.
+const TTL_BUFFER_MS = 5 * 60 * 1000;
+
 /** Active duration: grace period before idle-stop decisions + idle threshold. */
 function getActiveDurationMs(): number {
-  const minutes = parseInt(process.env.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5", 10);
-  return (minutes > 0 ? minutes : 5) * 60 * 1000;
+  const minutes = parseInt(process.env.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10", 10);
+  return (minutes > 0 ? minutes : 10) * 60 * 1000;
 }
 
 export interface SandboxResult {
@@ -387,14 +391,28 @@ export class SandboxLifecycleManager {
     }
 
     if (reason) {
-      try {
-        await sandbox.extendTimeout(EXTEND_DURATION_MS);
-        console.log(`[CloudClaw] Extended sandbox ${payload.sandboxId} (+${EXTEND_DURATION_MS / 1000}s, reason: ${reason})`);
+      const deadline = sandbox.createdAt + sandbox.timeout;
+      const remaining = deadline - now;
+
+      if (remaining < TTL_BUFFER_MS) {
+        try {
+          await sandbox.extendTimeout(EXTEND_DURATION_MS);
+          console.log(
+            `[CloudClaw] Extended TTL (+${EXTEND_DURATION_MS / 1000}s, reason: ${reason},` +
+            ` remaining was ${Math.round(remaining / 1000)}s)`,
+          );
+          return { action: "extended" };
+        } catch (err) {
+          // Extension failed (plan ceiling, API error) — fall through to
+          // graceful stop instead of leaving sandbox in limbo
+          console.error("[CloudClaw] extendTimeout failed, stopping gracefully:", err);
+        }
+      } else {
+        console.log(
+          `[CloudClaw] Skipping extend (reason: ${reason},` +
+          ` TTL ok: ${Math.round(remaining / 1000)}s remaining)`,
+        );
         return { action: "extended" };
-      } catch (err) {
-        // Extension failed (plan ceiling, API error) — fall through to
-        // graceful stop instead of leaving sandbox in limbo
-        console.error("[CloudClaw] extendTimeout failed, stopping gracefully:", err);
       }
     }
 

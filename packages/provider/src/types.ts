@@ -19,6 +19,10 @@ export interface CommandResult {
 export interface ManagedSandbox {
   readonly id: string;
   readonly status: string;
+  /** Current timeout in ms (includes extensions). */
+  readonly timeout: number;
+  /** Epoch ms when sandbox was created. */
+  readonly createdAt: number;
 
   runCommand(cmd: string, args?: string[]): Promise<CommandResult>;
   runCommand(opts: RunCommandOptions): Promise<CommandResult>;

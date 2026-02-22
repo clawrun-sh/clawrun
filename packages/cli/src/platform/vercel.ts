@@ -26,14 +26,12 @@ const KV_PRODUCTS = ["redis", "kv", "upstash"];
 
 const VERCEL_TIER_DEFAULTS: Record<PlatformTier, PlatformLimits> = {
   hobby: {
-    maxSandboxTimeoutMs: 45 * 60 * 1000,
     heartbeatCron: "0 0 * * *", // daily — hobby can't do per-minute
     cpuHoursPerMonth: 5,
     maxConcurrentSandboxes: 10,
     snapshotExpirationDays: 30,
   },
   paid: {
-    maxSandboxTimeoutMs: 5 * 60 * 60 * 1000,
     heartbeatCron: "* * * * *", // every minute
     cpuHoursPerMonth: null,
     maxConcurrentSandboxes: 100,
@@ -167,15 +165,8 @@ export class VercelPlatformProvider implements PlatformProvider {
   }
 
   getDefaults(tier: PlatformTier): Record<string, string> {
-    if (tier === "hobby") {
-      return {
-        CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "10", // 10 min
-        CLOUDCLAW_SANDBOX_TIMEOUT: "30", // 30 min safety net
-      };
-    }
     return {
-      CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "5",
-      CLOUDCLAW_SANDBOX_TIMEOUT: "240", // 4 hr
+      CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "10", // 10 min — unified across tiers
     };
   }
 
