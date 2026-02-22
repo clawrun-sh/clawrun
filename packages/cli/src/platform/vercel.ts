@@ -386,7 +386,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
       if (config.crons) {
         for (const cron of config.crons) {
-          if (cron.path === "/api/cron/heartbeat") {
+          if (cron.path === "/api/v1/heartbeat") {
             cron.schedule = limits.heartbeatCron;
           }
         }

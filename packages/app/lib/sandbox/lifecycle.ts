@@ -11,7 +11,7 @@ import { getStateStore } from "../storage/state";
 import { tryAcquireCreationLock, releaseCreationLock } from "../sandbox/lock";
 import type { StateStore } from "../storage/state-types";
 import type { ExtendReason } from "./extend-reasons";
-import { FileActivityReason, CronScheduleReason } from "./extend-reasons";
+import { GracePeriodReason, FileActivityReason, CronScheduleReason } from "./extend-reasons";
 
 // --- Constants ---
 
@@ -29,6 +29,10 @@ const EXTEND_INTERVAL_S = 60;
 
 // How long to keep sandbox alive when a cron job is due soon
 const CRON_KEEP_ALIVE_WINDOW_MS = 15 * 60 * 1000;
+
+// How far ahead of a scheduled cron job to wake the sandbox (seconds).
+// The sandbox needs time to boot + daemon init before the job fires.
+const CRON_WAKE_LEAD_S = 60;
 
 // Wait for daemon to initialize after starting
 const DAEMON_INIT_WAIT_MS = 3_000;
@@ -138,6 +142,7 @@ export class SandboxLifecycleManager {
   private provider: SandboxProvider = new VercelSandboxProvider();
   private retention = new CountBasedRetention(3);
   private extendReasons: ExtendReason[] = [
+    new GracePeriodReason(getActiveDurationMs()),
     new FileActivityReason(getActiveDurationMs()),
     new CronScheduleReason(CRON_KEEP_ALIVE_WINDOW_MS),
   ];
@@ -244,36 +249,57 @@ export class SandboxLifecycleManager {
 
   async heartbeat(): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
+    const now = Date.now();
 
     // Find all non-terminal sandboxes
     const active = sandboxes.filter((s) => !this.isTerminal(s));
-    console.log(
-      `[CloudClaw] Heartbeat: ${sandboxes.length} listed, ${active.length} active:`,
-      active.map((s) => `${s.id}(${s.status})`).join(", ") || "none",
-    );
 
     // RUNNING SANDBOX: extend loop owns keep-alive decisions
     if (active.length > 0) {
       const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
+      console.log(
+        `[CloudClaw] Heartbeat: action=none, reason=sandbox running` +
+        ` (${newest.id}, ${newest.status})`,
+      );
       return { status: "running", sandboxId: newest.id };
     }
 
     // NO SANDBOX: decide whether to wake
-    // Check for cron-triggered wake
     const nextWakeAtStr = await this.state.get(STATE_NEXT_WAKE_AT);
+
+    // Check for cron-triggered wake — wake CRON_WAKE_LEAD_S early so the
+    // sandbox is booted and the daemon is ready before the job fires.
     if (nextWakeAtStr) {
       const nextWakeAt = new Date(nextWakeAtStr);
-      if (nextWakeAt.getTime() <= Date.now()) {
-        console.log("[CloudClaw] Cron-triggered wake (next_wake_at due)");
+      const wakeDeadline = nextWakeAt.getTime() - CRON_WAKE_LEAD_S * 1000;
+      const secsUntilCron = Math.round((nextWakeAt.getTime() - now) / 1000);
+
+      if (now >= wakeDeadline) {
+        console.log(
+          `[CloudClaw] Heartbeat: action=wake, reason=cron due` +
+          ` (nextCronAt=${nextWakeAtStr}, in ${secsUntilCron}s,` +
+          ` lead=${CRON_WAKE_LEAD_S}s)`,
+        );
         await this.state.delete(STATE_NEXT_WAKE_AT);
         return this.startNew(sandboxes);
       }
-    }
 
-    // First boot: no sandbox has ever existed
-    const hasEverRun = sandboxes.some((s) => s.stoppedAt || s.status === "running");
-    if (!hasEverRun && sandboxes.length === 0) {
-      return this.startNew(sandboxes);
+      // Not yet time — log and fall through to sleeping
+      console.log(
+        `[CloudClaw] Heartbeat: action=none, reason=sleeping` +
+        ` (nextCronAt=${nextWakeAtStr}, in ${secsUntilCron}s)`,
+      );
+    } else {
+      // First boot: no sandbox has ever existed
+      const hasEverRun = sandboxes.some((s) => s.stoppedAt || s.status === "running");
+      if (!hasEverRun && sandboxes.length === 0) {
+        console.log("[CloudClaw] Heartbeat: action=wake, reason=first boot");
+        return this.startNew(sandboxes);
+      }
+
+      console.log(
+        `[CloudClaw] Heartbeat: action=none, reason=sleeping (no cron scheduled)`,
+      );
     }
 
     // Sleeping — register wake hooks as crash recovery safety net
@@ -340,17 +366,20 @@ export class SandboxLifecycleManager {
       ` cronJobs=${payload.cronJobCount ?? "?"}`,
     );
 
-    // Grace period: the sandbox is still within its initial native TTL.
-    // Don't extend, don't evaluate stop — just acknowledge.
-    if (payload.sandboxCreatedAt) {
-      const elapsed = now - payload.sandboxCreatedAt;
-      if (elapsed < activeDurationMs) {
-        console.log(`[CloudClaw] Grace period (${Math.round(elapsed / 1000)}s / ${activeDurationMs / 1000}s), no action`);
-        return { action: "extended" };
+    // Persist next_wake_at on every tick that reports a cron schedule.
+    // This ensures the heartbeat knows when to wake the sandbox even if
+    // it crashes or its native TTL expires without a graceful stop.
+    if (payload.nextCronAt) {
+      try {
+        await this.state.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[CloudClaw] Failed to store next_wake_at:", msg);
+        return { action: "error", error: `Failed to persist next_wake_at: ${msg}` };
       }
     }
 
-    // Past grace period — evaluate extend reasons (first match wins)
+    // Evaluate extend reasons (first match wins)
     let reason: string | null = null;
     for (const r of this.extendReasons) {
       reason = r.evaluate(payload, now);
@@ -380,8 +409,6 @@ export class SandboxLifecycleManager {
       console.error(`[CloudClaw] Cannot stop sandbox (snapshot failed): ${msg}`);
       return { action: "error", error: `Snapshot failed, sandbox kept running: ${msg}` };
     }
-
-    if (payload.nextCronAt) await this.state.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
 
     // Only register wake hooks if no new sandbox was created during our stop.
     // Avoids re-registering a webhook that a concurrent startNew() already tore down.
@@ -559,8 +586,8 @@ export class SandboxLifecycleManager {
 
   /**
    * Start a background reporter inside the sandbox that calls the parent's
-   * /api/sandbox/extend endpoint every 60s with filesystem mtime data and
-   * next cron schedule. The parent decides whether to extend or stop.
+   * /api/v1/sandbox/heartbeat endpoint every 60s with filesystem mtime data
+   * and next cron schedule. The parent decides whether to extend or stop.
    */
   private async startSandboxExtendLoop(sandbox: ManagedSandbox): Promise<void> {
     const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -570,7 +597,7 @@ export class SandboxLifecycleManager {
       return;
     }
 
-    const url = `https://${host}/api/sandbox/extend`;
+    const url = `https://${host}/api/v1/sandbox/heartbeat`;
     const id = sandbox.id;
 
     const script = [

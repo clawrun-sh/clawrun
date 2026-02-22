@@ -42,7 +42,7 @@ export const stop = command({
     spinner.start("Stopping sandbox...");
 
     try {
-      const res = await fetch(`${deployedUrl}/api/sandbox/stop`, {
+      const res = await fetch(`${deployedUrl}/api/v1/sandbox/stop`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}` },
       });

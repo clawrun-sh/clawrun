@@ -33,7 +33,10 @@ export async function startAgentChat(instanceName: string, config: CloudClawConf
     const cmd = adapter.buildCommand(msg);
     const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env, { timeoutMs: 150_000 });
     const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
-    return { success: response.success, output: response.message || response.error || "" };
+    const output = response.success
+      ? (response.message || "")
+      : (response.error || response.message || "Unknown error");
+    return { success: response.success, output };
   }
 
   // Interactive REPL mode
@@ -108,7 +111,9 @@ export const agent = command({
       const s = clack.spinner();
       s.start("Thinking...");
       s.stop(response.success ? "Done" : "Error");
-      const output = response.message || response.error || "";
+      const output = response.success
+        ? (response.message || "")
+        : (response.error || response.message || "Unknown error");
       console.log(response.success ? chalk.green(output) : chalk.red(output));
       process.exit(response.success ? 0 : 1);
     }

@@ -5,7 +5,7 @@ import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 import type { ExtendPayload } from "../sandbox/lifecycle";
 
 /**
- * Sandbox extend endpoint — called by the sandbox's internal reporter loop.
+ * Sandbox heartbeat endpoint — called by the sandbox's internal reporter loop.
  *
  * Every 60s, a background script inside the sandbox POST's here with
  * filesystem mtime data and next cron schedule. The lifecycle manager
@@ -50,6 +50,9 @@ export async function POST(req: Request) {
   try {
     const manager = new SandboxLifecycleManager();
     const result = await manager.handleExtend(payload);
+    if (result.action === "error") {
+      return NextResponse.json(result, { status: 500 });
+    }
     return NextResponse.json(result);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);

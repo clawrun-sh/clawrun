@@ -55,11 +55,20 @@ export class VercelSandboxClient implements SandboxClient {
       const result = await execa("npx", execArgs, { timeout: options?.timeoutMs ?? 60_000 });
       return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
     } catch (err: unknown) {
-      const e = err as { stdout?: string; stderr?: string; exitCode?: number };
+      const e = err as { stdout?: string; stderr?: string; exitCode?: number; message?: string };
+      let stderr = e.stderr ?? "";
+
+      // The sandbox CLI wraps API errors in a verbose stack trace.
+      // Try to extract the concise message from the JSON payload.
+      const jsonMatch = stderr.match(/"message"\s*:\s*"([^"]+)"/);
+      if (jsonMatch) {
+        stderr = jsonMatch[1];
+      }
+
       return {
         exitCode: e.exitCode ?? 1,
         stdout: e.stdout ?? "",
-        stderr: e.stderr ?? "",
+        stderr,
       };
     }
   }

@@ -10,6 +10,23 @@ export interface ExtendReason {
 }
 
 /**
+ * Extend unconditionally while the sandbox is within its initial grace period.
+ * This prevents premature idle-stop decisions before the agent has had time
+ * to initialise and produce file activity.
+ */
+export class GracePeriodReason implements ExtendReason {
+  constructor(private gracePeriodMs: number) {}
+
+  evaluate(payload: ExtendPayload, now: number): string | null {
+    if (!payload.sandboxCreatedAt) return null;
+    const elapsed = now - payload.sandboxCreatedAt;
+    return elapsed < this.gracePeriodMs
+      ? `grace period (${Math.round(elapsed / 1000)}s / ${this.gracePeriodMs / 1000}s)`
+      : null;
+  }
+}
+
+/**
  * Extend if files in ZEROCLAW_HOME have changed recently (sandbox is "active").
  */
 export class FileActivityReason implements ExtendReason {

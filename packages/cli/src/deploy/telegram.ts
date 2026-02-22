@@ -62,7 +62,7 @@ export async function setupTelegram(
   }
 
   // Step 2: Delete any stale webhook, then register fresh
-  const webhookUrl = `${deployUrl}/api/webhook/telegram`;
+  const webhookUrl = `${deployUrl}/api/v1/webhook/telegram`;
   console.log(chalk.dim(`  Registering webhook: ${webhookUrl}`));
 
   try {

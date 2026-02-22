@@ -34,8 +34,9 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
     transpilePackages: ["@cloudclaw/app", "@cloudclaw/provider"],
     serverExternalPackages: ["grammy", "@vercel/sandbox"],
     outputFileTracingIncludes: {
-      "/api/webhook/telegram": zeroclawBinPaths,
-      "/api/cron/heartbeat": zeroclawBinPaths,
+      "/api/v1/webhook/telegram": zeroclawBinPaths,
+      "/api/v1/heartbeat": zeroclawBinPaths,
+      "/api/v1/sandbox/restart": zeroclawBinPaths,
     },
     ...overrides,
   };

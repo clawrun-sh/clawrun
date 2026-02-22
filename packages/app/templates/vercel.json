@@ -2,16 +2,23 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "crons": [
-    { "path": "/api/cron/heartbeat", "schedule": "* * * * *" }
+    { "path": "/api/v1/heartbeat", "schedule": "* * * * *" }
   ],
   "functions": {
-    "app/api/webhook/telegram/route.ts": {
+    "app/api/v1/webhook/telegram/route.ts": {
       "maxDuration": 60,
       "includeFiles": "node_modules/zeroclaw/dist/bin/**"
     },
-    "app/api/cron/heartbeat/route.ts": {
+    "app/api/v1/heartbeat/route.ts": {
       "maxDuration": 60,
       "includeFiles": "node_modules/zeroclaw/dist/bin/**"
+    },
+    "app/api/v1/sandbox/restart/route.ts": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/zeroclaw/dist/bin/**"
+    },
+    "app/api/v1/sandbox/heartbeat/route.ts": {
+      "maxDuration": 60
     }
   }
 }

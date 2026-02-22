@@ -11,7 +11,9 @@
     "./api/health": "./lib/handlers/health.ts",
     "./api/webhook-telegram": "./lib/handlers/webhook-telegram.ts",
     "./api/heartbeat": "./lib/handlers/heartbeat.ts",
-    "./api/sandbox-extend": "./lib/handlers/sandbox-extend.ts",
+    "./api/sandbox-heartbeat": "./lib/handlers/sandbox-heartbeat.ts",
+    "./api/sandbox-restart": "./lib/handlers/sandbox-restart.ts",
+    "./api/sandbox-stop": "./lib/handlers/sandbox-stop.ts",
     "./pages/home": "./lib/components/home.tsx",
     "./pages/layout": "./lib/components/root-layout.tsx",
     "./config": "./lib/config.ts"

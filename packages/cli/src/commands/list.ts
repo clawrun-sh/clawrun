@@ -11,7 +11,7 @@ interface SandboxStatus {
 
 async function fetchSandboxStatus(deployedUrl: string): Promise<SandboxStatus | null> {
   try {
-    const res = await fetch(`${deployedUrl}/api/health`, { signal: AbortSignal.timeout(5_000) });
+    const res = await fetch(`${deployedUrl}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
     const data = await res.json() as Record<string, unknown>;
     return (data.sandbox as SandboxStatus) ?? null;
   } catch {

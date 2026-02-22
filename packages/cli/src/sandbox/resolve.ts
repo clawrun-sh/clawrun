@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import type { SandboxClient } from "./types.js";
 
 /** Find the running sandbox ID, or null. */
@@ -16,9 +17,10 @@ async function ensureRunning(
   deployedUrl: string,
   cronSecret: string,
 ): Promise<string> {
-  process.stdout.write(chalk.dim("Starting sandbox..."));
+  const spinner = clack.spinner();
+  spinner.start("Starting sandbox...");
 
-  await fetch(`${deployedUrl}/api/sandbox/restart`, {
+  await fetch(`${deployedUrl}/api/v1/sandbox/restart`, {
     method: "POST",
     headers: { Authorization: `Bearer ${cronSecret}` },
   });
@@ -31,14 +33,12 @@ async function ensureRunning(
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const id = await getRunningId(client);
     if (id) {
-      process.stdout.write("\n");
+      spinner.stop(chalk.green("Sandbox started."));
       return id;
     }
-    process.stdout.write(".");
   }
 
-  process.stdout.write("\n");
-  console.error(chalk.red("Sandbox did not start within 90s."));
+  spinner.stop(chalk.red("Sandbox did not start within 90s."));
   process.exit(1);
 }
 

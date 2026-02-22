@@ -3,7 +3,7 @@ const TELEGRAM_API = "https://api.telegram.org/bot";
 function getWebhookUrl(): string {
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
   if (!host) throw new Error("VERCEL_PROJECT_PRODUCTION_URL not set");
-  return `https://${host}/api/webhook/telegram`;
+  return `https://${host}/api/v1/webhook/telegram`;
 }
 
 export async function registerTelegramWakeWebhook(): Promise<void> {

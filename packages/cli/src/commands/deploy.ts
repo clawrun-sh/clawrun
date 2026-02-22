@@ -305,7 +305,7 @@ async function handleNewInstance(
   clack.log.step("Starting sandbox...");
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/sandbox/restart`, {
+      const res = await fetch(`${url}/api/v1/sandbox/restart`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
@@ -454,7 +454,7 @@ async function handleExistingInstance(
   const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/sandbox/restart`, {
+      const res = await fetch(`${url}/api/v1/sandbox/restart`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
@@ -481,7 +481,7 @@ function printSuccess(
   clack.log.success(chalk.bold.green("Deployment successful!"));
   console.log(`  ${chalk.bold("Instance:")} ${chalk.cyan(name)}`);
   console.log(`  ${chalk.bold("URL:")} ${chalk.cyan(url)}`);
-  console.log(`  ${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/health`)}`);
+  console.log(`  ${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/v1/health`)}`);
 
   if (botToken) {
     console.log(
