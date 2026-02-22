@@ -3,7 +3,6 @@ export interface AgentEnv {
   llmProvider: string; // Extracted for CloudClaw's own use
   llmApiKey: string;
   llmModel: string;
-  memoryBackend?: string;
 }
 
 export interface SandboxFile {

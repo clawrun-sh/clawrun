@@ -87,13 +87,12 @@ function getAgentEnv(): AgentEnv {
   const llmProvider = process.env.CLOUDCLAW_LLM_PROVIDER ?? "anthropic";
   const llmApiKey = process.env.CLOUDCLAW_LLM_API_KEY;
   const llmModel = process.env.CLOUDCLAW_LLM_MODEL ?? "claude-sonnet-4-20250514";
-  const memoryBackend = process.env.CLOUDCLAW_MEMORY_BACKEND ?? "sqlite";
 
   if (!llmApiKey) {
     throw new Error("CLOUDCLAW_LLM_API_KEY environment variable is required");
   }
 
-  return { configJson, llmProvider, llmApiKey, llmModel, memoryBackend };
+  return { configJson, llmProvider, llmApiKey, llmModel };
 }
 
 function getChannelConfig(): ChannelConfig {

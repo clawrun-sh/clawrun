@@ -61,7 +61,6 @@ export const zeroclawAdapter: AgentAdapter = {
       provider: env.llmProvider,
       apiKey: env.llmApiKey,
       model: env.llmModel,
-      memory: (env.memoryBackend ?? "sqlite") as "sqlite" | "markdown" | "postgres" | "none",
     });
   },
 
@@ -76,8 +75,7 @@ export const zeroclawAdapter: AgentAdapter = {
       return [{ path: `${ZEROCLAW_HOME}/config.toml`, content: toml }];
     }
     // Fallback: build TOML from individual fields
-    const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-    const toml = generateDaemonToml(env, channels, { databaseUrl, memoryBackend: env.memoryBackend });
+    const toml = generateDaemonToml(env, channels);
     return [{ path: `${ZEROCLAW_HOME}/config.toml`, content: toml }];
   },
 };

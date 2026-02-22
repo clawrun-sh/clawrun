@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import { execa } from "execa";
 
 export interface VercelProjectInfo {
@@ -9,41 +10,47 @@ export interface VercelProjectInfo {
 }
 
 export async function checkPrerequisites(): Promise<void> {
-  // Check Node version
+  // Node version
   const nodeVersion = process.versions.node;
   const major = parseInt(nodeVersion.split(".")[0], 10);
   if (major < 20) {
-    console.error(chalk.red(`Node.js >= 20 is required. You have v${nodeVersion}.`));
+    clack.log.error(`Node.js >= 20 is required. You have v${nodeVersion}.`);
     process.exit(1);
   }
-  console.log(chalk.green(`  Node.js v${nodeVersion}`));
+  clack.log.success(`Node.js v${nodeVersion}`);
 
-  // Check Vercel CLI
+  // Vercel CLI
+  const vercelSpinner = clack.spinner();
+  vercelSpinner.start("Checking Vercel CLI");
   try {
     const { stdout } = await execa("vercel", ["--version"]);
-    console.log(chalk.green(`  Vercel CLI ${stdout.trim()}`));
+    vercelSpinner.stop(`Vercel CLI ${stdout.trim()}`);
   } catch {
-    console.log(chalk.yellow("  Vercel CLI not found. Installing..."));
+    vercelSpinner.stop("Vercel CLI not found");
+    clack.log.step("Installing Vercel CLI...");
     try {
       await execa("npm", ["install", "-g", "vercel"], { stdio: "inherit" });
-      console.log(chalk.green("  Vercel CLI installed."));
+      clack.log.success("Vercel CLI installed.");
     } catch {
-      console.error(chalk.red("  Failed to install Vercel CLI. Install manually: npm i -g vercel"));
+      clack.log.error("Failed to install Vercel CLI. Install manually: npm i -g vercel");
       process.exit(1);
     }
   }
 
-  // Check Vercel auth
+  // Vercel auth
+  const authSpinner = clack.spinner();
+  authSpinner.start("Checking Vercel authentication");
   try {
     const { stdout } = await execa("vercel", ["whoami"]);
-    console.log(chalk.green(`  Logged in as ${stdout.trim()}`));
+    authSpinner.stop(`Logged in as ${chalk.bold(stdout.trim())}`);
   } catch {
-    console.log(chalk.yellow("  Not logged in to Vercel. Starting login..."));
+    authSpinner.stop("Not logged in to Vercel");
+    clack.log.step("Starting Vercel login...");
     try {
       await execa("vercel", ["login"], { stdio: "inherit" });
-      console.log(chalk.green("  Vercel login successful."));
+      clack.log.success("Vercel login successful.");
     } catch {
-      console.error(chalk.red("  Vercel login failed. Run 'vercel login' manually."));
+      clack.log.error("Vercel login failed. Run 'vercel login' manually.");
       process.exit(1);
     }
   }

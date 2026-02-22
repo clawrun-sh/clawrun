@@ -1,7 +1,8 @@
 import { command, positional, option, optional, string } from "cmd-ts";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import * as TOML from "@iarna/toml";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { humanId } from "human-id";
@@ -10,15 +11,14 @@ import { getPreset, listPresets } from "../presets/index.js";
 import {
   checkPrerequisites,
   createVercelProject,
-  deleteVercelProject,
   deployToVercel,
   disableDeploymentProtection,
   persistEnvVarsToProject,
   writeVercelLink,
 } from "../deploy/vercel.js";
 import type { VercelProjectInfo } from "../deploy/vercel.js";
-import { provisionDatabase } from "../deploy/database.js";
-import { provisionRedis } from "../deploy/redis.js";
+import { listStateStores, connectStateStore, provisionStateStore } from "../deploy/state-store.js";
+import type { StateStore } from "../deploy/state-store.js";
 import {
   createInstance,
   instanceExists,
@@ -128,7 +128,6 @@ async function handleNewInstance(
   clack.log.info(`Preset: ${preset.name} — ${preset.description}`);
 
   // Check prerequisites
-  clack.log.step("Checking prerequisites...");
   await checkPrerequisites();
 
   // Detect tier
@@ -208,6 +207,13 @@ async function handleNewInstance(
     }
   }
 
+  // Write memory backend into zeroclaw config.toml
+  const configTomlPath = join(zcConfigDir, "config.toml");
+  const tomlContent = readFileSync(configTomlPath, "utf-8");
+  const parsed = TOML.parse(tomlContent);
+  parsed.memory = { ...(parsed.memory as Record<string, unknown> ?? {}), backend: memoryBackend };
+  writeFileSync(configTomlPath, TOML.stringify(parsed as TOML.JsonMap));
+
   // Read the full assembled config from ZeroClaw
   const agentConfigJson = await napi.getSavedConfig();
 
@@ -222,7 +228,7 @@ async function handleNewInstance(
   const webhookSecret = randomUUID();
 
   // ============================================================
-  // Phase 1: Provision database (hard gate)
+  // Phase 1: Create Vercel project + provision state store
   // ============================================================
 
   let projectInfo: VercelProjectInfo;
@@ -233,28 +239,51 @@ async function handleNewInstance(
     process.exit(1);
   }
 
-  // Temp dir for DB provisioning
+  // Temp dir for integration provisioning
   const tempDir = join(tmpdir(), `cloudclaw-setup-${name}-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   writeVercelLink(tempDir, projectInfo);
 
-  let dbVars: Record<string, string> = {};
+  // State store — offer to reuse an existing store
+  let selectedStore: StateStore | undefined;
 
-  if (memoryBackend === "postgres") {
-    const dbResult = await provisionDatabase(tempDir);
-    if (!dbResult.success) {
-      clack.log.error("Database provisioning failed. Rolling back Vercel project.");
-      await deleteVercelProject(projectInfo);
-      rmSync(tempDir, { recursive: true, force: true });
-      process.exit(1);
+  if (!options.yes) {
+    const stores = await listStateStores();
+    if (stores.length > 0) {
+      const choice = await clack.select({
+        message: "Select a state store",
+        options: [
+          ...stores.map((s) => ({
+            value: s.id,
+            label: s.name,
+            hint: s.status,
+          })),
+          { value: "__new__", label: "➕ Create new store", hint: "provision a new store" },
+        ],
+      });
+
+      if (clack.isCancel(choice)) {
+        clack.cancel("Setup cancelled.");
+        rmSync(tempDir, { recursive: true, force: true });
+        process.exit(0);
+      }
+
+      if (choice !== "__new__") {
+        selectedStore = stores.find((s) => s.id === choice);
+      }
     }
-    dbVars = dbResult.dbVars;
-  } else {
-    clack.log.info(chalk.dim(`Skipping database (memory backend: ${memoryBackend})`));
   }
 
-  // Redis for state store
-  const redisResult = await provisionRedis(tempDir);
+  const stateResult = selectedStore
+    ? await connectStateStore(tempDir, selectedStore, projectInfo.projectId)
+    : await provisionStateStore(tempDir);
+
+  if (!stateResult.success) {
+    clack.log.error("Failed to provision state store.");
+    rmSync(tempDir, { recursive: true, force: true });
+    process.exit(1);
+  }
+
   rmSync(tempDir, { recursive: true, force: true });
 
   // ============================================================
@@ -262,7 +291,6 @@ async function handleNewInstance(
   // ============================================================
 
   const config = buildConfig(name, preset.id, preset.agent, {
-    memoryBackend,
     activeDuration,
     cronSecret,
     nextAuthSecret,
@@ -273,8 +301,7 @@ async function handleNewInstance(
   const cloudclawEnv = toEnvVars(config, agentConfigJson);
   const allEnvVars: Record<string, string> = {
     ...cloudclawEnv,
-    ...dbVars,
-    ...(redisResult.success ? redisResult.redisVars : {}),
+    ...stateResult.vars,
     CLOUDCLAW_INSTANCE_NAME: name,
   };
 
@@ -336,7 +363,6 @@ async function handleExistingInstance(
   }
 
   // Check prerequisites
-  clack.log.step("Checking prerequisites...");
   await checkPrerequisites();
 
   // Detect tier
@@ -479,7 +505,7 @@ function printSuccess(
   if (botToken) {
     console.log(
       chalk.dim(
-        "\n  Your agent is live! Message your Telegram bot to start chatting.",
+        "\n  Your agent is live!",
       ),
     );
   }

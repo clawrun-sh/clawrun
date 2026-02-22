@@ -3,16 +3,16 @@
   "tasks": {
     "build:bin": {
       "inputs": [
-        "docker/**",
-        "patches/**",
-        "src-rust/**",
-        "scripts/prepare-binary.js"
+        "upstream/**",
+        "build-docker.sh",
+        "Dockerfile",
+        "Cargo.toml"
       ],
-      "outputs": ["dist/bin/**"]
+      "outputs": ["dist/bin/**", "npm/**/*.node", "index.js", "index.d.ts"]
     },
     "build": {
-      "dependsOn": ["^build", "build:bin"],
-      "outputs": ["dist/**", ".next/**"]
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "!dist/bin/**", ".next/**"]
     },
     "dev": {
       "cache": false,

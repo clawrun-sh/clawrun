@@ -17,7 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "build:bin": "node scripts/prepare-binary.js",
+    "build:bin": "bash build-docker.sh",
     "build": "tsc",
     "dev": "tsc --watch"
   },

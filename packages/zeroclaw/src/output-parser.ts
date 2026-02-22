@@ -1,10 +1,15 @@
-import type { ZeroClawResult } from "./types.js";
+interface ParsedOutput {
+  success: boolean;
+  message: string;
+  error?: string;
+  exitCode: number;
+}
 
 export function parseOutput(
   stdout: string,
   stderr: string,
   exitCode: number,
-): ZeroClawResult {
+): ParsedOutput {
   if (exitCode !== 0) {
     return {
       success: false,

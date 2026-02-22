@@ -1,15 +1,9 @@
-import type { ZeroClawConfig, CommandSpec } from "./types.js";
-
-const PROVIDER_MAP: Record<string, string> = {
-  anthropic: "anthropic",
-  openai: "openai",
-  openrouter: "openrouter",
-};
+import type { SandboxCommand } from "./adapter/types.js";
 
 export function buildAgentCommand(
   binaryPath: string,
   message: string,
-): CommandSpec {
+): SandboxCommand {
   return {
     cmd: binaryPath,
     args: ["agent", "-m", message],
@@ -19,23 +13,19 @@ export function buildAgentCommand(
 
 export function buildOnboardCommand(
   binaryPath: string,
-  config: ZeroClawConfig,
-): CommandSpec {
-  const provider = PROVIDER_MAP[config.provider] ?? config.provider;
-
-  const args = [
-    "onboard",
-    "--api-key", config.apiKey,
-    "--provider", provider,
-  ];
-
-  if (config.memory) {
-    args.push("--memory", config.memory);
-  }
-
+  config: {
+    provider: string;
+    apiKey: string;
+    model?: string;
+  },
+): SandboxCommand {
   return {
     cmd: binaryPath,
-    args,
+    args: [
+      "onboard",
+      "--api-key", config.apiKey,
+      "--provider", config.provider,
+    ],
     env: { HOME: "/tmp" },
   };
 }
@@ -43,7 +33,7 @@ export function buildOnboardCommand(
 export function buildDaemonCommand(
   binaryPath: string,
   options?: { port?: number; host?: string },
-): CommandSpec {
+): SandboxCommand {
   return {
     cmd: binaryPath,
     args: [

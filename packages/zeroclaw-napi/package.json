@@ -14,7 +14,8 @@
     ]
   },
   "scripts": {
-    "build": "napi build --release --platform",
+    "build:bin": "bash build-docker.sh",
+    "build": "echo 'zeroclaw-napi: native artifacts built by build:bin'",
     "build:debug": "napi build --platform"
   },
   "optionalDependencies": {

@@ -11,7 +11,6 @@ function tomlString(value: string): string {
 export function generateDaemonToml(
   env: AgentEnv,
   channels: ChannelConfig,
-  options?: { databaseUrl?: string; memoryBackend?: string },
 ): string {
   const lines: string[] = [];
 
@@ -33,16 +32,6 @@ export function generateDaemonToml(
   lines.push('level = "full"');
   lines.push("require_approval_for_medium_risk = false");
   lines.push("workspace_only = true");
-  lines.push("");
-
-  // Memory
-  lines.push("[memory]");
-  const backend = options?.memoryBackend ?? (options?.databaseUrl ? "postgres" : "sqlite");
-  lines.push(`backend = ${tomlString(backend)}`);
-  lines.push("auto_save = true");
-  if (backend === "postgres" && options?.databaseUrl) {
-    lines.push(`postgres_url = ${tomlString(options.databaseUrl)}`);
-  }
   lines.push("");
 
   // Channels
