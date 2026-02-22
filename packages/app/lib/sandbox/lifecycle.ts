@@ -6,8 +6,9 @@ import { VercelSandboxProvider } from "@cloudclaw/provider/vercel";
 import { ZEROCLAW_HOME } from "zeroclaw/adapter";
 import type { AgentAdapter, AgentEnv, ChannelConfig } from "zeroclaw/adapter";
 import { getAgent } from "../agents/registry";
-import { registerTelegramWakeWebhook } from "../channels/telegram-wake";
+import { registerTelegramWakeWebhook, deleteTelegramWakeWebhook } from "../channels/telegram-wake";
 import { getStateStore } from "../storage/state";
+import { tryAcquireCreationLock, releaseCreationLock } from "../sandbox/lock";
 import type { StateStore } from "../storage/state-types";
 import type { ExtendReason } from "./extend-reasons";
 import { FileActivityReason, CronScheduleReason } from "./extend-reasons";
@@ -51,8 +52,8 @@ function getActiveDurationMs(): number {
   return (minutes > 0 ? minutes : 5) * 60 * 1000;
 }
 
-export interface HeartbeatResult {
-  action: "running" | "sleeping" | "failed";
+export interface SandboxResult {
+  status: "running" | "stopped" | "failed";
   sandboxId?: string;
   error?: string;
   nextWakeAt?: string;
@@ -129,7 +130,11 @@ function resolveAssetPath(localPath: string): string {
 
 export class SandboxLifecycleManager {
   private adapter: AgentAdapter = getAgent();
-  private state: StateStore | null = getStateStore();
+  private state: StateStore = (() => {
+    const s = getStateStore();
+    if (!s) throw new Error("State store unavailable — KV is required");
+    return s;
+  })();
   private provider: SandboxProvider = new VercelSandboxProvider();
   private retention = new CountBasedRetention(3);
   private extendReasons: ExtendReason[] = [
@@ -168,29 +173,41 @@ export class SandboxLifecycleManager {
   }
 
   /**
-   * Snapshot a running sandbox and stop it. Returns the snapshot ID if
-   * successful, null otherwise. On failure, attempts a plain stop.
+   * Snapshot a running sandbox and stop it. Retries up to 3 times on failure.
+   * Throws if all attempts fail — callers must handle this to avoid data loss
+   * (stopping a sandbox without a snapshot destroys its state).
    */
-  private async snapshotAndStop(sandboxId: string): Promise<string | null> {
-    try {
-      const sandbox = await this.provider.get(sandboxId);
-      if (sandbox.status !== "running") return null;
+  private async snapshotAndStop(
+    sandboxId: string,
+    retries = 3,
+    retryDelayMs = 2_000,
+  ): Promise<string | null> {
+    const sandbox = await this.provider.get(sandboxId);
+    if (sandbox.status !== "running") return null;
 
-      console.log(`[CloudClaw] Snapshotting sandbox ${sandboxId}`);
-      const snapshot = await sandbox.snapshot();
-      console.log(`[CloudClaw] Snapshot created: ${snapshot.id}`);
-      await this.applyRetention();
-      return snapshot.id;
-    } catch (err) {
-      console.error(`[CloudClaw] Snapshot failed:`, err);
+    let lastErr: unknown;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const sandbox = await this.provider.get(sandboxId);
-        await sandbox.stop();
-      } catch {
-        // best-effort
+        console.log(`[CloudClaw] Snapshotting sandbox ${sandboxId} (attempt ${attempt}/${retries})`);
+        const snapshot = await sandbox.snapshot();
+        console.log(`[CloudClaw] Snapshot created: ${snapshot.id}`);
+        await this.applyRetention();
+        return snapshot.id;
+      } catch (err) {
+        lastErr = err;
+        console.error(`[CloudClaw] Snapshot attempt ${attempt} failed:`, err);
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, retryDelayMs));
+        }
       }
-      return null;
     }
+
+    // All retries exhausted — do NOT stop the sandbox. Let it keep running
+    // so state is preserved. Caller must handle the error.
+    throw new Error(
+      `Snapshot failed after ${retries} attempts for sandbox ${sandboxId}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    );
   }
 
   /** Delete old snapshots beyond the retention count. */
@@ -216,7 +233,16 @@ export class SandboxLifecycleManager {
     // if (process.env.CLOUDCLAW_SLACK_BOT_TOKEN)   await registerSlackWakeHook();
   }
 
-  async heartbeat(): Promise<HeartbeatResult> {
+  /** Tear down wake hooks — sandbox is running, daemon handles channels directly. */
+  private async teardownWakeHooks(): Promise<void> {
+    if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
+      await deleteTelegramWakeWebhook();
+    }
+    // if (process.env.CLOUDCLAW_DISCORD_BOT_TOKEN) await deleteDiscordWakeHook();
+    // if (process.env.CLOUDCLAW_SLACK_BOT_TOKEN)   await deleteSlackWakeHook();
+  }
+
+  async heartbeat(): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
 
     // Find all non-terminal sandboxes
@@ -226,31 +252,20 @@ export class SandboxLifecycleManager {
       active.map((s) => `${s.id}(${s.status})`).join(", ") || "none",
     );
 
-    // 1. CLEANUP: stop duplicates — keep only the newest
-    if (active.length > 1) {
-      const sorted = [...active].sort((a, b) => b.createdAt - a.createdAt);
-      const keeper = sorted[0];
-      const duplicates = sorted.slice(1);
-      console.log(
-        `[CloudClaw] Stopping ${duplicates.length} duplicate(s), keeping ${keeper.id}`,
-      );
-      await this.stopSandboxes(duplicates);
-    }
-
-    // 2. RUNNING SANDBOX: extend loop owns keep-alive decisions
+    // RUNNING SANDBOX: extend loop owns keep-alive decisions
     if (active.length > 0) {
       const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
-      return { action: "running", sandboxId: newest.id };
+      return { status: "running", sandboxId: newest.id };
     }
 
-    // 3. NO SANDBOX: decide whether to wake
+    // NO SANDBOX: decide whether to wake
     // Check for cron-triggered wake
-    const nextWakeAtStr = await this.state?.get(STATE_NEXT_WAKE_AT);
+    const nextWakeAtStr = await this.state.get(STATE_NEXT_WAKE_AT);
     if (nextWakeAtStr) {
       const nextWakeAt = new Date(nextWakeAtStr);
       if (nextWakeAt.getTime() <= Date.now()) {
         console.log("[CloudClaw] Cron-triggered wake (next_wake_at due)");
-        await this.state?.delete(STATE_NEXT_WAKE_AT);
+        await this.state.delete(STATE_NEXT_WAKE_AT);
         return this.startNew(sandboxes);
       }
     }
@@ -261,13 +276,15 @@ export class SandboxLifecycleManager {
       return this.startNew(sandboxes);
     }
 
-    // Sleeping — waiting for event-driven wake (webhook or cron)
+    // Sleeping — register wake hooks as crash recovery safety net
+    await this.registerWakeHooks();
+
     const lastStopped = sandboxes
       .filter((s) => s.stoppedAt)
       .sort((a, b) => (b.stoppedAt ?? 0) - (a.stoppedAt ?? 0))[0];
 
     return {
-      action: "sleeping",
+      status: "stopped",
       sandboxId: lastStopped?.id,
       nextWakeAt: nextWakeAtStr ?? undefined,
     };
@@ -280,13 +297,13 @@ export class SandboxLifecycleManager {
    * sandbox is stopped. Unlike heartbeat(), this does NOT make keep-alive
    * or sleep decisions — it only ensures a sandbox exists.
    */
-  async wake(): Promise<HeartbeatResult> {
+  async wake(): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
     const active = sandboxes.filter((s) => !this.isTerminal(s));
 
     if (active.length > 0) {
       const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
-      return { action: "running", sandboxId: newest.id };
+      return { status: "running", sandboxId: newest.id };
     }
 
     console.log("[CloudClaw] Wake: no active sandbox, starting one");
@@ -354,24 +371,92 @@ export class SandboxLifecycleManager {
 
     // No reason to extend (or extend failed) → snapshot + stop
     console.log(`[CloudClaw] No activity, stopping sandbox ${payload.sandboxId}`);
-    await this.snapshotAndStop(payload.sandboxId);
-    if (payload.nextCronAt) await this.state?.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
+    try {
+      await this.snapshotAndStop(payload.sandboxId);
+    } catch (err) {
+      // Snapshot failed — sandbox is still running. Don't stop it.
+      // Extend loop will retry on the next tick.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[CloudClaw] Cannot stop sandbox (snapshot failed): ${msg}`);
+      return { action: "error", error: `Snapshot failed, sandbox kept running: ${msg}` };
+    }
 
-    await this.registerWakeHooks();
+    if (payload.nextCronAt) await this.state.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
+
+    // Only register wake hooks if no new sandbox was created during our stop.
+    // Avoids re-registering a webhook that a concurrent startNew() already tore down.
+    const freshActive = (await this.listSandboxes()).filter(s => !this.isTerminal(s));
+    if (freshActive.length === 0) {
+      await this.registerWakeHooks();
+    }
 
     return { action: "stopped", nextWakeAt: payload.nextCronAt ?? undefined };
   }
 
-  async forceRestart(): Promise<HeartbeatResult> {
-    const sandboxes = await this.listSandboxes();
-
-    // Stop all non-terminal sandboxes (not just running — pending counts too)
-    const active = sandboxes.filter((s) => !this.isTerminal(s));
-    if (active.length > 0) {
-      await this.stopSandboxes(active);
+  async forceRestart(): Promise<SandboxResult> {
+    const nonce = await tryAcquireCreationLock();
+    if (!nonce) {
+      return { status: "failed", error: "Could not acquire lock for restart" };
     }
 
-    return this.startNew(sandboxes);
+    try {
+      const sandboxes = await this.listSandboxes();
+      const active = sandboxes.filter((s) => !this.isTerminal(s));
+
+      if (active.length > 0) {
+        // Snapshot the newest to preserve state, hard-stop any extras
+        const sorted = [...active].sort((a, b) => b.createdAt - a.createdAt);
+        try {
+          await this.snapshotAndStop(sorted[0].id);
+        } catch (err) {
+          // Snapshot failed — sandbox is still running. Don't proceed with
+          // creating a new one — that would leave orphaned sandboxes and the
+          // old state is not preserved.
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[CloudClaw] Force restart aborted (snapshot failed): ${msg}`);
+          return { status: "failed", error: `Snapshot failed, sandbox kept running: ${msg}` };
+        }
+        if (sorted.length > 1) {
+          await this.stopSandboxes(sorted.slice(1));
+        }
+      }
+
+      return await this.startNewLocked(sandboxes);
+    } finally {
+      await releaseCreationLock(nonce);
+    }
+  }
+
+  /**
+   * Gracefully stop the running sandbox — snapshot first, then stop.
+   * Registers wake hooks so the sandbox can be woken by a message or cron.
+   */
+  async gracefulStop(): Promise<SandboxResult> {
+    const sandboxes = await this.listSandboxes();
+    const active = sandboxes.filter((s) => !this.isTerminal(s));
+
+    if (active.length === 0) {
+      return { status: "stopped" };
+    }
+
+    const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
+    try {
+      await this.snapshotAndStop(newest.id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[CloudClaw] Graceful stop failed (snapshot failed): ${msg}`);
+      return { status: "failed", error: `Snapshot failed, sandbox kept running: ${msg}` };
+    }
+
+    // Stop any extras
+    const extras = active.filter((s) => s.id !== newest.id);
+    if (extras.length > 0) {
+      await this.stopSandboxes(extras);
+    }
+
+    await this.registerWakeHooks();
+
+    return { status: "stopped", sandboxId: newest.id };
   }
 
   async getStatus(): Promise<SandboxStatus> {
@@ -404,7 +489,30 @@ export class SandboxLifecycleManager {
 
   private async startNew(
     _sandboxes: SandboxInfo[],
-  ): Promise<HeartbeatResult> {
+  ): Promise<SandboxResult> {
+    const nonce = await tryAcquireCreationLock();
+    if (!nonce) {
+      // Another caller is creating — wait briefly and re-check
+      await new Promise((r) => setTimeout(r, 5_000));
+      const fresh = await this.listSandboxes();
+      const active = fresh.filter((s) => !this.isTerminal(s));
+      if (active.length > 0) {
+        const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
+        return { status: "running", sandboxId: newest.id };
+      }
+      return { status: "failed", error: "Could not acquire creation lock" };
+    }
+
+    try {
+      return await this.startNewLocked(_sandboxes);
+    } finally {
+      await releaseCreationLock(nonce);
+    }
+  }
+
+  private async startNewLocked(
+    _sandboxes: SandboxInfo[],
+  ): Promise<SandboxResult> {
     try {
       let sandbox: ManagedSandbox | null = null;
 
@@ -439,12 +547,13 @@ export class SandboxLifecycleManager {
 
       await this.writeDaemonConfig(sandbox);
       await this.startDaemon(sandbox);
+      await this.teardownWakeHooks();
       await this.startSandboxExtendLoop(sandbox);
 
-      return { action: "running", sandboxId: sandbox.id };
+      return { status: "running", sandboxId: sandbox.id };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      return { action: "failed", error };
+      return { status: "failed", error };
     }
   }
 

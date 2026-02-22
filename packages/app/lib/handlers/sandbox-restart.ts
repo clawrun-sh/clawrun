@@ -3,8 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 
-export async function GET(req: Request) {
-  // Verify cron secret — Vercel Cron sends Authorization: Bearer <CRON_SECRET>
+export async function POST(req: Request) {
   const cronSecret = process.env.CRON_SECRET ?? process.env.CLOUDCLAW_CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.get("authorization");
@@ -15,11 +14,11 @@ export async function GET(req: Request) {
 
   try {
     const manager = new SandboxLifecycleManager();
-    const result = await manager.heartbeat();
+    const result = await manager.forceRestart();
     return NextResponse.json(result);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[CloudClaw] Heartbeat error:", error);
+    console.error("[CloudClaw] Restart error:", error);
     return NextResponse.json(
       { status: "error", error },
       { status: 500 },

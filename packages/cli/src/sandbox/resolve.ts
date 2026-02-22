@@ -18,7 +18,8 @@ async function ensureRunning(
 ): Promise<string> {
   process.stdout.write(chalk.dim("Starting sandbox..."));
 
-  await fetch(`${deployedUrl}/api/cron/heartbeat?restart=true`, {
+  await fetch(`${deployedUrl}/api/sandbox/restart`, {
+    method: "POST",
     headers: { Authorization: `Bearer ${cronSecret}` },
   });
 

@@ -305,11 +305,12 @@ async function handleNewInstance(
   clack.log.step("Starting sandbox...");
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
+      const res = await fetch(`${url}/api/sandbox/restart`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
       const result = await res.json() as Record<string, unknown>;
-      clack.log.success(`Sandbox: ${result.action ?? "ok"}`);
+      clack.log.success(`Sandbox: ${result.status ?? "ok"}`);
     } catch {
       clack.log.warn("Could not start sandbox — it will start on first message.");
     }
@@ -453,11 +454,12 @@ async function handleExistingInstance(
   const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/cron/heartbeat?restart=true`, {
+      const res = await fetch(`${url}/api/sandbox/restart`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}` },
       });
       const result = await res.json() as Record<string, unknown>;
-      clack.log.success(`Sandbox: ${result.action ?? "ok"}`);
+      clack.log.success(`Sandbox: ${result.status ?? "ok"}`);
     } catch (err) {
       clack.log.warn("Could not restart sandbox — it will start on first message.");
       clack.log.info(chalk.dim(`${err instanceof Error ? err.message : String(err)}`));
