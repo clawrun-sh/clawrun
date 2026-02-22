@@ -1,6 +1,4 @@
 import { command } from "cmd-ts";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import {
@@ -8,50 +6,9 @@ import {
   destroyInstance,
   instanceDir,
 } from "../instance/index.js";
-import { deleteVercelProject as deleteVercelProjectApi } from "../deploy/vercel.js";
+import { getPlatformProvider } from "../platform/index.js";
 import { instance } from "../args/instance.js";
 import { yes } from "../args/yes.js";
-
-async function deleteVercelProject(dir: string): Promise<void> {
-  const projectJsonPath = join(dir, ".vercel", "project.json");
-  if (!existsSync(projectJsonPath)) {
-    console.log(
-      chalk.yellow("  No Vercel project link found — skipping Vercel project deletion."),
-    );
-    return;
-  }
-
-  let projectId: string | undefined;
-  let orgId: string | undefined;
-  try {
-    const data = JSON.parse(readFileSync(projectJsonPath, "utf-8")) as {
-      projectId?: string;
-      orgId?: string;
-    };
-    projectId = data.projectId;
-    orgId = data.orgId;
-  } catch {
-    console.log(chalk.yellow("  Could not read Vercel project link — skipping."));
-    return;
-  }
-
-  if (!projectId || !orgId) {
-    console.log(chalk.yellow("  Incomplete Vercel project link — skipping."));
-    return;
-  }
-
-  console.log(chalk.dim(`  Removing Vercel project (${projectId})...`));
-
-  try {
-    await deleteVercelProjectApi({ projectId, orgId });
-    console.log(chalk.green("  Vercel project deleted."));
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.log(
-      chalk.yellow(`  Could not delete Vercel project: ${msg.slice(0, 200)}`),
-    );
-  }
-}
 
 export const destroy = command({
   name: "destroy",
@@ -77,7 +34,7 @@ export const destroy = command({
 
     if (!yes) {
       const confirmed = await clack.confirm({
-        message: `Are you sure you want to destroy instance "${name}"? This will delete the Vercel project and cannot be undone.`,
+        message: `Are you sure you want to destroy instance "${name}"? This will delete the project and cannot be undone.`,
         initialValue: false,
       });
 
@@ -96,8 +53,26 @@ export const destroy = command({
       }
     }
 
-    // Delete Vercel project first (needs .vercel/ dir to still exist)
-    await deleteVercelProject(dir);
+    // Delete platform project first (needs project link dir to still exist)
+    const platform = getPlatformProvider();
+    const handle = platform.readProjectLink(dir);
+
+    if (!handle) {
+      console.log(
+        chalk.yellow("  No project link found — skipping platform project deletion."),
+      );
+    } else {
+      console.log(chalk.dim(`  Removing project (${handle.projectId})...`));
+      try {
+        await platform.deleteProject(handle);
+        console.log(chalk.green("  Project deleted."));
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.log(
+          chalk.yellow(`  Could not delete project: ${msg.slice(0, 200)}`),
+        );
+      }
+    }
 
     // Remove local instance directory
     destroyInstance(name);

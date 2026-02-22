@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { CloudClawConfig } from "../instance/config.js";
 import { instanceDir } from "../instance/index.js";
+import { getPlatformProvider } from "../platform/index.js";
 import type { SandboxClient } from "./types.js";
 import { VercelSandboxClient } from "./vercel.js";
 
@@ -25,11 +24,15 @@ export function createSandboxClient(
   switch (provider) {
     case "vercel": {
       const dir = instanceDir(instance);
-      const projectJson = join(dir, ".vercel", "project.json");
-      const { projectId, orgId } = JSON.parse(
-        readFileSync(projectJson, "utf-8"),
-      ) as { projectId: string; orgId: string };
-      return new VercelSandboxClient({ projectId, orgId });
+      const platform = getPlatformProvider("vercel");
+      const handle = platform.readProjectLink(dir);
+      if (!handle) {
+        throw new Error(
+          `No project link found for instance "${instance}". ` +
+          `Re-run "cloudclaw deploy ${instance}" to fix this.`,
+        );
+      }
+      return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
     }
     default:
       throw new Error(`Unsupported sandbox provider: "${provider}"`);

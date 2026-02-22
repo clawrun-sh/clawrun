@@ -25,6 +25,7 @@ export interface SandboxClient {
     cmd: string,
     args: string[],
     env?: Record<string, string>,
+    options?: { timeoutMs?: number },
   ): Promise<ExecResult>;
 
   /** Open an interactive shell in a running sandbox. */

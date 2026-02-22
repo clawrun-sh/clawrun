@@ -8,17 +8,8 @@ import chalk from "chalk";
 import { humanId } from "human-id";
 import * as clack from "@clack/prompts";
 import { getPreset, listPresets } from "../presets/index.js";
-import {
-  checkPrerequisites,
-  createVercelProject,
-  deployToVercel,
-  disableDeploymentProtection,
-  persistEnvVarsToProject,
-  writeVercelLink,
-} from "../deploy/vercel.js";
-import type { VercelProjectInfo } from "../deploy/vercel.js";
-import { listStateStores, connectStateStore, provisionStateStore } from "../deploy/state-store.js";
-import type { StateStore } from "../deploy/state-store.js";
+import { getPlatformProvider } from "../platform/index.js";
+import type { PlatformTier, PlatformLimits, ProjectHandle, StateStoreEntry } from "../platform/index.js";
 import {
   createInstance,
   instanceExists,
@@ -26,14 +17,11 @@ import {
   instanceDir,
   saveDeployedUrl,
   upgradeInstance,
-  patchVercelJson,
   buildConfig,
   toEnvVars,
   readConfig,
   readAgentConfigJson,
 } from "../instance/index.js";
-import { getPlatformProvider } from "../platform/index.js";
-import type { PlatformTier, PlatformLimits } from "../platform/index.js";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
@@ -47,7 +35,7 @@ async function detectAndPrintTier(): Promise<{
   limits: PlatformLimits;
   tierDefaults: Record<string, string>;
 }> {
-  const platform = getPlatformProvider("vercel");
+  const platform = getPlatformProvider();
   const tier = await platform.detectTier();
   const limits = await platform.getLimits(tier);
   const tierDefaults = platform.getDefaults(tier);
@@ -114,8 +102,10 @@ async function handleNewInstance(
   clack.log.step(`Instance: ${chalk.bold(name)}`);
   clack.log.info(`Preset: ${preset.name} — ${preset.description}`);
 
+  const platform = getPlatformProvider();
+
   // Check prerequisites
-  await checkPrerequisites();
+  await platform.checkPrerequisites();
 
   // Detect tier
   const { limits, tierDefaults } = await detectAndPrintTier();
@@ -215,27 +205,27 @@ async function handleNewInstance(
   const webhookSecret = randomUUID();
 
   // ============================================================
-  // Phase 1: Create Vercel project + provision state store
+  // Phase 1: Create project + provision state store
   // ============================================================
 
-  let projectInfo: VercelProjectInfo;
+  let handle: ProjectHandle;
   try {
-    projectInfo = await createVercelProject(name);
+    handle = await platform.createProject(name);
   } catch (err) {
-    clack.log.error(`Failed to create Vercel project: ${err instanceof Error ? err.message : String(err)}`);
+    clack.log.error(`Failed to create project: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
   // Temp dir for integration provisioning
   const tempDir = join(tmpdir(), `cloudclaw-setup-${name}-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
-  writeVercelLink(tempDir, projectInfo);
+  platform.writeProjectLink(tempDir, handle);
 
   // State store — offer to reuse an existing store
-  let selectedStore: StateStore | undefined;
+  let selectedStore: StateStoreEntry | undefined;
 
   if (!options.yes) {
-    const stores = await listStateStores();
+    const stores = await platform.listStateStores();
     if (stores.length > 0) {
       const choice = await clack.select({
         message: "Select a state store",
@@ -245,7 +235,7 @@ async function handleNewInstance(
             label: s.name,
             hint: s.status,
           })),
-          { value: "__new__", label: "➕ Create new store", hint: "provision a new store" },
+          { value: "__new__", label: "\u2795 Create new store", hint: "provision a new store" },
         ],
       });
 
@@ -262,8 +252,8 @@ async function handleNewInstance(
   }
 
   const stateResult = selectedStore
-    ? await connectStateStore(tempDir, selectedStore, projectInfo.projectId)
-    : await provisionStateStore(tempDir);
+    ? await platform.connectStateStore(tempDir, selectedStore, handle.projectId)
+    : await platform.provisionStateStore(tempDir);
 
   if (!stateResult.success) {
     clack.log.error("Failed to provision state store.");
@@ -282,6 +272,7 @@ async function handleNewInstance(
     cronSecret,
     nextAuthSecret,
     webhookSecret,
+    provider: platform.id,
   });
 
   // Derive env vars from config + agent config JSON
@@ -294,20 +285,20 @@ async function handleNewInstance(
 
   const dir = await createInstance(name, config, allEnvVars);
 
-  // Write the Vercel project link
-  writeVercelLink(dir, projectInfo);
+  // Write the project link
+  platform.writeProjectLink(dir, handle);
 
-  // Patch vercel.json with plan-aware cron schedule
-  patchVercelJson(dir, limits.heartbeatCron);
+  // Patch platform config with plan-aware cron schedule
+  platform.patchPlatformConfig(dir, limits);
 
-  // Disable Vercel Deployment Protection
-  await disableDeploymentProtection(dir);
+  // Disable deployment protection
+  await platform.disableDeploymentProtection(dir);
 
-  // Persist all env vars to Vercel project
-  await persistEnvVarsToProject(dir, allEnvVars);
+  // Persist all env vars to project
+  await platform.persistEnvVars(dir, allEnvVars);
 
   // Deploy
-  const url = await deployToVercel(dir, allEnvVars);
+  const url = await platform.deploy(dir, allEnvVars);
   saveDeployedUrl(name, url);
 
   // Start sandbox
@@ -349,8 +340,10 @@ async function handleExistingInstance(
     clack.log.info(`Last deployed to: ${meta.deployedUrl}`);
   }
 
+  const platform = getPlatformProvider();
+
   // Check prerequisites
-  await checkPrerequisites();
+  await platform.checkPrerequisites();
 
   // Detect tier
   const { limits } = await detectAndPrintTier();
@@ -405,7 +398,6 @@ async function handleExistingInstance(
       process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
 
       // Show currently configured channels before the wizard
-      // (the upstream wizard always starts from a blank slate)
       try {
         const currentJson = await napi!.getSavedConfig();
         const current = JSON.parse(currentJson);
@@ -435,8 +427,8 @@ async function handleExistingInstance(
   // Upgrade instance
   await upgradeInstance(name);
 
-  // Patch vercel.json
-  patchVercelJson(dir, limits.heartbeatCron);
+  // Patch platform config
+  platform.patchPlatformConfig(dir, limits);
 
   // Read config
   const config = readConfig(name);
@@ -450,10 +442,10 @@ async function handleExistingInstance(
   const cloudclawEnv = toEnvVars(config, agentConfigJson);
 
   // Persist env vars
-  await persistEnvVarsToProject(dir, cloudclawEnv);
+  await platform.persistEnvVars(dir, cloudclawEnv);
 
   // Deploy
-  const url = await deployToVercel(dir, cloudclawEnv);
+  const url = await platform.deploy(dir, cloudclawEnv);
   saveDeployedUrl(name, url);
 
   // Restart sandbox

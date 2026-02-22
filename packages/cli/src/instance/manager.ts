@@ -285,36 +285,6 @@ export async function upgradeInstance(name: string): Promise<void> {
   console.log(chalk.green(`  Instance "${name}" upgraded.`));
 }
 
-/**
- * Patch the vercel.json in an instance directory with a plan-aware cron schedule.
- * Replaces any existing heartbeat cron expression with the provided one.
- */
-export function patchVercelJson(dir: string, heartbeatCron: string): void {
-  const vercelJsonPath = join(dir, "vercel.json");
-  if (!existsSync(vercelJsonPath)) return;
-
-  try {
-    const content = readFileSync(vercelJsonPath, "utf-8");
-    const config = JSON.parse(content) as {
-      crons?: Array<{ path: string; schedule: string }>;
-      [key: string]: unknown;
-    };
-
-    if (config.crons) {
-      for (const cron of config.crons) {
-        if (cron.path === "/api/cron/heartbeat") {
-          cron.schedule = heartbeatCron;
-        }
-      }
-    }
-
-    writeFileSync(vercelJsonPath, JSON.stringify(config, null, 2) + "\n");
-    console.log(chalk.green(`  Heartbeat cron set to: ${heartbeatCron}`));
-  } catch {
-    console.log(chalk.yellow("  Could not patch vercel.json cron schedule."));
-  }
-}
-
 export function destroyInstance(name: string): void {
   const dir = instanceDir(name);
 

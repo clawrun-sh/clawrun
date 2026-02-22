@@ -31,7 +31,7 @@ export async function startAgentChat(instanceName: string, config: CloudClawConf
 
   async function sendMessage(msg: string): Promise<{ success: boolean; output: string }> {
     const cmd = adapter.buildCommand(msg);
-    const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env);
+    const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env, { timeoutMs: 150_000 });
     const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
     return { success: response.success, output: response.message || response.error || "" };
   }
@@ -102,7 +102,7 @@ export const agent = command({
       const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
 
       const cmd = adapter.buildCommand(message);
-      const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env);
+      const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env, { timeoutMs: 150_000 });
       const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
 
       const s = clack.spinner();

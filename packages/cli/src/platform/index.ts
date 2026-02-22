@@ -12,4 +12,11 @@ export function getPlatformProvider(id?: string): PlatformProvider {
   return factory();
 }
 
-export type { PlatformProvider, PlatformTier, PlatformLimits } from "./types.js";
+export type {
+  PlatformProvider,
+  PlatformTier,
+  PlatformLimits,
+  ProjectHandle,
+  StateStoreEntry,
+  StateStoreResult,
+} from "./types.js";

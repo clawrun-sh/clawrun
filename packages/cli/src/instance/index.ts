@@ -7,7 +7,6 @@ export {
   saveDeployedUrl,
   upgradeInstance,
   destroyInstance,
-  patchVercelJson,
   isDevMode,
 } from "./manager.js";
 export type { InstanceMetadata } from "./manager.js";

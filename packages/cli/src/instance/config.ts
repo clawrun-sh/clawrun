@@ -53,6 +53,7 @@ export function buildConfig(
     cronSecret: string;
     nextAuthSecret: string;
     webhookSecret: string;
+    provider?: string;
   },
 ): CloudClawConfig {
   return {
@@ -60,7 +61,7 @@ export function buildConfig(
     instance: {
       name,
       preset,
-      provider: "vercel",
+      provider: options.provider ?? "vercel",
     },
     agent: {
       name: agentName,

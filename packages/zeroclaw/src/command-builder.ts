@@ -1,5 +1,8 @@
 import type { SandboxCommand } from "./adapter/types.js";
 
+/** Default workspace inside the sandbox — must match the daemon's ZEROCLAW_WORKSPACE. */
+const SANDBOX_WORKSPACE = "/tmp/.zeroclaw";
+
 export function buildAgentCommand(
   binaryPath: string,
   message: string,
@@ -7,7 +10,7 @@ export function buildAgentCommand(
   return {
     cmd: binaryPath,
     args: ["agent", "-m", message],
-    env: { HOME: "/tmp" },
+    env: { HOME: "/tmp", ZEROCLAW_WORKSPACE: SANDBOX_WORKSPACE },
   };
 }
 

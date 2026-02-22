@@ -36,6 +36,7 @@ export class VercelSandboxClient implements SandboxClient {
     cmd: string,
     args: string[],
     env?: Record<string, string>,
+    options?: { timeoutMs?: number },
   ): Promise<ExecResult> {
     const execArgs = [
       "sandbox", "exec", sandboxId,
@@ -51,7 +52,7 @@ export class VercelSandboxClient implements SandboxClient {
     execArgs.push("--", cmd, ...args);
 
     try {
-      const result = await execa("npx", execArgs, { timeout: 60_000 });
+      const result = await execa("npx", execArgs, { timeout: options?.timeoutMs ?? 60_000 });
       return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
     } catch (err: unknown) {
       const e = err as { stdout?: string; stderr?: string; exitCode?: number };
