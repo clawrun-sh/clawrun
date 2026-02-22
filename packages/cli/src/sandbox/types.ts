@@ -29,5 +29,5 @@ export interface SandboxClient {
   ): Promise<ExecResult>;
 
   /** Open an interactive shell in a running sandbox. */
-  connect(sandboxId: string): Promise<void>;
+  connect(sandboxId: string, env?: Record<string, string>): Promise<void>;
 }

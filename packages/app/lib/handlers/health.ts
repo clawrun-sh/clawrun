@@ -10,7 +10,9 @@ export async function GET() {
 
   try {
     const manager = new SandboxLifecycleManager();
-    response.sandbox = await manager.getStatus();
+    const sandboxStatus = await manager.getStatus();
+    // Only expose running state publicly — no sandbox IDs or timestamps
+    response.sandbox = { running: sandboxStatus.running };
   } catch {
     response.sandbox = { running: false };
   }

@@ -1,17 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { requireBearerAuth } from "../auth";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 
 export async function GET(req: Request) {
-  // Verify cron secret — Vercel Cron sends Authorization: Bearer <CRON_SECRET>
-  const cronSecret = process.env.CRON_SECRET ?? process.env.CLOUDCLAW_CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-  }
+  const denied = requireBearerAuth(req);
+  if (denied) return denied;
 
   try {
     const manager = new SandboxLifecycleManager();

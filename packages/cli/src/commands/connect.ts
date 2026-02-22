@@ -1,9 +1,15 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
+import { zeroclawAdapter } from "zeroclaw/adapter";
+import type { AgentAdapter } from "zeroclaw/adapter";
 import { createSandboxClient } from "../sandbox/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { readConfig } from "../instance/index.js";
 import { instance } from "../args/instance.js";
+
+const agents: Record<string, AgentAdapter> = {
+  [zeroclawAdapter.id]: zeroclawAdapter,
+};
 
 export const connect = command({
   name: "connect",
@@ -29,9 +35,12 @@ export const connect = command({
     const client = createSandboxClient(instanceName, config);
     const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
 
+    const adapter = agents[config.agent.name];
+    const shellEnv = adapter?.shellEnv?.() ?? {};
+
     console.log(chalk.dim(`Sandbox: ${sandboxId}`));
     console.log(chalk.bold(`Connecting to ${chalk.cyan(instanceName)}...\n`));
 
-    await client.connect(sandboxId);
+    await client.connect(sandboxId, shellEnv);
   },
 });

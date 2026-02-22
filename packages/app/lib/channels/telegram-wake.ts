@@ -9,7 +9,13 @@ function getWebhookUrl(): string {
 export async function registerTelegramWakeWebhook(): Promise<void> {
   const token = process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN;
   if (!token) return;
-  const secret = process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET!;
+
+  const secret = process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn("[CloudClaw] CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET not set — skipping webhook registration");
+    return;
+  }
+
   await fetch(`${TELEGRAM_API}${token}/setWebhook`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

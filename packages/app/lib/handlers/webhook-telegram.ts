@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 import { Bot } from "grammy";
+import { requireTelegramWebhookAuth } from "../auth";
 import { deleteTelegramWakeWebhook } from "../channels/telegram-wake";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 
@@ -42,14 +43,9 @@ export async function POST(req: Request) {
     return new Response("Telegram not configured", { status: 200 });
   }
 
-  // Verify webhook secret
-  const secretToken = process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET;
-  if (secretToken) {
-    const header = req.headers.get("x-telegram-bot-api-secret-token");
-    if (header !== secretToken) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-  }
+  // Verify webhook secret (fail-closed — rejects if secret is not configured)
+  const denied = requireTelegramWebhookAuth(req);
+  if (denied) return denied;
 
   let update: Record<string, unknown>;
   try {

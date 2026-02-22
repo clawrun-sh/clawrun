@@ -13,6 +13,7 @@ export function getPlatformProvider(id?: string): PlatformProvider {
 }
 
 export type {
+  LogsOptions,
   PlatformProvider,
   PlatformTier,
   PlatformLimits,

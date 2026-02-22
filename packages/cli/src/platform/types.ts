@@ -34,6 +34,15 @@ export interface StateStoreResult {
   vars: Record<string, string>;
 }
 
+export interface LogsOptions {
+  follow?: boolean;
+  limit?: number;
+  json?: boolean;
+  query?: string;
+  since?: string;
+  level?: string;
+}
+
 export interface PlatformProvider {
   readonly id: string;
   readonly name: string;
@@ -74,4 +83,8 @@ export interface PlatformProvider {
 
   // --- Deploy ---
   deploy(dir: string, envVars: Record<string, string>): Promise<string>;
+
+  // --- Logs ---
+  /** Stream deployment logs to stdout. */
+  streamLogs(deploymentUrl: string, dir: string, options?: LogsOptions): Promise<void>;
 }

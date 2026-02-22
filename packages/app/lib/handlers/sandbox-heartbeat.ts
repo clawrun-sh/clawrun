@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { requireSandboxAuth } from "../auth";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 import type { ExtendPayload } from "../sandbox/lifecycle";
 
@@ -12,14 +13,8 @@ import type { ExtendPayload } from "../sandbox/lifecycle";
  * decides whether to extend the timeout or snapshot+stop.
  */
 export async function POST(req: Request) {
-  // Verify cron secret (same auth as heartbeat)
-  const cronSecret = process.env.CRON_SECRET ?? process.env.CLOUDCLAW_CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-  }
+  const denied = requireSandboxAuth(req);
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try {

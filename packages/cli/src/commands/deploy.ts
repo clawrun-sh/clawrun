@@ -1,5 +1,4 @@
 import { command, positional, option, optional, string } from "cmd-ts";
-import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as TOML from "@iarna/toml";
@@ -21,13 +20,14 @@ import {
   toEnvVars,
   readConfig,
   readAgentConfigJson,
+  generateSecret,
 } from "../instance/index.js";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
 
 function generateInstanceName(): string {
-  return humanId({ separator: "-", capitalize: false });
+  return `cloudclaw-${humanId({ separator: "-", capitalize: false })}`;
 }
 
 async function detectAndPrintTier(): Promise<{
@@ -198,9 +198,10 @@ async function handleNewInstance(
 
   // CloudClaw-specific settings
   const activeDuration = defaultActiveDuration;
-  const cronSecret = randomUUID();
-  const nextAuthSecret = randomUUID();
-  const webhookSecret = randomUUID();
+  const cronSecret = generateSecret();
+  const nextAuthSecret = generateSecret();
+  const webhookSecret = generateSecret();
+  const sandboxSecret = generateSecret();
 
   // ============================================================
   // Phase 1: Create project + provision state store
@@ -270,6 +271,7 @@ async function handleNewInstance(
     cronSecret,
     nextAuthSecret,
     webhookSecret,
+    sandboxSecret,
     provider: platform.id,
   });
 

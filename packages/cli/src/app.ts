@@ -5,13 +5,14 @@ import { destroy } from "./commands/destroy.js";
 import { agent } from "./commands/agent.js";
 import { connect } from "./commands/connect.js";
 import { stop } from "./commands/stop.js";
+import { logs } from "./commands/logs.js";
 import { version } from "./pkg.js";
 
 export const app = subcommands({
   name: "cloudclaw",
   description: "AI agent hosting, simplified.",
   version,
-  cmds: { deploy, list, destroy, agent, connect, stop },
+  cmds: { deploy, list, destroy, agent, connect, stop, logs },
   examples: [
     { description: "Deploy a new instance", command: "cloudclaw deploy" },
     { description: "Deploy with a specific preset", command: "cloudclaw deploy --preset zeroclaw-basic" },
@@ -19,6 +20,8 @@ export const app = subcommands({
     { description: "Chat with an agent", command: "cloudclaw agent my-instance -m \"Hello\"" },
     { description: "Open a shell in the sandbox", command: "cloudclaw connect my-instance" },
     { description: "Stop a running sandbox", command: "cloudclaw stop my-instance" },
+    { description: "View instance logs", command: "cloudclaw logs my-instance" },
+    { description: "Follow live logs", command: "cloudclaw logs my-instance -f" },
     { description: "Remove an instance", command: "cloudclaw destroy my-instance" },
   ],
 });

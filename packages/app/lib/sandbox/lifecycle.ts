@@ -609,7 +609,7 @@ export class SandboxLifecycleManager {
    */
   private async startSandboxExtendLoop(sandbox: ManagedSandbox): Promise<void> {
     const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-    const secret = process.env.CRON_SECRET ?? process.env.CLOUDCLAW_CRON_SECRET;
+    const secret = process.env.CLOUDCLAW_SANDBOX_SECRET;
     if (!host || !secret) {
       console.log(`[CloudClaw] Cannot start extend loop — host=${host ?? "UNSET"}, secret=${secret ? "set" : "UNSET"}`);
       return;

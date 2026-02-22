@@ -4,6 +4,7 @@ import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { execa } from "execa";
 import type {
+  LogsOptions,
   PlatformLimits,
   PlatformProvider,
   PlatformTier,
@@ -445,6 +446,21 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
       process.exit(1);
     }
+  }
+
+  // ---- Logs -------------------------------------------------------------
+
+  async streamLogs(deploymentUrl: string, dir: string, options?: LogsOptions): Promise<void> {
+    // vercel logs <url> implies --follow. Use --no-follow unless explicitly requested.
+    const args = ["logs", deploymentUrl];
+    if (!options?.follow) args.push("--no-follow");
+    if (options?.limit)   args.push("--limit", String(options.limit));
+    if (options?.json)    args.push("--json");
+    if (options?.query)   args.push("--query", options.query);
+    if (options?.since)   args.push("--since", options.since);
+    if (options?.level)   args.push("--level", options.level);
+
+    await execa("vercel", args, { cwd: dir, stdio: "inherit" });
   }
 
   // ---- Private helpers --------------------------------------------------

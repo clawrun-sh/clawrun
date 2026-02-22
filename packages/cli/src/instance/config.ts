@@ -1,6 +1,12 @@
+import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+
+/** Generate a 256-bit base64url secret. */
+export function generateSecret(): string {
+  return randomBytes(32).toString("base64url");
+}
 import { instanceDir } from "./paths.js";
 
 const SCHEMA_URL = "https://cloudclaw.sh/schema.json";
@@ -34,6 +40,7 @@ export const cloudClawConfigSchema = z.object({
     cronSecret: z.string(),
     nextAuthSecret: z.string(),
     webhookSecret: z.string(),
+    sandboxSecret: z.string(),
   }),
   state: stateSchema.optional(),
 });
@@ -53,6 +60,7 @@ export function buildConfig(
     cronSecret: string;
     nextAuthSecret: string;
     webhookSecret: string;
+    sandboxSecret: string;
     provider?: string;
   },
 ): CloudClawConfig {
@@ -74,6 +82,7 @@ export function buildConfig(
       cronSecret: options.cronSecret,
       nextAuthSecret: options.nextAuthSecret,
       webhookSecret: options.webhookSecret,
+      sandboxSecret: options.sandboxSecret,
     },
   };
 }
@@ -117,6 +126,7 @@ export function toEnvVars(
   vars["CLOUDCLAW_CRON_SECRET"] = config.secrets.cronSecret;
   vars["CLOUDCLAW_NEXTAUTH_SECRET"] = config.secrets.nextAuthSecret;
   vars["CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"] = config.secrets.webhookSecret;
+  vars["CLOUDCLAW_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
 
   // State store
   if (config.state) {

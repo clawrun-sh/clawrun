@@ -6,9 +6,9 @@ export function cloudclawHome(): string {
 }
 
 export function instancesDir(): string {
-  return join(cloudclawHome(), "instances");
+  return cloudclawHome();
 }
 
 export function instanceDir(name: string): string {
-  return join(instancesDir(), name);
+  return join(cloudclawHome(), name);
 }
