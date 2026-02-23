@@ -26,15 +26,17 @@ export const cloudClawConfigSchema = z.object({
   instance: z.object({
     name: z.string(),
     preset: z.string(),
-    provider: z.string(),
+    provider: z.string().default("vercel"),
     deployedUrl: z.string().optional(),
   }),
   agent: z.object({
     name: z.string(),          // e.g. "zeroclaw"
-    config: z.string(),        // relative path: "zeroclaw/config.toml"
+    config: z.string().default("zeroclaw/config.toml"),
   }),
   sandbox: z.object({
-    activeDuration: z.number(),
+    activeDuration: z.number().default(600),        // seconds
+    cronKeepAliveWindow: z.number().default(900),   // seconds
+    cronWakeLeadTime: z.number().default(60),       // seconds
   }),
   secrets: z.object({
     cronSecret: z.string(),
@@ -57,6 +59,8 @@ export function buildConfig(
   options: {
     agentConfigPath?: string;
     activeDuration?: number;
+    cronKeepAliveWindow?: number;
+    cronWakeLeadTime?: number;
     cronSecret: string;
     nextAuthSecret: string;
     webhookSecret: string;
@@ -64,19 +68,21 @@ export function buildConfig(
     provider?: string;
   },
 ): CloudClawConfig {
-  return {
+  return cloudClawConfigSchema.parse({
     $schema: SCHEMA_URL,
     instance: {
       name,
       preset,
-      provider: options.provider ?? "vercel",
+      provider: options.provider,
     },
     agent: {
       name: agentName,
-      config: options.agentConfigPath ?? "zeroclaw/config.toml",
+      config: options.agentConfigPath,
     },
     sandbox: {
-      activeDuration: options.activeDuration ?? 5,
+      activeDuration: options.activeDuration,
+      cronKeepAliveWindow: options.cronKeepAliveWindow,
+      cronWakeLeadTime: options.cronWakeLeadTime,
     },
     secrets: {
       cronSecret: options.cronSecret,
@@ -84,7 +90,7 @@ export function buildConfig(
       webhookSecret: options.webhookSecret,
       sandboxSecret: options.sandboxSecret,
     },
-  };
+  });
 }
 
 // --- Env var derivation ---
@@ -96,31 +102,15 @@ export function toEnvVars(
 ): Record<string, string> {
   const vars: Record<string, string> = {};
 
-  // Instance
-  vars["CLOUDCLAW_INSTANCE_NAME"] = config.instance.name;
-
-  // Extract LLM/channel info from agent config JSON
+  // Extract Telegram bot token from agent config JSON (needed at app level for wake hooks)
   try {
     const agentCfg = JSON.parse(agentConfigJson);
-
-    // LLM
-    if (agentCfg.default_provider) vars["CLOUDCLAW_LLM_PROVIDER"] = agentCfg.default_provider;
-    if (agentCfg.api_key) vars["CLOUDCLAW_LLM_API_KEY"] = agentCfg.api_key;
-    if (agentCfg.default_model) vars["CLOUDCLAW_LLM_MODEL"] = agentCfg.default_model;
-
-    // Telegram bot token (for webhook setup)
     if (agentCfg.channels_config?.telegram?.bot_token) {
       vars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"] = agentCfg.channels_config.telegram.bot_token;
     }
   } catch {
     // agentConfigJson might not be valid JSON yet during initial setup
   }
-
-  // Full agent config as env var (sandbox uses this)
-  vars["CLOUDCLAW_AGENT_CONFIG_JSON"] = agentConfigJson;
-
-  // Sandbox
-  vars["CLOUDCLAW_SANDBOX_ACTIVE_DURATION"] = String(config.sandbox.activeDuration);
 
   // Secrets
   vars["CLOUDCLAW_CRON_SECRET"] = config.secrets.cronSecret;

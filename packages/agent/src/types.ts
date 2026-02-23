@@ -1,0 +1,56 @@
+export interface CommandResult {
+  exitCode: number;
+  stdout(): Promise<string>;
+  stderr(): Promise<string>;
+}
+
+export interface SandboxHandle {
+  runCommand(cmd: string, args?: string[]): Promise<CommandResult>;
+  runCommand(opts: {
+    cmd: string; args?: string[]; env?: Record<string, string>;
+    signal?: AbortSignal; detached?: boolean;
+  }): Promise<CommandResult>;
+  writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
+}
+
+export interface AgentResponse {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+export interface CronEntry {
+  name?: string;
+  schedule?: string;
+  nextRunAt: string;
+}
+
+export interface CronInfo {
+  jobs: CronEntry[];
+}
+
+export interface ExtendLoopConfig {
+  monitorDir: string;
+  ignoreFiles: string[];
+}
+
+export interface Agent {
+  readonly id: string;
+  readonly name: string;
+
+  provision(sandbox: SandboxHandle, root: string, configJson: string): Promise<void>;
+
+  sendMessage(sandbox: SandboxHandle, root: string, message: string, opts?: {
+    env?: Record<string, string>;
+    signal?: AbortSignal;
+  }): Promise<AgentResponse>;
+
+  startDaemon(sandbox: SandboxHandle, root: string, opts?: {
+    port?: number; host?: string;
+    env?: Record<string, string>;
+  }): Promise<void>;
+
+  getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo>;
+
+  getExtendLoopConfig(root: string): ExtendLoopConfig;
+}

@@ -7,18 +7,19 @@
   "functions": {
     "app/api/v1/webhook/telegram/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/zeroclaw/dist/bin/**"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
     },
     "app/api/v1/heartbeat/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/zeroclaw/dist/bin/**"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
     },
     "app/api/v1/sandbox/restart/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/zeroclaw/dist/bin/**"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
     },
     "app/api/v1/sandbox/heartbeat/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "{cloudclaw.json,zeroclaw/config.json}"
     }
   }
 }

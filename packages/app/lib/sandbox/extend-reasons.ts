@@ -1,3 +1,4 @@
+import type { CronInfo } from "@cloudclaw/agent";
 import type { ExtendPayload } from "./lifecycle";
 
 /**
@@ -6,7 +7,7 @@ import type { ExtendPayload } from "./lifecycle";
  */
 export interface ExtendReason {
   /** Returns a human-readable label if this reason justifies extending, null otherwise. */
-  evaluate(payload: ExtendPayload, now: number): string | null;
+  evaluate(payload: ExtendPayload, now: number, cronInfo?: CronInfo): string | null;
 }
 
 /**
@@ -27,7 +28,7 @@ export class GracePeriodReason implements ExtendReason {
 }
 
 /**
- * Extend if files in ZEROCLAW_HOME have changed recently (sandbox is "active").
+ * Extend if files in the agent workspace have changed recently (sandbox is "active").
  */
 export class FileActivityReason implements ExtendReason {
   constructor(private activeDurationMs: number) {}
@@ -46,13 +47,16 @@ export class FileActivityReason implements ExtendReason {
 export class CronScheduleReason implements ExtendReason {
   constructor(private keepAliveWindowMs: number) {}
 
-  evaluate(payload: ExtendPayload, now: number): string | null {
-    if (!payload.nextCronAt) return null;
-    const msUntilCron = new Date(payload.nextCronAt).getTime() - now;
-    // Past timestamps are not a reason to extend — they indicate a cron
-    // that already fired. Without this guard, negative msUntilCron would
-    // always be < keepAliveWindowMs, keeping the sandbox alive forever.
-    if (msUntilCron <= 0) return null;
+  evaluate(_payload: ExtendPayload, now: number, cronInfo?: CronInfo): string | null {
+    if (!cronInfo || cronInfo.jobs.length === 0) return null;
+
+    const nextRunMs = cronInfo.jobs
+      .map((j) => new Date(j.nextRunAt).getTime())
+      .filter((t) => !isNaN(t) && t > now)
+      .sort((a, b) => a - b)[0];
+
+    if (!nextRunMs) return null;
+    const msUntilCron = nextRunMs - now;
     return msUntilCron < this.keepAliveWindowMs ? "cron due soon" : null;
   }
 }

@@ -15,8 +15,24 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/agent:
+    dependencies:
+      zeroclaw:
+        specifier: workspace:*
+        version: link:../zeroclaw
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/app:
     dependencies:
+      '@cloudclaw/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@cloudclaw/provider':
         specifier: workspace:*
         version: link:../provider
@@ -66,6 +82,9 @@ importers:
       '@clack/prompts':
         specifier: ^0.10.0
         version: 0.10.1
+      '@cloudclaw/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@iarna/toml':
         specifier: ^2.2.5
         version: 2.2.5
@@ -115,7 +134,14 @@ importers:
         version: 5.9.3
 
   packages/zeroclaw:
+    dependencies:
+      '@iarna/toml':
+        specifier: ^2.2.5
+        version: 2.2.5
     devDependencies:
+      '@types/iarna__toml':
+        specifier: ^2.0.5
+        version: 2.0.5
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.11

@@ -2,7 +2,7 @@ import { subcommands } from "cmd-ts";
 import { deploy } from "./commands/deploy.js";
 import { list } from "./commands/list.js";
 import { destroy } from "./commands/destroy.js";
-import { agent } from "./commands/agent.js";
+import { agentCommand } from "./commands/agent.js";
 import { connect } from "./commands/connect.js";
 import { stop } from "./commands/stop.js";
 import { logs } from "./commands/logs.js";
@@ -12,7 +12,7 @@ export const app = subcommands({
   name: "cloudclaw",
   description: "AI agent hosting, simplified.",
   version,
-  cmds: { deploy, list, destroy, agent, connect, stop, logs },
+  cmds: { deploy, list, destroy, agent: agentCommand, connect, stop, logs },
   examples: [
     { description: "Deploy a new instance", command: "cloudclaw deploy" },
     { description: "Deploy with a specific preset", command: "cloudclaw deploy --preset zeroclaw-basic" },

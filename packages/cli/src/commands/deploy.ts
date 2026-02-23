@@ -30,33 +30,35 @@ function generateInstanceName(): string {
   return `cloudclaw-${humanId({ separator: "-", capitalize: false })}`;
 }
 
+// Default active duration from the Zod schema (600s = 10 min)
+const DEFAULT_ACTIVE_DURATION_S = 600;
+
 async function detectAndPrintTier(): Promise<{
   tier: PlatformTier;
   limits: PlatformLimits;
-  tierDefaults: Record<string, string>;
 }> {
   const platform = getPlatformProvider();
   const tier = await platform.detectTier();
   const limits = await platform.getLimits(tier);
-  const tierDefaults = platform.getDefaults(tier);
+  const activeDurationMins = Math.round(DEFAULT_ACTIVE_DURATION_S / 60);
 
   if (tier === "hobby") {
     clack.log.info(
       `${chalk.bold("Vercel Hobby (free) plan detected")}\n` +
       chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (daily)\n`) +
-      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session\n`) +
+      chalk.dim(`  Active duration:   ${activeDurationMins} minutes per session\n`) +
       chalk.dim("  Lifecycle mode:    webhook-driven"),
     );
   } else {
     clack.log.info(
       `${chalk.bold("Vercel Pro plan detected")}\n` +
       chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (every minute)\n`) +
-      chalk.dim(`  Active duration:   ${tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "10"} minutes per session\n`) +
+      chalk.dim(`  Active duration:   ${activeDurationMins} minutes per session\n`) +
       chalk.dim("  Lifecycle mode:    heartbeat-driven"),
     );
   }
 
-  return { tier, limits, tierDefaults };
+  return { tier, limits };
 }
 
 async function handleNewInstance(
@@ -106,8 +108,8 @@ async function handleNewInstance(
   await platform.checkPrerequisites();
 
   // Detect tier
-  const { limits, tierDefaults } = await detectAndPrintTier();
-  const defaultActiveDuration = parseInt(tierDefaults.CLOUDCLAW_SANDBOX_ACTIVE_DURATION ?? "5", 10);
+  const { limits } = await detectAndPrintTier();
+  const defaultActiveDuration = DEFAULT_ACTIVE_DURATION_S;
 
   // ============================================================
   // Agent config via napi-rs (required — no fallback)
@@ -191,6 +193,9 @@ async function handleNewInstance(
 
   // Read the full assembled config from ZeroClaw
   const agentConfigJson = await napi.getSavedConfig();
+
+  // Write agent config JSON to instance's zeroclaw/ dir (deployed alongside the app)
+  writeFileSync(join(zcConfigDir, "config.json"), agentConfigJson);
 
   // Restore ZEROCLAW_CONFIG_DIR
   if (prevConfigDir !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prevConfigDir;
@@ -280,7 +285,6 @@ async function handleNewInstance(
   const allEnvVars: Record<string, string> = {
     ...cloudclawEnv,
     ...stateResult.vars,
-    CLOUDCLAW_INSTANCE_NAME: name,
   };
 
   const dir = await createInstance(name, config, allEnvVars);
@@ -350,6 +354,7 @@ async function handleExistingInstance(
   const { limits } = await detectAndPrintTier();
 
   // Offer reconfiguration — two separate yes/no prompts
+  // (napi may or may not be loaded depending on user choices)
   if (!options.yes) {
     const zcConfigDir = join(instanceDir(name), "zeroclaw");
     mkdirSync(zcConfigDir, { recursive: true });
@@ -440,6 +445,12 @@ async function handleExistingInstance(
 
   // Read fresh agent config from config.toml (picks up edits + reconfiguration)
   const agentConfigJson = await readAgentConfigJson(name);
+
+  // Write agent config JSON to instance's zeroclaw/ dir (deployed alongside the app)
+  const zcDir = join(instanceDir(name), "zeroclaw");
+  mkdirSync(zcDir, { recursive: true });
+  writeFileSync(join(zcDir, "config.json"), agentConfigJson);
+
   const cloudclawEnv = toEnvVars(config, agentConfigJson);
 
   // Persist env vars

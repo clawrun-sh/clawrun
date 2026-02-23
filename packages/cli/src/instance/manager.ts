@@ -51,6 +51,7 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
   // Pack in dependency order: zeroclaw and provider first since @cloudclaw/app depends on both
   const packages = [
     { name: "zeroclaw", dir: join(root, "packages", "zeroclaw") },
+    { name: "@cloudclaw/agent", dir: join(root, "packages", "agent") },
     { name: "@cloudclaw/provider", dir: join(root, "packages", "provider") },
     { name: "@cloudclaw/app", dir: join(root, "packages", "app") },
   ];
@@ -135,6 +136,7 @@ export async function createInstance(
     deps = await packLocalDeps(dir);
   } else {
     deps = {
+      "@cloudclaw/agent": "0.1.0",
       "@cloudclaw/provider": "0.1.0",
       "@cloudclaw/app": "0.1.0",
       "zeroclaw": "0.1.0",

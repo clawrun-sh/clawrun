@@ -1,17 +1,17 @@
-import type { AgentAdapter } from "zeroclaw/adapter";
-import { zeroclawAdapter } from "zeroclaw/adapter";
+import type { Agent } from "@cloudclaw/agent";
+import { ZeroclawAgent } from "@cloudclaw/agent/zeroclaw";
 
-const agents: Record<string, AgentAdapter> = {
-  [zeroclawAdapter.id]: zeroclawAdapter,
+const agents: Record<string, Agent> = {
+  zeroclaw: new ZeroclawAgent(),
 };
 
 const DEFAULT_AGENT = "zeroclaw";
 
-export function getAgent(id?: string): AgentAdapter {
+export function getAgent(id?: string): Agent {
   const agentId = id ?? DEFAULT_AGENT;
-  const adapter = agents[agentId];
-  if (!adapter) {
+  const agent = agents[agentId];
+  if (!agent) {
     throw new Error(`Unknown agent: ${agentId}`);
   }
-  return adapter;
+  return agent;
 }

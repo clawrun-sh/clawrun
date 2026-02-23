@@ -1,1 +1,1 @@
-export { GET } from "@cloudclaw/app/api/health";
+export { dynamic, GET } from "@cloudclaw/app/api/health";

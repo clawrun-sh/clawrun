@@ -3,6 +3,7 @@ import { RedisStateStore } from "./state-redis";
 import { RedisLockStore } from "./lock-redis";
 import { PostgresStateStore } from "./state-postgres";
 import type { RedisClient } from "./redis-types";
+import { getRuntimeConfig } from "../cloudclaw-config";
 
 let _redisClient: RedisClient | null = null;
 
@@ -19,7 +20,7 @@ function getRedisClient(): RedisClient | null {
 
 /** Key prefix for multi-instance isolation: "cloudclaw:{instance}:" */
 function getKeyPrefix(): string {
-  const instance = process.env.CLOUDCLAW_INSTANCE_NAME ?? "default";
+  const instance = getRuntimeConfig().instance.name;
   return `cloudclaw:${instance}:`;
 }
 

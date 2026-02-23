@@ -9,8 +9,8 @@ import type { ExtendPayload } from "../sandbox/lifecycle";
  * Sandbox heartbeat endpoint — called by the sandbox's internal reporter loop.
  *
  * Every 60s, a background script inside the sandbox POST's here with
- * filesystem mtime data and next cron schedule. The lifecycle manager
- * decides whether to extend the timeout or snapshot+stop.
+ * filesystem mtime data. The lifecycle manager queries cron info
+ * server-side and decides whether to extend the timeout or snapshot+stop.
  */
 export async function POST(req: Request) {
   const denied = requireSandboxAuth(req);
@@ -23,23 +23,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ action: "error", error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sandboxId, lastChangedAt, nextCronAt } = body;
+  const { sandboxId, lastChangedAt, root } = body;
   if (!sandboxId || typeof sandboxId !== "string") {
     return NextResponse.json({ action: "error", error: "Missing sandboxId" }, { status: 400 });
   }
   if (typeof lastChangedAt !== "number") {
     return NextResponse.json({ action: "error", error: "Missing or invalid lastChangedAt" }, { status: 400 });
   }
+  if (!root || typeof root !== "string") {
+    return NextResponse.json({ action: "error", error: "Missing root" }, { status: 400 });
+  }
 
-  const cronJobCount = typeof body.cronJobCount === "number" ? body.cronJobCount : undefined;
   const sandboxCreatedAt = typeof body.sandboxCreatedAt === "number" ? body.sandboxCreatedAt : undefined;
 
   const payload: ExtendPayload = {
     sandboxId,
     lastChangedAt,
-    nextCronAt: typeof nextCronAt === "string" ? nextCronAt : null,
-    cronJobCount,
     sandboxCreatedAt,
+    root,
   };
 
   try {

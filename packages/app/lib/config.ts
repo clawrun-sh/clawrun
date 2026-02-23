@@ -29,14 +29,29 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
     zeroclawBinPaths.push(`../../node_modules/zeroclaw/${binGlob}`);
   }
 
+  // Config files that must be bundled with every function.
+  const configPaths = ["./cloudclaw.json", "./zeroclaw/config.json"];
+
+  // Extend-loop script injected into sandbox for keep-alive reporting.
+  const extendLoopPaths = [
+    "./node_modules/@cloudclaw/app/dist/scripts/extend-loop.js",
+  ];
+  if (isMonorepo) {
+    extendLoopPaths.push("../app/dist/scripts/extend-loop.js");
+  }
+
+  // Merge binary + config + script paths for each route.
+  const allPaths = [...zeroclawBinPaths, ...configPaths, ...extendLoopPaths];
+
   return {
     ...(isMonorepo ? { outputFileTracingRoot: monorepoRoot } : {}),
-    transpilePackages: ["@cloudclaw/app", "@cloudclaw/provider"],
+    transpilePackages: ["@cloudclaw/app", "@cloudclaw/agent", "@cloudclaw/provider"],
     serverExternalPackages: ["grammy", "@vercel/sandbox"],
     outputFileTracingIncludes: {
-      "/api/v1/webhook/telegram": zeroclawBinPaths,
-      "/api/v1/heartbeat": zeroclawBinPaths,
-      "/api/v1/sandbox/restart": zeroclawBinPaths,
+      "/api/v1/health": allPaths,
+      "/api/v1/webhook/telegram": allPaths,
+      "/api/v1/heartbeat": allPaths,
+      "/api/v1/sandbox/restart": allPaths,
     },
     ...overrides,
   };

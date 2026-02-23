@@ -165,10 +165,8 @@ export class VercelPlatformProvider implements PlatformProvider {
     return VERCEL_TIER_DEFAULTS[tier];
   }
 
-  getDefaults(tier: PlatformTier): Record<string, string> {
-    return {
-      CLOUDCLAW_SANDBOX_ACTIVE_DURATION: "10", // 10 min — unified across tiers
-    };
+  getDefaults(_tier: PlatformTier): Record<string, string> {
+    return {};
   }
 
   // ---- Project lifecycle ------------------------------------------------

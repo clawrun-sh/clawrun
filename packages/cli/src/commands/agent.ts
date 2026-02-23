@@ -3,12 +3,22 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { zeroclawAdapter } from "zeroclaw/adapter";
+import { ZeroclawAgent } from "@cloudclaw/agent/zeroclaw";
 import { createSandboxClient } from "../sandbox/index.js";
+import { createSandboxHandle } from "../sandbox/handle.js";
 import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { instance } from "../args/instance.js";
 import type { CloudClawConfig } from "../instance/config.js";
+
+const agent = new ZeroclawAgent();
+
+/** Resolve the cloudclaw workspace root inside a sandbox by querying $HOME. */
+async function resolveRoot(handle: ReturnType<typeof createSandboxHandle>): Promise<string> {
+  const result = await handle.runCommand("sh", ["-c", "echo $HOME"]);
+  const home = (await result.stdout()).trim() || "/home/vercel-sandbox";
+  return `${home}/cloudclaw`;
+}
 
 /**
  * Start an interactive chat REPL with the agent in a deployed instance.
@@ -23,16 +33,18 @@ export async function startAgentChat(instanceName: string, config: CloudClawConf
   }
 
   const client = createSandboxClient(instanceName, config);
-  const adapter = zeroclawAdapter;
 
   const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
 
   console.log(chalk.dim(`Sandbox: ${sandboxId}\n`));
 
+  const handle = createSandboxHandle(client, sandboxId);
+  const root = await resolveRoot(handle);
+
   async function sendMessage(msg: string): Promise<{ success: boolean; output: string }> {
-    const cmd = adapter.buildCommand(msg);
-    const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env, { timeoutMs: 150_000 });
-    const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
+    const response = await agent.sendMessage(handle, root, msg, {
+      signal: AbortSignal.timeout(150_000),
+    });
     const output = response.success
       ? (response.message || "")
       : (response.error || response.message || "Unknown error");
@@ -77,7 +89,7 @@ export async function startAgentChat(instanceName: string, config: CloudClawConf
   console.log(chalk.dim("\nDisconnected."));
 }
 
-export const agent = command({
+export const agentCommand = command({
   name: "agent",
   description: "Chat with the agent running in an instance",
   args: {
@@ -101,15 +113,17 @@ export const agent = command({
       }
 
       const client = createSandboxClient(instanceName, config);
-      const adapter = zeroclawAdapter;
       const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
-
-      const cmd = adapter.buildCommand(message);
-      const result = await client.exec(sandboxId, cmd.cmd, cmd.args, cmd.env, { timeoutMs: 150_000 });
-      const response = adapter.parseResponse(result.stdout, result.stderr, result.exitCode);
+      const handle = createSandboxHandle(client, sandboxId);
+      const root = await resolveRoot(handle);
 
       const s = clack.spinner();
       s.start("Thinking...");
+
+      const response = await agent.sendMessage(handle, root, message, {
+        signal: AbortSignal.timeout(150_000),
+      });
+
       s.stop(response.success ? "Done" : "Error");
       const output = response.success
         ? (response.message || "")

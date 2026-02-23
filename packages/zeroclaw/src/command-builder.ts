@@ -1,40 +1,24 @@
-import type { SandboxCommand } from "./adapter/types.js";
-
-/** Default workspace inside the sandbox — must match the daemon's ZEROCLAW_WORKSPACE. */
-const SANDBOX_WORKSPACE = "/tmp/.zeroclaw";
+interface SandboxCommand {
+  cmd: string;
+  args: string[];
+  env?: Record<string, string>;
+}
 
 export function buildAgentCommand(
   binaryPath: string,
   message: string,
+  env: Record<string, string>,
 ): SandboxCommand {
   return {
     cmd: binaryPath,
     args: ["agent", "-m", message],
-    env: { HOME: "/tmp", ZEROCLAW_WORKSPACE: SANDBOX_WORKSPACE },
-  };
-}
-
-export function buildOnboardCommand(
-  binaryPath: string,
-  config: {
-    provider: string;
-    apiKey: string;
-    model?: string;
-  },
-): SandboxCommand {
-  return {
-    cmd: binaryPath,
-    args: [
-      "onboard",
-      "--api-key", config.apiKey,
-      "--provider", config.provider,
-    ],
-    env: { HOME: "/tmp" },
+    env,
   };
 }
 
 export function buildDaemonCommand(
   binaryPath: string,
+  env: Record<string, string>,
   options?: { port?: number; host?: string },
 ): SandboxCommand {
   return {
@@ -44,6 +28,17 @@ export function buildDaemonCommand(
       "--port", String(options?.port ?? 3000),
       "--host", options?.host ?? "0.0.0.0",
     ],
-    env: { HOME: "/tmp" },
+    env,
+  };
+}
+
+export function buildCronListCommand(
+  binaryPath: string,
+  env: Record<string, string>,
+): SandboxCommand {
+  return {
+    cmd: binaryPath,
+    args: ["cron", "list"],
+    env,
   };
 }

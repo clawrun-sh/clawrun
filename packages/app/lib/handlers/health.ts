@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { SandboxLifecycleManager } from "../sandbox/lifecycle";
 
@@ -11,8 +13,8 @@ export async function GET() {
   try {
     const manager = new SandboxLifecycleManager();
     const sandboxStatus = await manager.getStatus();
-    // Only expose running state publicly — no sandbox IDs or timestamps
-    response.sandbox = { running: sandboxStatus.running };
+    // Expose running state + status publicly — no sandbox IDs or timestamps
+    response.sandbox = { running: sandboxStatus.running, status: sandboxStatus.status };
   } catch {
     response.sandbox = { running: false };
   }
