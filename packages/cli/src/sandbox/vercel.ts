@@ -1,8 +1,17 @@
 import { execa } from "execa";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
 
+/** Resolve the `sandbox` CLI binary from our own node_modules. */
+function sandboxBin(): string {
+  const require = createRequire(import.meta.url);
+  const pkgPath = require.resolve("sandbox/package.json");
+  return join(dirname(pkgPath), "bin", "sandbox.mjs");
+}
+
 /**
- * SandboxClient backed by the Vercel `npx sandbox` CLI.
+ * SandboxClient backed by the Vercel `sandbox` CLI.
  */
 export class VercelSandboxClient implements SandboxClient {
   private projectId: string;
@@ -18,8 +27,8 @@ export class VercelSandboxClient implements SandboxClient {
   }
 
   async list(): Promise<SandboxEntry[]> {
-    const { stdout } = await execa("npx", [
-      "sandbox", "list", ...this.scopeArgs(),
+    const { stdout } = await execa("node", [
+      sandboxBin(), "list", ...this.scopeArgs(),
     ]);
 
     const entries: SandboxEntry[] = [];
@@ -39,7 +48,7 @@ export class VercelSandboxClient implements SandboxClient {
     options?: { timeoutMs?: number },
   ): Promise<ExecResult> {
     const execArgs = [
-      "sandbox", "exec", sandboxId,
+      sandboxBin(), "exec", sandboxId,
       ...this.scopeArgs(),
     ];
 
@@ -52,7 +61,7 @@ export class VercelSandboxClient implements SandboxClient {
     execArgs.push("--", cmd, ...args);
 
     try {
-      const result = await execa("npx", execArgs, { timeout: options?.timeoutMs ?? 60_000 });
+      const result = await execa("node", execArgs, { timeout: options?.timeoutMs ?? 60_000 });
       return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
     } catch (err: unknown) {
       const e = err as { stdout?: string; stderr?: string; exitCode?: number; message?: string };
@@ -74,12 +83,12 @@ export class VercelSandboxClient implements SandboxClient {
   }
 
   async connect(sandboxId: string, env?: Record<string, string>): Promise<void> {
-    const args = ["sandbox", "connect", sandboxId, ...this.scopeArgs()];
+    const args = [sandboxBin(), "connect", sandboxId, ...this.scopeArgs()];
     if (env) {
       for (const [k, v] of Object.entries(env)) {
         args.push("-e", `${k}=${v}`);
       }
     }
-    await execa("npx", args, { stdio: "inherit" });
+    await execa("node", args, { stdio: "inherit" });
   }
 }

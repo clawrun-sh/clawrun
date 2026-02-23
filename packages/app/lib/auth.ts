@@ -68,30 +68,3 @@ export function requireSandboxAuth(req: Request): Response | null {
   return null;
 }
 
-/**
- * Require Telegram webhook secret verification.
- *
- * Telegram sends the secret_token (registered via setWebhook) in the
- * x-telegram-bot-api-secret-token header on every delivery.
- *
- * Returns null on success, or a Response to send back on failure.
- * Fail-closed: returns 500 if the secret env var is not configured.
- */
-export function requireTelegramWebhookAuth(req: Request): Response | null {
-  const secret = process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error("[CloudClaw] CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET is not configured — rejecting request");
-    return new Response("Server misconfigured", { status: 500 });
-  }
-
-  const header = req.headers.get("x-telegram-bot-api-secret-token");
-  if (!header) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  if (!safeEqual(header, secret)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  return null;
-}

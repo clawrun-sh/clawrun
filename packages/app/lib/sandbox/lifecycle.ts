@@ -7,7 +7,7 @@ import { VercelSandboxProvider } from "@cloudclaw/provider/vercel";
 import type { Agent, CronInfo } from "@cloudclaw/agent";
 import { getAgent } from "../agents/registry";
 import { getRuntimeConfig } from "../cloudclaw-config";
-import { registerTelegramWakeWebhook, deleteTelegramWakeWebhook } from "../channels/telegram-wake";
+import { registerWakeHooks as registerAllWakeHooks, teardownWakeHooks as teardownAllWakeHooks } from "@cloudclaw/channel";
 import { getStateStore } from "../storage/state";
 import { tryAcquireCreationLock, releaseCreationLock } from "../sandbox/lock";
 import type { StateStore } from "../storage/state-types";
@@ -197,16 +197,17 @@ export class SandboxLifecycleManager {
 
   /** Register wake hooks for all configured channels. */
   private async registerWakeHooks(): Promise<void> {
-    if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
-      await registerTelegramWakeWebhook();
+    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    if (!host) {
+      console.warn("[CloudClaw] VERCEL_PROJECT_PRODUCTION_URL not set — skipping wake hook registration");
+      return;
     }
+    await registerAllWakeHooks(`https://${host}`);
   }
 
   /** Tear down wake hooks — sandbox is running, daemon handles channels directly. */
   private async teardownWakeHooks(): Promise<void> {
-    if (process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN) {
-      await deleteTelegramWakeWebhook();
-    }
+    await teardownAllWakeHooks();
   }
 
   async heartbeat(): Promise<SandboxResult> {

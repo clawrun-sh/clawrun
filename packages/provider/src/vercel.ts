@@ -40,8 +40,8 @@ class VercelManagedSandbox implements ManagedSandbox {
     return this.sandbox.writeFiles(files);
   }
 
-  stop(): Promise<void> {
-    return this.sandbox.stop();
+  async stop(): Promise<void> {
+    await this.sandbox.stop();
   }
 
   async snapshot(): Promise<SnapshotRef> {

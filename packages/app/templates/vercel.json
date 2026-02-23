@@ -5,7 +5,7 @@
     { "path": "/api/v1/heartbeat", "schedule": "* * * * *" }
   ],
   "functions": {
-    "app/api/v1/webhook/telegram/route.ts": {
+    "app/api/v1/webhook/[channel]/route.ts": {
       "maxDuration": 60,
       "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
     },

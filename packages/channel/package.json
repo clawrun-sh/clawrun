@@ -1,0 +1,23 @@
+{
+  "name": "@cloudclaw/channel",
+  "version": "0.1.0",
+  "description": "Wake hook adapters for CloudClaw messaging channels",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

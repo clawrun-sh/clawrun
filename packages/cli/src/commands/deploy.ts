@@ -22,6 +22,7 @@ import {
   readAgentConfigJson,
   generateSecret,
 } from "../instance/index.js";
+import { getChannelSecretDefinitions } from "@cloudclaw/channel";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
@@ -205,7 +206,10 @@ async function handleNewInstance(
   const activeDuration = defaultActiveDuration;
   const cronSecret = generateSecret();
   const nextAuthSecret = generateSecret();
-  const webhookSecret = generateSecret();
+  const webhookSecrets: Record<string, string> = {};
+  for (const def of getChannelSecretDefinitions()) {
+    webhookSecrets[def.channelId] = generateSecret();
+  }
   const sandboxSecret = generateSecret();
 
   // ============================================================
@@ -275,7 +279,7 @@ async function handleNewInstance(
     activeDuration,
     cronSecret,
     nextAuthSecret,
-    webhookSecret,
+    webhookSecrets,
     sandboxSecret,
     provider: platform.id,
   });

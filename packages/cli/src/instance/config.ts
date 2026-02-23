@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { extractChannelEnvVars, getChannelSecretDefinitions } from "@cloudclaw/channel";
 
 /** Generate a 256-bit base64url secret. */
 export function generateSecret(): string {
@@ -41,7 +42,8 @@ export const cloudClawConfigSchema = z.object({
   secrets: z.object({
     cronSecret: z.string(),
     nextAuthSecret: z.string(),
-    webhookSecret: z.string(),
+    /** Per-channel webhook secrets, keyed by channel ID (e.g. "telegram"). */
+    webhookSecrets: z.record(z.string(), z.string()).optional(),
     sandboxSecret: z.string(),
   }),
   state: stateSchema.optional(),
@@ -63,7 +65,7 @@ export function buildConfig(
     cronWakeLeadTime?: number;
     cronSecret: string;
     nextAuthSecret: string;
-    webhookSecret: string;
+    webhookSecrets?: Record<string, string>;
     sandboxSecret: string;
     provider?: string;
   },
@@ -87,7 +89,7 @@ export function buildConfig(
     secrets: {
       cronSecret: options.cronSecret,
       nextAuthSecret: options.nextAuthSecret,
-      webhookSecret: options.webhookSecret,
+      webhookSecrets: options.webhookSecrets,
       sandboxSecret: options.sandboxSecret,
     },
   });
@@ -102,21 +104,25 @@ export function toEnvVars(
 ): Record<string, string> {
   const vars: Record<string, string> = {};
 
-  // Extract Telegram bot token from agent config JSON (needed at app level for wake hooks)
-  try {
-    const agentCfg = JSON.parse(agentConfigJson);
-    if (agentCfg.channels_config?.telegram?.bot_token) {
-      vars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"] = agentCfg.channels_config.telegram.bot_token;
-    }
-  } catch {
-    // agentConfigJson might not be valid JSON yet during initial setup
-  }
+  // Extract channel tokens from agent config (bot tokens, API keys, etc.)
+  const channelVars = extractChannelEnvVars(agentConfigJson);
+  Object.assign(vars, channelVars);
 
-  // Secrets
+  // Core secrets
   vars["CLOUDCLAW_CRON_SECRET"] = config.secrets.cronSecret;
   vars["CLOUDCLAW_NEXTAUTH_SECRET"] = config.secrets.nextAuthSecret;
-  vars["CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"] = config.secrets.webhookSecret;
   vars["CLOUDCLAW_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
+
+  // Per-channel webhook secrets
+  if (config.secrets.webhookSecrets) {
+    // Map per-channel secrets to their env var names
+    for (const def of getChannelSecretDefinitions()) {
+      const secret = config.secrets.webhookSecrets[def.channelId];
+      if (secret) {
+        vars[def.envVar] = secret;
+      }
+    }
+  }
 
   // State store
   if (config.state) {
