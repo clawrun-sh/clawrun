@@ -49,6 +49,10 @@ export class CronScheduleReason implements ExtendReason {
   evaluate(payload: ExtendPayload, now: number): string | null {
     if (!payload.nextCronAt) return null;
     const msUntilCron = new Date(payload.nextCronAt).getTime() - now;
+    // Past timestamps are not a reason to extend — they indicate a cron
+    // that already fired. Without this guard, negative msUntilCron would
+    // always be < keepAliveWindowMs, keeping the sandbox alive forever.
+    if (msUntilCron <= 0) return null;
     return msUntilCron < this.keepAliveWindowMs ? "cron due soon" : null;
   }
 }

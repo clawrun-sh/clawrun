@@ -284,7 +284,10 @@ export class SandboxLifecycleManager {
           ` (nextCronAt=${nextWakeAtStr}, in ${secsUntilCron}s,` +
           ` lead=${CRON_WAKE_LEAD_S}s)`,
         );
-        await this.state.delete(STATE_NEXT_WAKE_AT);
+        // Don't delete next_wake_at here — the extend loop owns the
+        // write/delete lifecycle. Once the sandbox boots and the daemon
+        // reschedules the job, the extend loop will overwrite with the
+        // next future occurrence.
         return this.startNew(sandboxes);
       }
 
@@ -373,6 +376,9 @@ export class SandboxLifecycleManager {
     // Persist next_wake_at on every tick that reports a cron schedule.
     // This ensures the heartbeat knows when to wake the sandbox even if
     // it crashes or its native TTL expires without a graceful stop.
+    // The extend loop now only reports future timestamps, so a non-null
+    // nextCronAt is guaranteed to be a valid future wake target. When null
+    // (no future crons, or daemon unavailable), clear any stale value.
     if (payload.nextCronAt) {
       try {
         await this.state.set(STATE_NEXT_WAKE_AT, payload.nextCronAt);
@@ -381,6 +387,9 @@ export class SandboxLifecycleManager {
         console.error("[CloudClaw] Failed to store next_wake_at:", msg);
         return { action: "error", error: `Failed to persist next_wake_at: ${msg}` };
       }
+    } else {
+      // No future crons — clear any stale wake time.
+      try { await this.state.delete(STATE_NEXT_WAKE_AT); } catch {}
     }
 
     // Evaluate extend reasons (first match wins)
@@ -632,7 +641,7 @@ export class SandboxLifecycleManager {
       `const CREATED_AT = Date.now();`,
       ``,
       `// Daemon housekeeping files — changes to these don't indicate user activity`,
-      `const IGNORE_FILES = new Set(["daemon_state.json"]);`,
+      `const IGNORE_FILES = new Set(["daemon_state.json", "jobs.db", "jobs.db-wal", "jobs.db-shm", "jobs.db-journal"]);`,
       ``,
       `function getMaxMtime(dir) {`,
       `  let max = 0;`,
@@ -657,10 +666,11 @@ export class SandboxLifecycleManager {
       `      timeout: 5000, stdio: ["pipe", "pipe", "pipe"],`,
       `    }).toString();`,
       `    const matches = [...raw.matchAll(/next=([\\d-]+T[\\d:.+Z]+)/g)];`,
-      `    const times = matches.map(m => new Date(m[1]).getTime()).filter(t => !isNaN(t));`,
+      `    const now = Date.now();`,
+      `    const times = matches.map(m => new Date(m[1]).getTime()).filter(t => !isNaN(t) && t > now);`,
       `    return {`,
       `      nextCronAt: times.length ? new Date(Math.min(...times)).toISOString() : null,`,
-      `      cronJobCount: matches.length,`,
+      `      cronJobCount: times.length,`,
       `    };`,
       `  } catch { return { nextCronAt: null, cronJobCount: 0 }; }`,
       `}`,

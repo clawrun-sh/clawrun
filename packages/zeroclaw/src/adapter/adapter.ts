@@ -68,6 +68,10 @@ export const zeroclawAdapter: AgentAdapter = {
     return buildDaemonCommand(ZEROCLAW_BIN_PATH, options);
   },
 
+  shellEnv(): Record<string, string> {
+    return { ZEROCLAW_WORKSPACE: ZEROCLAW_HOME };
+  },
+
   generateDaemonConfig(env: AgentEnv, channels: ChannelConfig): SandboxFile[] {
     // If we have the full agent config JSON from napi, convert it to TOML directly
     if (env.configJson && env.configJson !== "{}") {

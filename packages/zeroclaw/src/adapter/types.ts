@@ -44,4 +44,6 @@ export interface AgentAdapter {
   onboardCommand?(env: AgentEnv): SandboxCommand;
   buildDaemonCommand?(options?: { port?: number; host?: string }): SandboxCommand;
   generateDaemonConfig?(env: AgentEnv, channels: ChannelConfig): SandboxFile[];
+  /** Env vars to set when opening an interactive shell in the sandbox. */
+  shellEnv?(): Record<string, string>;
 }
