@@ -1,0 +1,105 @@
+import { command } from "cmd-ts";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import chalk from "chalk";
+import * as clack from "@clack/prompts";
+import { createSandboxClient } from "../sandbox/index.js";
+import { getRunningId } from "../sandbox/resolve.js";
+import { readConfig, instanceAgentDir } from "../instance/index.js";
+import { instance } from "../args/instance.js";
+
+/** Files that flow local → sandbox. Never pulled back. */
+const LOCAL_OWNED_FILES = new Set([
+  "config.toml",
+  ".secret_key",
+]);
+
+export const pull = command({
+  name: "pull",
+  description: "Pull agent runtime state from sandbox to local",
+  args: {
+    instance,
+  },
+  async handler({ instance: instanceName }) {
+    const config = readConfig(instanceName);
+    if (!config) {
+      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      process.exit(1);
+    }
+
+    const { deployedUrl } = config.instance;
+    const { cronSecret } = config.secrets;
+    if (!deployedUrl || !cronSecret) {
+      console.error(chalk.red(`Instance "${instanceName}" is not fully deployed.`));
+      process.exit(1);
+    }
+
+    const client = createSandboxClient(instanceName, config);
+
+    // Find running sandbox (don't start one — pull requires an existing sandbox)
+    const sandboxId = await getRunningId(client);
+    if (!sandboxId) {
+      console.error(chalk.red("No running sandbox found. Start one first with a message or `cloudclaw deploy`."));
+      process.exit(1);
+    }
+
+    // Resolve sandbox root
+    const homeResult = await client.exec(sandboxId, "sh", ["-c", "echo $HOME"]);
+    const home = homeResult.stdout.trim() || "/home/vercel-sandbox";
+    const remoteAgentDir = `${home}/.cloudclaw/agent`;
+
+    // List all files in the remote agent/ dir recursively
+    const findResult = await client.exec(
+      sandboxId, "sh",
+      ["-c", `find "${remoteAgentDir}" -type f 2>/dev/null`],
+    );
+
+    if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
+      console.log(chalk.yellow("No files found in sandbox agent directory."));
+      return;
+    }
+
+    const remoteFiles = findResult.stdout.trim().split("\n")
+      .map(abs => abs.slice(remoteAgentDir.length + 1))  // relative path
+      .filter(rel => !LOCAL_OWNED_FILES.has(rel));
+
+    if (remoteFiles.length === 0) {
+      console.log(chalk.yellow("No pullable files found (only config files present)."));
+      return;
+    }
+
+    const agentDir = instanceAgentDir(instanceName);
+    const s = clack.spinner();
+    s.start(`Pulling ${remoteFiles.length} file${remoteFiles.length !== 1 ? "s" : ""} from sandbox...`);
+
+    let pulled = 0;
+    let failed = 0;
+
+    for (const relPath of remoteFiles) {
+      const remotePath = `${remoteAgentDir}/${relPath}`;
+      const data = await client.readFile(sandboxId, remotePath);
+
+      if (data) {
+        const localPath = join(agentDir, relPath);
+        mkdirSync(dirname(localPath), { recursive: true });
+        writeFileSync(localPath, data);
+        pulled++;
+      } else {
+        failed++;
+      }
+    }
+
+    s.stop(chalk.green("Done."));
+
+    console.log(`  ${chalk.bold("Pulled:")} ${pulled} file${pulled !== 1 ? "s" : ""}`);
+    if (failed > 0) {
+      console.log(`  ${chalk.dim("Failed:")} ${failed} file${failed !== 1 ? "s" : ""}`);
+    }
+    console.log(`  ${chalk.bold("Destination:")} ${agentDir}`);
+
+    // Show what was pulled
+    for (const relPath of remoteFiles) {
+      console.log(chalk.dim(`    ${relPath}`));
+    }
+  },
+});

@@ -11,6 +11,7 @@ export interface SandboxHandle {
     signal?: AbortSignal; detached?: boolean;
   }): Promise<CommandResult>;
   writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
+  readFile(path: string): Promise<Buffer | null>;
 }
 
 export interface AgentResponse {
@@ -34,11 +35,16 @@ export interface ExtendLoopConfig {
   ignoreFiles: string[];
 }
 
+export interface ProvisionOpts {
+  localAgentDir: string;
+  secretKey: string;
+}
+
 export interface Agent {
   readonly id: string;
   readonly name: string;
 
-  provision(sandbox: SandboxHandle, root: string, configJson: string): Promise<void>;
+  provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
   sendMessage(sandbox: SandboxHandle, root: string, message: string, opts?: {
     env?: Record<string, string>;

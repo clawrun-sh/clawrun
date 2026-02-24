@@ -30,7 +30,7 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   }
 
   // Config files that must be bundled with every function.
-  const configPaths = ["./cloudclaw.json", "./zeroclaw/config.json"];
+  const configPaths = ["./cloudclaw.json", "./agent/config.toml", "./agent/.secret_key"];
 
   // Extend-loop script injected into sandbox for keep-alive reporting.
   const extendLoopPaths = [
@@ -52,6 +52,7 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
       "/api/v1/webhook/[channel]": allPaths,
       "/api/v1/heartbeat": allPaths,
       "/api/v1/sandbox/restart": allPaths,
+      "/api/v1/sandbox/start": allPaths,
     },
     ...overrides,
   };

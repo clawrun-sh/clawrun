@@ -1,5 +1,5 @@
 import type { CloudClawConfig } from "../instance/config.js";
-import { instanceDir } from "../instance/index.js";
+import { instanceDeployDir } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type { SandboxClient } from "./types.js";
 import { VercelSandboxClient } from "./vercel.js";
@@ -23,7 +23,7 @@ export function createSandboxClient(
 
   switch (provider) {
     case "vercel": {
-      const dir = instanceDir(instance);
+      const dir = instanceDeployDir(instance);
       const platform = getPlatformProvider("vercel");
       const handle = platform.readProjectLink(dir);
       if (!handle) {

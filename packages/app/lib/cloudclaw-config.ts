@@ -23,7 +23,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     instance: { name: raw.instance?.name ?? "default" },
     agent: {
       name: raw.agent?.name ?? "zeroclaw",
-      config: raw.agent?.config ?? "zeroclaw/config.toml",
+      config: raw.agent?.config ?? "agent/config.toml",
     },
     sandbox: {
       activeDuration: raw.sandbox?.activeDuration ?? 600,

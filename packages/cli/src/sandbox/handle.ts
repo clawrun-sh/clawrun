@@ -44,5 +44,9 @@ export function createSandboxHandle(
     async writeFiles(): Promise<void> {
       throw new Error("writeFiles not supported via CLI sandbox client");
     },
+
+    async readFile(path: string): Promise<Buffer | null> {
+      return client.readFile(sandboxId, path);
+    },
   };
 }

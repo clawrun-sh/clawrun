@@ -5,5 +5,6 @@ export type {
   CronEntry,
   CronInfo,
   ExtendLoopConfig,
+  ProvisionOpts,
   Agent,
 } from "./types.js";

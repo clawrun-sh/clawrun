@@ -55,9 +55,9 @@ function getDatabaseUrl(): string | undefined {
   return process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 }
 
-/** Read the agent config JSON bundled at zeroclaw/config.json. */
-function readBundledAgentConfigJson(): string {
-  return readFileSync(join(process.cwd(), "zeroclaw", "config.json"), "utf-8");
+/** Read the agent .secret_key bundled at agent/.secret_key. */
+function readBundledSecretKey(): string {
+  return readFileSync(join(process.cwd(), "agent", ".secret_key"), "utf-8").trim();
 }
 
 /** Read the cloudclaw.json content for writing into the sandbox. */
@@ -559,7 +559,7 @@ export class SandboxLifecycleManager {
       // Resolve workspace root from sandbox HOME
       const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
       const home = (await homeResult.stdout()).trim() || "/home/vercel-sandbox";
-      const root = `${home}/cloudclaw`;
+      const root = `${home}/.cloudclaw`;
 
       // Write cloudclaw.json into the sandbox workspace
       const cloudclawJson = readBundledCloudclawJson();
@@ -569,8 +569,9 @@ export class SandboxLifecycleManager {
       ]);
 
       // Provision agent (binary, config, secret key, .profile)
-      const configJson = readBundledAgentConfigJson();
-      await this.agent.provision(sandbox, root, configJson);
+      const localAgentDir = join(process.cwd(), "agent");
+      const secretKey = readBundledSecretKey();
+      await this.agent.provision(sandbox, root, { localAgentDir, secretKey });
 
       const databaseUrl = getDatabaseUrl();
       await this.agent.startDaemon(sandbox, root, {
@@ -602,8 +603,8 @@ export class SandboxLifecycleManager {
     const url = `https://${host}/api/v1/sandbox/heartbeat`;
     const id = sandbox.id;
     const agentConfig = this.agent.getExtendLoopConfig(root);
-    const scriptPath = `${root}/extend-loop.mjs`;
-    const configPath = `${root}/extend-loop-config.json`;
+    const scriptPath = `${root}/scripts/extend-loop.mjs`;
+    const configPath = `${root}/scripts/extend-loop-config.json`;
 
     // Read the compiled extend-loop script.
     // Try cwd first (dev monorepo), then node_modules (deployed instance).
@@ -629,6 +630,7 @@ export class SandboxLifecycleManager {
     };
 
     try {
+      await sandbox.runCommand("mkdir", ["-p", `${root}/scripts`]);
       await sandbox.writeFiles([
         { path: scriptPath, content: Buffer.from(scriptContent) },
         { path: configPath, content: Buffer.from(JSON.stringify(loopConfig)) },

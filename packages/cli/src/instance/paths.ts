@@ -12,3 +12,11 @@ export function instancesDir(): string {
 export function instanceDir(name: string): string {
   return join(cloudclawHome(), name);
 }
+
+export function instanceAgentDir(name: string): string {
+  return join(instanceDir(name), "agent");
+}
+
+export function instanceDeployDir(name: string): string {
+  return join(instanceDir(name), ".deploy");
+}

@@ -7,19 +7,23 @@
   "functions": {
     "app/api/v1/webhook/[channel]/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,agent/config.toml,agent/.secret_key}"
     },
     "app/api/v1/heartbeat/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,agent/config.toml,agent/.secret_key}"
     },
     "app/api/v1/sandbox/restart/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,zeroclaw/config.json}"
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,agent/config.toml,agent/.secret_key}"
+    },
+    "app/api/v1/sandbox/start/route.ts": {
+      "maxDuration": 60,
+      "includeFiles": "{node_modules/zeroclaw/dist/bin/**,cloudclaw.json,agent/config.toml,agent/.secret_key}"
     },
     "app/api/v1/sandbox/heartbeat/route.ts": {
       "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,zeroclaw/config.json}"
+      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
     }
   }
 }

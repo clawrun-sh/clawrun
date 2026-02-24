@@ -8,7 +8,7 @@ import {
   HOUSEKEEPING_FILES,
   DAEMON_PROCESS_PATTERN,
 } from "zeroclaw";
-import type { Agent, SandboxHandle, AgentResponse, CronInfo, ExtendLoopConfig } from "./types.js";
+import type { Agent, SandboxHandle, AgentResponse, CronInfo, ExtendLoopConfig, ProvisionOpts } from "./types.js";
 
 export class ZeroclawAgent implements Agent {
   readonly id = "zeroclaw";
@@ -16,17 +16,17 @@ export class ZeroclawAgent implements Agent {
 
   private env(root: string): Record<string, string> {
     return {
-      HOME: root,
       ZEROCLAW_WORKSPACE: `${root}/agent`,
       ZEROCLAW_CONFIG_DIR: `${root}/agent`,
     };
   }
 
-  async provision(sandbox: SandboxHandle, root: string, configJson: string): Promise<void> {
+  async provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void> {
     await zeroclawProvision(sandbox, {
       binPath: `${root}/bin/zeroclaw`,
       agentDir: `${root}/agent`,
-      configJson,
+      localAgentDir: opts.localAgentDir,
+      secretKey: opts.secretKey,
     });
   }
 

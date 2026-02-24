@@ -8,9 +8,9 @@ import { getAgent } from "../agents/registry";
 const SANDBOX_TIMEOUT_MS = 60_000;
 const COMMAND_TIMEOUT_MS = 45_000;
 
-/** Read the agent config JSON bundled at zeroclaw/config.json. */
-function readBundledAgentConfigJson(): string {
-  return readFileSync(join(process.cwd(), "zeroclaw", "config.json"), "utf-8");
+/** Read the agent .secret_key bundled at agent/.secret_key. */
+function readBundledSecretKey(): string {
+  return readFileSync(join(process.cwd(), "agent", ".secret_key"), "utf-8").trim();
 }
 
 const provider: SandboxProvider = new VercelSandboxProvider();
@@ -39,11 +39,12 @@ export async function runAgent(
     // Resolve workspace root from sandbox HOME
     const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
     const home = (await homeResult.stdout()).trim() || "/home/vercel-sandbox";
-    const root = `${home}/cloudclaw`;
+    const root = `${home}/.cloudclaw`;
 
     // Provision agent (binary, config, secret key, .profile)
-    const configJson = readBundledAgentConfigJson();
-    await agent.provision(sandbox, root, configJson);
+    const localAgentDir = join(process.cwd(), "agent");
+    const secretKey = readBundledSecretKey();
+    await agent.provision(sandbox, root, { localAgentDir, secretKey });
 
     // Run agent with timeout
     const controller = new AbortController();

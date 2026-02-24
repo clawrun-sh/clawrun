@@ -14,6 +14,7 @@
     "./api/heartbeat": "./lib/handlers/heartbeat.ts",
     "./api/sandbox-heartbeat": "./lib/handlers/sandbox-heartbeat.ts",
     "./api/sandbox-restart": "./lib/handlers/sandbox-restart.ts",
+    "./api/sandbox-start": "./lib/handlers/sandbox-start.ts",
     "./api/sandbox-stop": "./lib/handlers/sandbox-stop.ts",
     "./pages/home": "./lib/components/home.tsx",
     "./pages/layout": "./lib/components/root-layout.tsx",

@@ -17,7 +17,7 @@ const agent = new ZeroclawAgent();
 async function resolveRoot(handle: ReturnType<typeof createSandboxHandle>): Promise<string> {
   const result = await handle.runCommand("sh", ["-c", "echo $HOME"]);
   const home = (await result.stdout()).trim() || "/home/vercel-sandbox";
-  return `${home}/cloudclaw`;
+  return `${home}/.cloudclaw`;
 }
 
 /**

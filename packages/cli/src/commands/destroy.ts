@@ -5,6 +5,7 @@ import {
   getInstance,
   destroyInstance,
   instanceDir,
+  instanceDeployDir,
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import { instance } from "../args/instance.js";
@@ -55,7 +56,7 @@ export const destroy = command({
 
     // Delete platform project first (needs project link dir to still exist)
     const platform = getPlatformProvider();
-    const handle = platform.readProjectLink(dir);
+    const handle = platform.readProjectLink(instanceDeployDir(name));
 
     if (!handle) {
       console.log(

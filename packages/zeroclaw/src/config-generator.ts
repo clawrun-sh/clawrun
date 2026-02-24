@@ -1,11 +1,12 @@
 import * as TOML from "@iarna/toml";
 
 /**
- * Convert the full ZeroClaw config JSON (from napi getSavedConfig) to TOML format
- * for writing into the sandbox. Injects gateway overrides for daemon mode.
+ * Convert a parsed ZeroClaw config object to TOML format for writing into
+ * the sandbox. Injects gateway overrides for daemon mode.
  */
-export function generateDaemonTomlFromJson(configJson: string): string {
-  const cfg = JSON.parse(configJson) as TOML.JsonMap;
+export function generateDaemonToml(config: TOML.JsonMap): string {
+  // Shallow-clone so callers' object isn't mutated
+  const cfg = { ...config };
 
   // Merge gateway overrides for daemon mode (CloudClaw sandbox)
   cfg.gateway = {

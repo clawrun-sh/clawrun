@@ -14,15 +14,18 @@ import {
   instanceExists,
   getInstance,
   instanceDir,
+  instanceAgentDir,
+  instanceDeployDir,
   saveDeployedUrl,
   upgradeInstance,
+  copyMirroredFiles,
   buildConfig,
   toEnvVars,
   readConfig,
-  readAgentConfigJson,
   generateSecret,
 } from "../instance/index.js";
-import { getChannelSecretDefinitions } from "@cloudclaw/channel";
+import { extractChannelEnvVars, getChannelSecretDefinitions } from "@cloudclaw/channel";
+import { readParsedConfig } from "zeroclaw";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
@@ -128,11 +131,11 @@ async function handleNewInstance(
     process.exit(1);
   }
 
-  // Redirect ZeroClaw config to instance directory (never touch ~/.zeroclaw/)
-  const zcConfigDir = join(instanceDir(name), "zeroclaw");
-  mkdirSync(zcConfigDir, { recursive: true });
+  // Redirect ZeroClaw config to instance's agent/ directory (never touch ~/.zeroclaw/)
+  const agentConfigDir = instanceAgentDir(name);
+  mkdirSync(agentConfigDir, { recursive: true });
   const prevConfigDir = process.env.ZEROCLAW_CONFIG_DIR;
-  process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+  process.env.ZEROCLAW_CONFIG_DIR = agentConfigDir;
 
   // Memory backend
   let memoryBackend = "sqlite";
@@ -186,17 +189,11 @@ async function handleNewInstance(
   }
 
   // Write memory backend into zeroclaw config.toml
-  const configTomlPath = join(zcConfigDir, "config.toml");
+  const configTomlPath = join(agentConfigDir, "config.toml");
   const tomlContent = readFileSync(configTomlPath, "utf-8");
   const parsed = TOML.parse(tomlContent);
   parsed.memory = { ...(parsed.memory as Record<string, unknown> ?? {}), backend: memoryBackend };
   writeFileSync(configTomlPath, TOML.stringify(parsed as TOML.JsonMap));
-
-  // Read the full assembled config from ZeroClaw
-  const agentConfigJson = await napi.getSavedConfig();
-
-  // Write agent config JSON to instance's zeroclaw/ dir (deployed alongside the app)
-  writeFileSync(join(zcConfigDir, "config.json"), agentConfigJson);
 
   // Restore ZEROCLAW_CONFIG_DIR
   if (prevConfigDir !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prevConfigDir;
@@ -284,29 +281,33 @@ async function handleNewInstance(
     provider: platform.id,
   });
 
-  // Derive env vars from config + agent config JSON
-  const cloudclawEnv = toEnvVars(config, agentConfigJson);
+  // Derive env vars: CloudClaw secrets + agent channel tokens
+  const agentConfig = readParsedConfig(agentConfigDir);
+  const agentEnv = extractChannelEnvVars(agentConfig as Record<string, unknown>);
+  const cloudclawEnv = toEnvVars(config);
   const allEnvVars: Record<string, string> = {
     ...cloudclawEnv,
+    ...agentEnv,
     ...stateResult.vars,
   };
 
   const dir = await createInstance(name, config, allEnvVars);
+  const deployDir = instanceDeployDir(name);
 
-  // Write the project link
-  platform.writeProjectLink(dir, handle);
+  // Write the project link into .deploy/
+  platform.writeProjectLink(deployDir, handle);
 
   // Patch platform config with plan-aware cron schedule
-  platform.patchPlatformConfig(dir, limits);
+  platform.patchPlatformConfig(deployDir, limits);
 
   // Disable deployment protection
-  await platform.disableDeploymentProtection(dir);
+  await platform.disableDeploymentProtection(deployDir);
 
   // Persist all env vars to project
-  await platform.persistEnvVars(dir, allEnvVars);
+  await platform.persistEnvVars(deployDir, allEnvVars);
 
-  // Deploy
-  const url = await platform.deploy(dir, allEnvVars);
+  // Deploy from .deploy/
+  const url = await platform.deploy(deployDir, allEnvVars);
   saveDeployedUrl(name, url);
 
   // Start sandbox
@@ -342,6 +343,7 @@ async function handleExistingInstance(
   }
 
   const dir = instanceDir(name);
+  const deployDir = instanceDeployDir(name);
 
   clack.intro(chalk.bold.cyan(`Redeploying: ${name}`));
   clack.log.info(`Preset: ${meta.preset} | App: ${meta.appVersion}`);
@@ -360,8 +362,8 @@ async function handleExistingInstance(
   // Offer reconfiguration — two separate yes/no prompts
   // (napi may or may not be loaded depending on user choices)
   if (!options.yes) {
-    const zcConfigDir = join(instanceDir(name), "zeroclaw");
-    mkdirSync(zcConfigDir, { recursive: true });
+    const agentConfigDir = instanceAgentDir(name);
+    mkdirSync(agentConfigDir, { recursive: true });
 
     let napiLoaded = false;
     let napi: typeof import("zeroclaw-napi");
@@ -388,7 +390,7 @@ async function handleExistingInstance(
     if (!clack.isCancel(reconfigureProvider) && reconfigureProvider) {
       await loadNapi();
       const prev = process.env.ZEROCLAW_CONFIG_DIR;
-      process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+      process.env.ZEROCLAW_CONFIG_DIR = agentConfigDir;
       const result = await napi!.runProviderWizard();
       clack.log.success(
         `Provider: ${chalk.green(result.provider)} | Model: ${chalk.green(result.model)}`,
@@ -405,13 +407,12 @@ async function handleExistingInstance(
     if (!clack.isCancel(reconfigureChannels) && reconfigureChannels) {
       await loadNapi();
       const prev = process.env.ZEROCLAW_CONFIG_DIR;
-      process.env.ZEROCLAW_CONFIG_DIR = zcConfigDir;
+      process.env.ZEROCLAW_CONFIG_DIR = agentConfigDir;
 
       // Show currently configured channels before the wizard
       try {
-        const currentJson = await napi!.getSavedConfig();
-        const current = JSON.parse(currentJson);
-        const cc = current.channels_config;
+        const current = readParsedConfig(agentConfigDir);
+        const cc = current.channels_config as Record<string, unknown> | undefined;
         if (cc) {
           const active = Object.entries(cc)
             .filter(([k, v]) => v != null && typeof v === "object" && k !== "cli")
@@ -437,8 +438,8 @@ async function handleExistingInstance(
   // Upgrade instance
   await upgradeInstance(name);
 
-  // Patch platform config
-  platform.patchPlatformConfig(dir, limits);
+  // Patch platform config in .deploy/
+  platform.patchPlatformConfig(deployDir, limits);
 
   // Read config
   const config = readConfig(name);
@@ -447,21 +448,20 @@ async function handleExistingInstance(
     process.exit(1);
   }
 
-  // Read fresh agent config from config.toml (picks up edits + reconfiguration)
-  const agentConfigJson = await readAgentConfigJson(name);
+  // Copy mirrored files into .deploy/ (picks up updated config.toml)
+  copyMirroredFiles(name);
 
-  // Write agent config JSON to instance's zeroclaw/ dir (deployed alongside the app)
-  const zcDir = join(instanceDir(name), "zeroclaw");
-  mkdirSync(zcDir, { recursive: true });
-  writeFileSync(join(zcDir, "config.json"), agentConfigJson);
+  // Derive env vars: CloudClaw secrets + agent channel tokens
+  const agentDir = instanceAgentDir(name);
+  const agentConfig = readParsedConfig(agentDir);
+  const agentEnv = extractChannelEnvVars(agentConfig as Record<string, unknown>);
+  const cloudclawEnv = { ...toEnvVars(config), ...agentEnv };
 
-  const cloudclawEnv = toEnvVars(config, agentConfigJson);
+  // Persist env vars to .deploy/
+  await platform.persistEnvVars(deployDir, cloudclawEnv);
 
-  // Persist env vars
-  await platform.persistEnvVars(dir, cloudclawEnv);
-
-  // Deploy
-  const url = await platform.deploy(dir, cloudclawEnv);
+  // Deploy from .deploy/
+  const url = await platform.deploy(deployDir, cloudclawEnv);
   saveDeployedUrl(name, url);
 
   // Restart sandbox

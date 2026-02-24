@@ -28,6 +28,9 @@ export interface SandboxClient {
     options?: { timeoutMs?: number },
   ): Promise<ExecResult>;
 
+  /** Read a file from a running sandbox, returning null if not found. */
+  readFile(sandboxId: string, path: string): Promise<Buffer | null>;
+
   /** Open an interactive shell in a running sandbox. */
   connect(sandboxId: string, env?: Record<string, string>): Promise<void>;
 }

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { extractChannelEnvVars, getChannelSecretDefinitions } from "@cloudclaw/channel";
+import { getChannelSecretDefinitions } from "@cloudclaw/channel";
 
 /** Generate a 256-bit base64url secret. */
 export function generateSecret(): string {
@@ -32,7 +32,7 @@ export const cloudClawConfigSchema = z.object({
   }),
   agent: z.object({
     name: z.string(),          // e.g. "zeroclaw"
-    config: z.string().default("zeroclaw/config.toml"),
+    config: z.string().default("agent/config.toml"),
   }),
   sandbox: z.object({
     activeDuration: z.number().default(600),        // seconds
@@ -97,16 +97,13 @@ export function buildConfig(
 
 // --- Env var derivation ---
 
-/** Derive flat env vars from a structured config + agent config JSON (for .env / Vercel). */
+/** Derive CloudClaw env vars from a structured config (for .env / Vercel).
+ *  Channel env vars (bot tokens, etc.) are NOT included — the caller
+ *  extracts those separately via extractChannelEnvVars(). */
 export function toEnvVars(
   config: CloudClawConfig,
-  agentConfigJson: string,
 ): Record<string, string> {
   const vars: Record<string, string> = {};
-
-  // Extract channel tokens from agent config (bot tokens, API keys, etc.)
-  const channelVars = extractChannelEnvVars(agentConfigJson);
-  Object.assign(vars, channelVars);
 
   // Core secrets
   vars["CLOUDCLAW_CRON_SECRET"] = config.secrets.cronSecret;
@@ -173,26 +170,3 @@ export function writeConfig(name: string, config: CloudClawConfig): void {
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 }
 
-/** Read agent config.toml via napi, returning JSON string.
- *  Sets ZEROCLAW_CONFIG_DIR so napi reads from the instance's zeroclaw/ dir. */
-export async function readAgentConfigJson(name: string): Promise<string> {
-  const config = readConfig(name);
-  if (!config) throw new Error(`No config for instance "${name}"`);
-
-  const zcDir = join(instanceDir(name), "zeroclaw");
-  const configFilePath = join(instanceDir(name), config.agent.config);
-
-  if (!existsSync(configFilePath)) {
-    throw new Error(`Agent config not found: ${configFilePath}`);
-  }
-
-  const prev = process.env.ZEROCLAW_CONFIG_DIR;
-  process.env.ZEROCLAW_CONFIG_DIR = zcDir;
-  try {
-    const napi = await import("zeroclaw-napi");
-    return await napi.getSavedConfig();
-  } finally {
-    if (prev !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prev;
-    else delete process.env.ZEROCLAW_CONFIG_DIR;
-  }
-}

@@ -11,7 +11,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { execa } from "execa";
-import { instanceDir, instancesDir } from "./paths.js";
+import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
 import type { CloudClawConfig } from "./config.js";
 import { readConfig, writeConfig } from "./config.js";
@@ -116,9 +116,11 @@ export async function createInstance(
   envVars: Record<string, string>,
 ): Promise<string> {
   const dir = instanceDir(name);
+  const agentDir = instanceAgentDir(name);
+  const deployDir = instanceDeployDir(name);
   const devMode = isDevMode();
 
-  // Tolerate pre-existing dir (wizard may have already created zeroclaw/ subdir)
+  // Tolerate pre-existing dir (wizard may have already created agent/ subdir)
   if (existsSync(join(dir, "cloudclaw.json"))) {
     throw new Error(`Instance "${name}" already exists at ${dir}`);
   }
@@ -127,14 +129,25 @@ export async function createInstance(
   console.log(chalk.dim(`  Path: ${dir}`));
   console.log(chalk.dim(`  Mode: ${devMode ? "dev (packed tarballs)" : "production"}`));
 
-  // Create directory
+  // Create directories
   mkdirSync(dir, { recursive: true });
+  mkdirSync(agentDir, { recursive: true });
+  mkdirSync(deployDir, { recursive: true });
+
+  // Write cloudclaw.json at instance root (canonical config)
+  writeConfig(name, config);
+
+  // Generate .secret_key at agent/ dir (source of truth for agent identity)
+  if (!existsSync(join(agentDir, ".secret_key"))) {
+    const { randomBytes } = await import("node:crypto");
+    writeFileSync(join(agentDir, ".secret_key"), randomBytes(32).toString("base64"));
+  }
 
   // Resolve dependencies
   let deps: Record<string, string>;
   if (devMode) {
     console.log(chalk.cyan("\n  Packing local packages...\n"));
-    deps = await packLocalDeps(dir);
+    deps = await packLocalDeps(deployDir);
   } else {
     deps = {
       "@cloudclaw/agent": "0.1.0",
@@ -145,29 +158,61 @@ export async function createInstance(
     };
   }
 
-  // Write package.json (no cloudclaw metadata — that lives in cloudclaw.json)
+  // Write package.json into .deploy/
   const pkg = buildPackageJson(name, deps);
-  writeFileSync(join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
+  writeFileSync(join(deployDir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
-  // Write cloudclaw.json (canonical config)
-  writeConfig(name, config);
+  // Write .env into .deploy/ (derived from config + agent config, for Next.js runtime)
+  writeEnvFile(deployDir, envVars);
 
-  // Write .env (derived from config + agent config, for Next.js runtime)
-  writeEnvFile(dir, envVars);
+  // Copy mirrored files into .deploy/ for Vercel bundling
+  copyMirroredFiles(name);
 
-  // Install dependencies
+  // Install dependencies in .deploy/
   console.log(chalk.cyan("\n  Installing dependencies...\n"));
   await execa("npm", ["install"], {
-    cwd: dir,
+    cwd: deployDir,
     stdio: "inherit",
   });
 
-  // Apply templates from installed @cloudclaw/app
+  // Apply templates from installed @cloudclaw/app into .deploy/
   console.log(chalk.cyan("\n  Applying templates..."));
-  applyTemplates(dir);
+  applyTemplates(deployDir);
 
   console.log(chalk.green(`\n  Instance "${name}" created.`));
   return dir;
+}
+
+/**
+ * Copy files that are mirrored between local instance root and .deploy/.
+ * These files live at the instance root (source of truth) and are copied
+ * into .deploy/ so Vercel can bundle them.
+ */
+export function copyMirroredFiles(name: string): void {
+  const dir = instanceDir(name);
+  const agentDir = instanceAgentDir(name);
+  const deployDir = instanceDeployDir(name);
+
+  // cloudclaw.json
+  const configSrc = join(dir, "cloudclaw.json");
+  if (existsSync(configSrc)) {
+    writeFileSync(join(deployDir, "cloudclaw.json"), readFileSync(configSrc));
+  }
+
+  // agent/config.toml
+  const agentDeployDir = join(deployDir, "agent");
+  mkdirSync(agentDeployDir, { recursive: true });
+
+  const configTomlSrc = join(agentDir, "config.toml");
+  if (existsSync(configTomlSrc)) {
+    writeFileSync(join(agentDeployDir, "config.toml"), readFileSync(configTomlSrc));
+  }
+
+  // agent/.secret_key
+  const secretKeySrc = join(agentDir, ".secret_key");
+  if (existsSync(secretKeySrc)) {
+    writeFileSync(join(agentDeployDir, ".secret_key"), readFileSync(secretKeySrc));
+  }
 }
 
 export function listInstances(): InstanceMetadata[] {
@@ -182,18 +227,26 @@ export function listInstances(): InstanceMetadata[] {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const pkgPath = join(dir, entry.name, "package.json");
-    if (!existsSync(pkgPath)) continue;
+    // Check for cloudclaw.json at instance root (not package.json)
+    const cfgPath = join(dir, entry.name, "cloudclaw.json");
+    if (!existsSync(cfgPath)) continue;
 
     const config = readConfig(entry.name);
     if (!config) continue;
 
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
+    // Read app version from .deploy/package.json if it exists
+    const deployPkgPath = join(dir, entry.name, ".deploy", "package.json");
+    let appVersion = "unknown";
+    if (existsSync(deployPkgPath)) {
+      const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
+      appVersion = pkg.dependencies?.["@cloudclaw/app"] ?? "unknown";
+    }
+
     instances.push({
       name: entry.name,
       preset: config.instance.preset,
       agent: config.agent.name,
-      appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
+      appVersion,
       deployedUrl: config.instance.deployedUrl,
     });
   }
@@ -203,25 +256,29 @@ export function listInstances(): InstanceMetadata[] {
 
 export function getInstance(name: string): InstanceMetadata | null {
   const dir = instanceDir(name);
-  const pkgPath = join(dir, "package.json");
-
-  if (!existsSync(pkgPath)) return null;
 
   const config = readConfig(name);
   if (!config) return null;
 
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
+  // Read app version from .deploy/package.json if it exists
+  const deployPkgPath = join(dir, ".deploy", "package.json");
+  let appVersion = "unknown";
+  if (existsSync(deployPkgPath)) {
+    const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
+    appVersion = pkg.dependencies?.["@cloudclaw/app"] ?? "unknown";
+  }
+
   return {
     name,
     preset: config.instance.preset,
     agent: config.agent.name,
-    appVersion: pkg.dependencies?.["@cloudclaw/app"] ?? "unknown",
+    appVersion,
     deployedUrl: config.instance.deployedUrl,
   };
 }
 
 export function instanceExists(name: string): boolean {
-  return existsSync(join(instanceDir(name), "package.json"));
+  return existsSync(join(instanceDir(name), "cloudclaw.json"));
 }
 
 export function saveDeployedUrl(name: string, url: string): void {
@@ -235,56 +292,64 @@ export function saveDeployedUrl(name: string, url: string): void {
 
 export async function upgradeInstance(name: string): Promise<void> {
   const dir = instanceDir(name);
+  const deployDir = instanceDeployDir(name);
 
   if (!existsSync(dir)) {
     throw new Error(`Instance "${name}" does not exist.`);
   }
+
+  // Ensure .deploy/ exists (migration from old layout)
+  mkdirSync(deployDir, { recursive: true });
 
   console.log(chalk.cyan(`\nUpgrading instance "${name}"...`));
 
   // In dev mode, repack local packages to pick up changes
   if (isDevMode()) {
     console.log(chalk.cyan("  Repacking local packages...\n"));
-    const deps = await packLocalDeps(dir);
+    const deps = await packLocalDeps(deployDir);
 
     // Update package.json with new tarball paths
-    const pkgPath = join(dir, "package.json");
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-    Object.assign(pkg.dependencies, deps);
-    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    const pkgPath = join(deployDir, "package.json");
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
+      Object.assign(pkg.dependencies, deps);
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    }
   }
 
   // Remove node_modules to force fresh install from new tarballs
-  // (npm skips extraction if same version is already installed)
-  const nodeModulesDir = join(dir, "node_modules");
+  const nodeModulesDir = join(deployDir, "node_modules");
   if (existsSync(nodeModulesDir)) {
     console.log(chalk.dim("  Cleaning node_modules..."));
     rmSync(nodeModulesDir, { recursive: true, force: true });
   }
 
   // Remove stale lock file so npm resolves from new tarballs
-  const lockPath = join(dir, "package-lock.json");
+  const lockPath = join(deployDir, "package-lock.json");
   if (existsSync(lockPath)) {
     rmSync(lockPath);
   }
 
   // Remove .next build cache so Vercel does a clean build
-  const nextCacheDir = join(dir, ".next");
+  const nextCacheDir = join(deployDir, ".next");
   if (existsSync(nextCacheDir)) {
     console.log(chalk.dim("  Cleaning .next cache..."));
     rmSync(nextCacheDir, { recursive: true, force: true });
   }
 
+  // Copy mirrored files from instance root into .deploy/
+  copyMirroredFiles(name);
+
   // Fresh install
   console.log(chalk.cyan("  Installing dependencies...\n"));
   await execa("npm", ["install"], {
-    cwd: dir,
+    cwd: deployDir,
     stdio: "inherit",
   });
 
   // Reapply templates from the updated @cloudclaw/app
   console.log(chalk.cyan("\n  Reapplying templates..."));
-  applyTemplates(dir);
+  applyTemplates(deployDir);
 
   console.log(chalk.green(`  Instance "${name}" upgraded.`));
 }

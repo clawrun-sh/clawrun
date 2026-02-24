@@ -28,6 +28,7 @@ export interface ManagedSandbox {
   runCommand(opts: RunCommandOptions): Promise<CommandResult>;
 
   writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
+  readFile(path: string): Promise<Buffer | null>;
   stop(): Promise<void>;
   snapshot(): Promise<SnapshotRef>;
   extendTimeout(ms: number): Promise<void>;

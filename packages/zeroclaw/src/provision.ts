@@ -1,19 +1,21 @@
 import { readFileSync } from "node:fs";
 import type { ZeroclawSandbox } from "./types.js";
 import { getBinaryPath } from "./binary.js";
-import { generateDaemonTomlFromJson } from "./config-generator.js";
+import { generateDaemonToml } from "./config-generator.js";
+import { readParsedConfig } from "./config-reader.js";
 
 export interface ProvisionOptions {
   binPath: string;
   agentDir: string;
-  configJson: string;
+  localAgentDir: string;
+  secretKey: string;
 }
 
 export async function provision(
   sandbox: ZeroclawSandbox,
   opts: ProvisionOptions,
 ): Promise<void> {
-  const { binPath, agentDir, configJson } = opts;
+  const { binPath, agentDir } = opts;
   const binDir = binPath.substring(0, binPath.lastIndexOf("/"));
 
   // Create directories
@@ -39,28 +41,31 @@ export async function provision(
     throw new Error(`Binary not executable after install: ${binPath}`);
   }
 
-  // Generate TOML config
-  const toml = generateDaemonTomlFromJson(configJson);
+  // Read agent config from local dir and generate daemon TOML
+  const parsed = readParsedConfig(opts.localAgentDir);
+  const toml = generateDaemonToml(parsed);
 
-  // Generate .secret_key
-  const secretKeyResult = await sandbox.runCommand("sh", ["-c", "head -c 32 /dev/urandom | base64"]);
-  const secretKey = (await secretKeyResult.stdout()).trim();
-
-  // Write config + .secret_key
+  // Write config + .secret_key (secret key is passed from local — never regenerated)
   await sandbox.writeFiles([
     { path: `${agentDir}/config.toml`, content: Buffer.from(toml) },
-    { path: `${agentDir}/.secret_key`, content: Buffer.from(secretKey) },
+    { path: `${agentDir}/.secret_key`, content: Buffer.from(opts.secretKey) },
   ]);
 
-  // Write .profile so interactive shells (connect) get the right env
+  // Write .profile so interactive shells (connect) get the right env.
+  // Do NOT override HOME — the sandbox's native HOME is correct.
+  // Set CLOUDCLAW_ROOT so scripts can find the instance layout.
   const root = binDir.substring(0, binDir.lastIndexOf("/"));
   const profile = [
-    `export HOME="${root}"`,
+    `export CLOUDCLAW_ROOT="${root}"`,
     `export ZEROCLAW_WORKSPACE="${agentDir}"`,
     `export ZEROCLAW_CONFIG_DIR="${agentDir}"`,
     "",
   ].join("\n");
+
+  // Write .profile to $HOME (not to root, which is $HOME/.cloudclaw)
+  const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
+  const home = (await homeResult.stdout()).trim() || "/home/vercel-sandbox";
   await sandbox.writeFiles([
-    { path: `${root}/.profile`, content: Buffer.from(profile) },
+    { path: `${home}/.profile`, content: Buffer.from(profile) },
   ]);
 }

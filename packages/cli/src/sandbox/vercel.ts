@@ -82,6 +82,22 @@ export class VercelSandboxClient implements SandboxClient {
     }
   }
 
+  async readFile(sandboxId: string, path: string): Promise<Buffer | null> {
+    try {
+      const result = await this.exec(
+        sandboxId,
+        "sh",
+        ["-c", `base64 < "${path}" 2>/dev/null`],
+      );
+      if (result.exitCode !== 0 || !result.stdout.trim()) {
+        return null;
+      }
+      return Buffer.from(result.stdout.trim(), "base64");
+    } catch {
+      return null;
+    }
+  }
+
   async connect(sandboxId: string, env?: Record<string, string>): Promise<void> {
     const args = [sandboxBin(), "connect", sandboxId, ...this.scopeArgs()];
     if (env) {
