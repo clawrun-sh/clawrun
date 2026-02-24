@@ -1,5 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import type { WakeHookAdapter, WakeSignal, AuthResult, ChannelEnvMapping } from "../types.js";
+import { createLogger } from "@cloudclaw/logger";
+
+const log = createLogger("channel:telegram");
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
@@ -12,9 +15,7 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
   readonly envMapping: ChannelEnvMapping = {
     channelId: "telegram",
     configKey: "telegram",
-    fields: [
-      { configField: "bot_token", envVar: "CLOUDCLAW_TELEGRAM_BOT_TOKEN" },
-    ],
+    fields: [{ configField: "bot_token", envVar: "CLOUDCLAW_TELEGRAM_BOT_TOKEN" }],
     generatedSecrets: [
       { envVar: "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET", purpose: "webhook request verification" },
     ],
@@ -38,7 +39,7 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
 
     const secret = this.webhookSecret;
     if (!secret) {
-      console.warn("[CloudClaw] CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET not set — skipping webhook registration");
+      log.warn("CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET not set — skipping webhook registration");
       return;
     }
 
@@ -67,7 +68,7 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
   async verifyRequest(req: Request, _body: Buffer): Promise<AuthResult> {
     const secret = this.webhookSecret;
     if (!secret) {
-      console.error("[CloudClaw] CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET is not configured — rejecting request");
+      log.error("CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET is not configured — rejecting request");
       return { valid: false, error: "Server misconfigured" };
     }
 

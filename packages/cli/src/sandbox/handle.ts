@@ -14,10 +14,15 @@ export function createSandboxHandle(
 
   return {
     async runCommand(
-      cmdOrOpts: string | {
-        cmd: string; args?: string[]; env?: Record<string, string>;
-        signal?: AbortSignal; detached?: boolean;
-      },
+      cmdOrOpts:
+        | string
+        | {
+            cmd: string;
+            args?: string[];
+            env?: Record<string, string>;
+            signal?: AbortSignal;
+            detached?: boolean;
+          },
       args?: string[],
     ): Promise<CommandResult> {
       let cmd: string;

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
+import { cloudClawConfigSchema, type CloudClawConfig } from "@cloudclaw/runtime";
+export { cloudClawConfigSchema };
 import { getChannelSecretDefinitions } from "@cloudclaw/channel";
 
 /** Generate a 256-bit base64url secret. */
@@ -13,43 +14,12 @@ import { instanceDir } from "./paths.js";
 const SCHEMA_URL = "https://cloudclaw.sh/schema.json";
 const CONFIG_FILENAME = "cloudclaw.json";
 
-// --- Zod schema ---
-
-const stateSchema = z.object({
-  url: z.string(),
-  token: z.string(),
-  readOnlyToken: z.string().optional(),
-  kvUrl: z.string().optional(),
-});
-
-export const cloudClawConfigSchema = z.object({
-  $schema: z.string().optional(),
-  instance: z.object({
-    name: z.string(),
-    preset: z.string(),
-    provider: z.string().default("vercel"),
-    deployedUrl: z.string().optional(),
-  }),
-  agent: z.object({
-    name: z.string(),          // e.g. "zeroclaw"
-    config: z.string().default("agent/config.toml"),
-  }),
-  sandbox: z.object({
-    activeDuration: z.number().default(600),        // seconds
-    cronKeepAliveWindow: z.number().default(900),   // seconds
-    cronWakeLeadTime: z.number().default(60),       // seconds
-  }),
-  secrets: z.object({
-    cronSecret: z.string(),
-    nextAuthSecret: z.string(),
-    /** Per-channel webhook secrets, keyed by channel ID (e.g. "telegram"). */
-    webhookSecrets: z.record(z.string(), z.string()).optional(),
-    sandboxSecret: z.string(),
-  }),
-  state: stateSchema.optional(),
-});
-
-export type CloudClawConfig = z.infer<typeof cloudClawConfigSchema>;
+// Re-export the shared type and provide a stricter variant for CLI use
+// (CLI configs always have secrets populated).
+export type { CloudClawConfig };
+export type CloudClawConfigWithSecrets = CloudClawConfig & {
+  secrets: NonNullable<CloudClawConfig["secrets"]>;
+};
 
 // --- Builder ---
 
@@ -68,8 +38,9 @@ export function buildConfig(
     webhookSecrets?: Record<string, string>;
     sandboxSecret: string;
     provider?: string;
+    bundlePaths?: string[];
   },
-): CloudClawConfig {
+): CloudClawConfigWithSecrets {
   return cloudClawConfigSchema.parse({
     $schema: SCHEMA_URL,
     instance: {
@@ -80,6 +51,7 @@ export function buildConfig(
     agent: {
       name: agentName,
       config: options.agentConfigPath,
+      bundlePaths: options.bundlePaths,
     },
     sandbox: {
       activeDuration: options.activeDuration,
@@ -92,7 +64,7 @@ export function buildConfig(
       webhookSecrets: options.webhookSecrets,
       sandboxSecret: options.sandboxSecret,
     },
-  });
+  }) as CloudClawConfigWithSecrets;
 }
 
 // --- Env var derivation ---
@@ -100,9 +72,7 @@ export function buildConfig(
 /** Derive CloudClaw env vars from a structured config (for .env / Vercel).
  *  Channel env vars (bot tokens, etc.) are NOT included — the caller
  *  extracts those separately via extractChannelEnvVars(). */
-export function toEnvVars(
-  config: CloudClawConfig,
-): Record<string, string> {
+export function toEnvVars(config: CloudClawConfigWithSecrets): Record<string, string> {
   const vars: Record<string, string> = {};
 
   // Core secrets
@@ -144,7 +114,7 @@ export function configPath(name: string): string {
 }
 
 /** Read and validate cloudclaw.json for an instance. Returns null if not found. */
-export function readConfig(name: string): CloudClawConfig | null {
+export function readConfig(name: string): CloudClawConfigWithSecrets | null {
   const path = configPath(name);
   if (!existsSync(path)) return null;
 
@@ -152,16 +122,14 @@ export function readConfig(name: string): CloudClawConfig | null {
   const result = cloudClawConfigSchema.safeParse(raw);
 
   if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `  ${i.path.join(".")}: ${i.message}`)
-      .join("\n");
+    const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(
       `Invalid cloudclaw.json for "${name}":\n${issues}\n` +
-      `Re-run "cloudclaw deploy ${name}" to regenerate it.`,
+        `Re-run "cloudclaw deploy ${name}" to regenerate it.`,
     );
   }
 
-  return result.data;
+  return result.data as CloudClawConfigWithSecrets;
 }
 
 /** Write cloudclaw.json for an instance. */
@@ -169,4 +137,3 @@ export function writeConfig(name: string, config: CloudClawConfig): void {
   const path = configPath(name);
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 }
-

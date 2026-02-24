@@ -9,10 +9,7 @@ import { readConfig, instanceAgentDir } from "../instance/index.js";
 import { instance } from "../args/instance.js";
 
 /** Files that flow local → sandbox. Never pulled back. */
-const LOCAL_OWNED_FILES = new Set([
-  "config.toml",
-  ".secret_key",
-]);
+const LOCAL_OWNED_FILES = new Set(["config.toml", ".secret_key"]);
 
 export const pull = command({
   name: "pull",
@@ -39,29 +36,39 @@ export const pull = command({
     // Find running sandbox (don't start one — pull requires an existing sandbox)
     const sandboxId = await getRunningId(client);
     if (!sandboxId) {
-      console.error(chalk.red("No running sandbox found. Start one first with a message or `cloudclaw deploy`."));
+      console.error(
+        chalk.red(
+          "No running sandbox found. Start one first with a message or `cloudclaw deploy`.",
+        ),
+      );
       process.exit(1);
     }
 
     // Resolve sandbox root
     const homeResult = await client.exec(sandboxId, "sh", ["-c", "echo $HOME"]);
-    const home = homeResult.stdout.trim() || "/home/vercel-sandbox";
-    const remoteAgentDir = `${home}/.cloudclaw/agent`;
+    const home = homeResult.stdout.trim();
+    if (!home) {
+      console.error(chalk.red("Could not determine sandbox $HOME."));
+      process.exit(1);
+    }
+    const remoteAgentDir = `${home}/${config.instance.sandboxRoot}/agent`;
 
     // List all files in the remote agent/ dir recursively
-    const findResult = await client.exec(
-      sandboxId, "sh",
-      ["-c", `find "${remoteAgentDir}" -type f 2>/dev/null`],
-    );
+    const findResult = await client.exec(sandboxId, "sh", [
+      "-c",
+      `find "${remoteAgentDir}" -type f 2>/dev/null`,
+    ]);
 
     if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
       console.log(chalk.yellow("No files found in sandbox agent directory."));
       return;
     }
 
-    const remoteFiles = findResult.stdout.trim().split("\n")
-      .map(abs => abs.slice(remoteAgentDir.length + 1))  // relative path
-      .filter(rel => !LOCAL_OWNED_FILES.has(rel));
+    const remoteFiles = findResult.stdout
+      .trim()
+      .split("\n")
+      .map((abs) => abs.slice(remoteAgentDir.length + 1)) // relative path
+      .filter((rel) => !LOCAL_OWNED_FILES.has(rel));
 
     if (remoteFiles.length === 0) {
       console.log(chalk.yellow("No pullable files found (only config files present)."));
@@ -70,7 +77,9 @@ export const pull = command({
 
     const agentDir = instanceAgentDir(instanceName);
     const s = clack.spinner();
-    s.start(`Pulling ${remoteFiles.length} file${remoteFiles.length !== 1 ? "s" : ""} from sandbox...`);
+    s.start(
+      `Pulling ${remoteFiles.length} file${remoteFiles.length !== 1 ? "s" : ""} from sandbox...`,
+    );
 
     let pulled = 0;
     let failed = 0;

@@ -6,35 +6,35 @@ import { VercelSandboxClient } from "./vercel.js";
 
 export type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
 
+const clientFactories: Record<
+  string,
+  (instance: string, config: CloudClawConfig) => SandboxClient
+> = {
+  vercel: (instance) => {
+    const dir = instanceDeployDir(instance);
+    const platform = getPlatformProvider("vercel");
+    const handle = platform.readProjectLink(dir);
+    if (!handle) {
+      throw new Error(
+        `No project link found for instance "${instance}". ` +
+          `Re-run "cloudclaw deploy ${instance}" to fix this.`,
+      );
+    }
+    return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
+  },
+};
+
 /**
  * Create a SandboxClient for the given instance based on its configured provider.
  */
-export function createSandboxClient(
-  instance: string,
-  config: CloudClawConfig,
-): SandboxClient {
+export function createSandboxClient(instance: string, config: CloudClawConfig): SandboxClient {
   const { provider } = config.instance;
-  if (!provider) {
-    throw new Error(
-      `Instance "${instance}" has no provider configured. ` +
-      `Re-run "cloudclaw deploy ${instance}" to fix this.`,
-    );
+
+  const factory = clientFactories[provider];
+  if (!factory) {
+    const known = Object.keys(clientFactories).join(", ") || "(none)";
+    throw new Error(`Unsupported sandbox provider: "${provider}". Available: ${known}`);
   }
 
-  switch (provider) {
-    case "vercel": {
-      const dir = instanceDeployDir(instance);
-      const platform = getPlatformProvider("vercel");
-      const handle = platform.readProjectLink(dir);
-      if (!handle) {
-        throw new Error(
-          `No project link found for instance "${instance}". ` +
-          `Re-run "cloudclaw deploy ${instance}" to fix this.`,
-        );
-      }
-      return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
-    }
-    default:
-      throw new Error(`Unsupported sandbox provider: "${provider}"`);
-  }
+  return factory(instance, config);
 }

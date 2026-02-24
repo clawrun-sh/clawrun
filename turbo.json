@@ -2,12 +2,7 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build:bin": {
-      "inputs": [
-        "upstream/**",
-        "build-docker.sh",
-        "Dockerfile",
-        "Cargo.toml"
-      ],
+      "inputs": ["upstream/**", "build-docker.sh", "Dockerfile", "Cargo.toml"],
       "outputs": ["dist/bin/**", "npm/**/*.node", "index.js", "index.d.ts"]
     },
     "build": {
@@ -17,6 +12,17 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "format:check": {
+      "outputs": []
     }
   }
 }

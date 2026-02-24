@@ -5,11 +5,7 @@ interface ParsedOutput {
   exitCode: number;
 }
 
-export function parseOutput(
-  stdout: string,
-  stderr: string,
-  exitCode: number,
-): ParsedOutput {
+export function parseOutput(stdout: string, stderr: string, exitCode: number): ParsedOutput {
   if (exitCode !== 0) {
     return {
       success: false,
@@ -36,9 +32,7 @@ export function parseOutput(
   };
 }
 
-export function parseCronListOutput(
-  stdout: string,
-): { jobs: Array<{ nextRunAt: string }> } {
+export function parseCronListOutput(stdout: string): { jobs: Array<{ nextRunAt: string }> } {
   const matches = [...stdout.matchAll(/next=([\d-]+T[\d:.+Z]+)/g)];
   const now = Date.now();
   const jobs = matches

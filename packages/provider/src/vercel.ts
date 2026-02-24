@@ -8,7 +8,7 @@ import type {
   RunCommandOptions,
   CommandResult,
   SnapshotRef,
-} from "./types";
+} from "./types.js";
 
 class VercelManagedSandbox implements ManagedSandbox {
   constructor(private sandbox: Sandbox) {}

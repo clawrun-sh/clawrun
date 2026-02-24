@@ -1,4 +1,7 @@
 import { getConfiguredAdapters } from "./registry.js";
+import { createLogger } from "@cloudclaw/logger";
+
+const log = createLogger("channel");
 
 /**
  * Register wake hooks for all configured programmable-webhook channels.
@@ -16,9 +19,9 @@ export async function registerWakeHooks(baseUrl: string): Promise<void> {
     const webhookUrl = `${baseUrl}/api/v1/webhook/${adapter.channelId}`;
     try {
       await adapter.registerWebhook(webhookUrl);
-      console.log(`[CloudClaw] Registered wake hook: ${adapter.name} → ${webhookUrl}`);
+      log.info(`Registered wake hook: ${adapter.name} → ${webhookUrl}`);
     } catch (err) {
-      console.error(`[CloudClaw] Failed to register wake hook for ${adapter.name}:`, err);
+      log.error(`Failed to register wake hook for ${adapter.name}:`, err);
     }
   }
 }
@@ -38,9 +41,9 @@ export async function teardownWakeHooks(): Promise<void> {
 
     try {
       await adapter.deleteWebhook();
-      console.log(`[CloudClaw] Torn down wake hook: ${adapter.name}`);
+      log.info(`Torn down wake hook: ${adapter.name}`);
     } catch (err) {
-      console.error(`[CloudClaw] Failed to tear down wake hook for ${adapter.name}:`, err);
+      log.error(`Failed to tear down wake hook for ${adapter.name}:`, err);
     }
   }
 }

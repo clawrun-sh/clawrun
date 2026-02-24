@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,9 +27,9 @@ interface InstancePackageJson {
 
 export function isDevMode(): boolean {
   // In dev mode, CLI runs from packages/cli/dist/ inside the monorepo.
-  // Check for packages/app relative to the repo root.
+  // Check for packages/server relative to the repo root.
   const repoRoot = resolve(__dirname, "..", "..", "..", "..");
-  return existsSync(join(repoRoot, "packages", "app", "package.json"));
+  return existsSync(join(repoRoot, "packages", "server", "package.json"));
 }
 
 function getMonorepoRoot(): string {
@@ -48,22 +41,22 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
   const deps: Record<string, string> = {};
 
   // pnpm pack must be run from the workspace root so it can resolve workspace:* deps
-  // Pack in dependency order: zeroclaw and provider first since @cloudclaw/app depends on both
+  // Pack in dependency order: zeroclaw and provider first since @cloudclaw/server depends on both
   const packages = [
     { name: "zeroclaw", dir: join(root, "packages", "zeroclaw") },
     { name: "@cloudclaw/agent", dir: join(root, "packages", "agent") },
     { name: "@cloudclaw/provider", dir: join(root, "packages", "provider") },
     { name: "@cloudclaw/channel", dir: join(root, "packages", "channel") },
-    { name: "@cloudclaw/app", dir: join(root, "packages", "app") },
+    { name: "@cloudclaw/runtime", dir: join(root, "packages", "runtime") },
+    { name: "@cloudclaw/logger", dir: join(root, "packages", "logger") },
+    { name: "@cloudclaw/server", dir: join(root, "packages", "server") },
   ];
 
   for (const pkg of packages) {
     console.log(chalk.dim(`  Packing ${pkg.name}...`));
-    const { stdout } = await execa(
-      "pnpm",
-      ["pack", "--pack-destination", instancePath],
-      { cwd: pkg.dir },
-    );
+    const { stdout } = await execa("pnpm", ["pack", "--pack-destination", instancePath], {
+      cwd: pkg.dir,
+    });
     // pnpm pack prints the tarball path — grab the filename only
     const tarballPath = stdout.trim().split("\n").pop()?.trim() ?? "";
     const tarball = tarballPath.split("/").pop() ?? tarballPath;
@@ -74,22 +67,19 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
 }
 
 // Direct dependencies every instance needs for `next build` to succeed.
-// These are transitive deps of @cloudclaw/app but must be available
+// These are transitive deps of @cloudclaw/server but must be available
 // as top-level deps for Vercel's build step.
 const INSTANCE_PEER_DEPS: Record<string, string> = {
-  "next": "^15.1.0",
-  "react": "^19.0.0",
+  next: "^15.1.0",
+  react: "^19.0.0",
   "react-dom": "^19.0.0",
-  "typescript": "^5.7.0",
+  typescript: "^5.7.0",
   "@types/node": "^22.0.0",
   "@types/react": "^19.0.0",
   "@types/react-dom": "^19.0.0",
 };
 
-function buildPackageJson(
-  name: string,
-  deps: Record<string, string>,
-): InstancePackageJson {
+function buildPackageJson(name: string, deps: Record<string, string>): InstancePackageJson {
   return {
     name,
     private: true,
@@ -100,10 +90,7 @@ function buildPackageJson(
   };
 }
 
-function writeEnvFile(
-  dir: string,
-  envVars: Record<string, string>,
-): void {
+function writeEnvFile(dir: string, envVars: Record<string, string>): void {
   const content = Object.entries(envVars)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n");
@@ -153,8 +140,10 @@ export async function createInstance(
       "@cloudclaw/agent": "0.1.0",
       "@cloudclaw/provider": "0.1.0",
       "@cloudclaw/channel": "0.1.0",
-      "@cloudclaw/app": "0.1.0",
-      "zeroclaw": "0.1.0",
+      "@cloudclaw/logger": "0.1.0",
+      "@cloudclaw/runtime": "0.1.0",
+      "@cloudclaw/server": "0.1.0",
+      zeroclaw: "0.1.0",
     };
   }
 
@@ -175,7 +164,7 @@ export async function createInstance(
     stdio: "inherit",
   });
 
-  // Apply templates from installed @cloudclaw/app into .deploy/
+  // Apply templates from installed @cloudclaw/server into .deploy/
   console.log(chalk.cyan("\n  Applying templates..."));
   applyTemplates(deployDir);
 
@@ -239,12 +228,12 @@ export function listInstances(): InstanceMetadata[] {
     let appVersion = "unknown";
     if (existsSync(deployPkgPath)) {
       const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-      appVersion = pkg.dependencies?.["@cloudclaw/app"] ?? "unknown";
+      appVersion = pkg.dependencies?.["@cloudclaw/server"] ?? "unknown";
     }
 
     instances.push({
       name: entry.name,
-      preset: config.instance.preset,
+      preset: config.instance.preset ?? "unknown",
       agent: config.agent.name,
       appVersion,
       deployedUrl: config.instance.deployedUrl,
@@ -265,12 +254,12 @@ export function getInstance(name: string): InstanceMetadata | null {
   let appVersion = "unknown";
   if (existsSync(deployPkgPath)) {
     const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-    appVersion = pkg.dependencies?.["@cloudclaw/app"] ?? "unknown";
+    appVersion = pkg.dependencies?.["@cloudclaw/server"] ?? "unknown";
   }
 
   return {
     name,
-    preset: config.instance.preset,
+    preset: config.instance.preset ?? "unknown",
     agent: config.agent.name,
     appVersion,
     deployedUrl: config.instance.deployedUrl,
@@ -347,7 +336,7 @@ export async function upgradeInstance(name: string): Promise<void> {
     stdio: "inherit",
   });
 
-  // Reapply templates from the updated @cloudclaw/app
+  // Reapply templates from the updated @cloudclaw/server
   console.log(chalk.cyan("\n  Reapplying templates..."));
   applyTemplates(deployDir);
 

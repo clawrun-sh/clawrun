@@ -8,11 +8,22 @@ import {
   HOUSEKEEPING_FILES,
   DAEMON_PROCESS_PATTERN,
 } from "zeroclaw";
-import type { Agent, SandboxHandle, AgentResponse, CronInfo, ExtendLoopConfig, ProvisionOpts } from "./types.js";
+import type {
+  Agent,
+  SandboxHandle,
+  AgentResponse,
+  CronInfo,
+  ExtendLoopConfig,
+  ProvisionOpts,
+} from "./types.js";
+import { createLogger } from "@cloudclaw/logger";
+
+const log = createLogger("agent:zeroclaw");
 
 export class ZeroclawAgent implements Agent {
   readonly id = "zeroclaw";
   readonly name = "ZeroClaw";
+  readonly channelsConfigKey = "channels_config";
 
   private env(root: string): Record<string, string> {
     return {
@@ -30,10 +41,15 @@ export class ZeroclawAgent implements Agent {
     });
   }
 
-  async sendMessage(sandbox: SandboxHandle, root: string, message: string, opts?: {
-    env?: Record<string, string>;
-    signal?: AbortSignal;
-  }): Promise<AgentResponse> {
+  async sendMessage(
+    sandbox: SandboxHandle,
+    root: string,
+    message: string,
+    opts?: {
+      env?: Record<string, string>;
+      signal?: AbortSignal;
+    },
+  ): Promise<AgentResponse> {
     const cmd = buildAgentCommand(`${root}/bin/zeroclaw`, message, this.env(root));
     const result = await sandbox.runCommand({
       cmd: cmd.cmd,
@@ -47,10 +63,15 @@ export class ZeroclawAgent implements Agent {
     return { success: parsed.success, message: parsed.message, error: parsed.error };
   }
 
-  async startDaemon(sandbox: SandboxHandle, root: string, opts?: {
-    port?: number; host?: string;
-    env?: Record<string, string>;
-  }): Promise<void> {
+  async startDaemon(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: {
+      port?: number;
+      host?: string;
+      env?: Record<string, string>;
+    },
+  ): Promise<void> {
     const cmd = buildDaemonCommand(`${root}/bin/zeroclaw`, this.env(root), opts);
     await sandbox.runCommand({
       cmd: cmd.cmd,
@@ -64,12 +85,15 @@ export class ZeroclawAgent implements Agent {
 
     // Verify daemon is running
     try {
-      const ps = await sandbox.runCommand("sh", ["-c", `ps aux | grep '${DAEMON_PROCESS_PATTERN}' | grep -v grep`]);
+      const ps = await sandbox.runCommand("sh", [
+        "-c",
+        `ps aux | grep '${DAEMON_PROCESS_PATTERN}' | grep -v grep`,
+      ]);
       const psOut = await ps.stdout();
       if (psOut.trim()) {
-        console.log(`[ZeroClaw] Daemon started (PID ${psOut.trim().split(/\s+/)[1]})`);
+        log.info(`Daemon started (PID ${psOut.trim().split(/\s+/)[1]})`);
       } else {
-        console.error("[ZeroClaw] WARNING: Daemon process not found after start");
+        log.warn("Daemon process not found after start");
       }
     } catch {
       // best-effort check
@@ -77,7 +101,9 @@ export class ZeroclawAgent implements Agent {
   }
 
   async getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo> {
-    const cmd = buildCronListCommand(`${root}/bin/zeroclaw`, { ZEROCLAW_WORKSPACE: `${root}/agent` });
+    const cmd = buildCronListCommand(`${root}/bin/zeroclaw`, {
+      ZEROCLAW_WORKSPACE: `${root}/agent`,
+    });
     const result = await sandbox.runCommand({
       cmd: cmd.cmd,
       args: cmd.args,

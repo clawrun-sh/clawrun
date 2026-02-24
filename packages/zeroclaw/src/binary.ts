@@ -41,6 +41,6 @@ export function getBinaryPath(platform?: Platform): string {
 
   throw new Error(
     `ZeroClaw binary not found at ${standardPath}. ` +
-    `Run "pnpm build" in the zeroclaw package to prepare the binary.`,
+      `Run "pnpm build" in the zeroclaw package to prepare the binary.`,
   );
 }

@@ -1,4 +1,10 @@
-export { cloudclawHome, instancesDir, instanceDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
+export {
+  cloudclawHome,
+  instancesDir,
+  instanceDir,
+  instanceAgentDir,
+  instanceDeployDir,
+} from "./paths.js";
 export {
   createInstance,
   listInstances,
@@ -12,5 +18,12 @@ export {
 } from "./manager.js";
 export type { InstanceMetadata } from "./manager.js";
 export { applyTemplates } from "./templates.js";
-export { cloudClawConfigSchema, buildConfig, toEnvVars, readConfig, writeConfig, generateSecret } from "./config.js";
-export type { CloudClawConfig } from "./config.js";
+export {
+  cloudClawConfigSchema,
+  buildConfig,
+  toEnvVars,
+  readConfig,
+  writeConfig,
+  generateSecret,
+} from "./config.js";
+export type { CloudClawConfig, CloudClawConfigWithSecrets } from "./config.js";

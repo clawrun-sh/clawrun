@@ -5,10 +5,12 @@ const providers: Record<string, () => PlatformProvider> = {
   vercel: () => new VercelPlatformProvider(),
 };
 
-export function getPlatformProvider(id?: string): PlatformProvider {
-  const providerId = id ?? "vercel";
-  const factory = providers[providerId];
-  if (!factory) throw new Error(`Unknown platform: ${providerId}`);
+export function getPlatformProvider(id: string): PlatformProvider {
+  const factory = providers[id];
+  if (!factory) {
+    const known = Object.keys(providers).join(", ") || "(none)";
+    throw new Error(`Unknown platform: "${id}". Available: ${known}`);
+  }
   return factory();
 }
 

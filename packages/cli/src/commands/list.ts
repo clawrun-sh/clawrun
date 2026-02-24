@@ -12,7 +12,7 @@ interface SandboxStatus {
 async function fetchSandboxStatus(deployedUrl: string): Promise<SandboxStatus | null> {
   try {
     const res = await fetch(`${deployedUrl}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
-    const data = await res.json() as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
     return (data.sandbox as SandboxStatus) ?? null;
   } catch {
     return null;
@@ -22,11 +22,22 @@ async function fetchSandboxStatus(deployedUrl: string): Promise<SandboxStatus | 
 function formatSandboxStatus(status: SandboxStatus | null, width: number): string {
   let label: string;
   let colorFn: (s: string) => string;
-  if (!status) { label = "unreachable"; colorFn = chalk.dim; }
-  else if (status.running) { label = "running"; colorFn = chalk.green; }
-  else if (status.status === "stopped") { label = "stopped"; colorFn = chalk.yellow; }
-  else if (status.status === "failed") { label = "failed"; colorFn = chalk.red; }
-  else { label = status.status ?? "stopped"; colorFn = chalk.dim; }
+  if (!status) {
+    label = "unreachable";
+    colorFn = chalk.dim;
+  } else if (status.running) {
+    label = "running";
+    colorFn = chalk.green;
+  } else if (status.status === "stopped") {
+    label = "stopped";
+    colorFn = chalk.yellow;
+  } else if (status.status === "failed") {
+    label = "failed";
+    colorFn = chalk.red;
+  } else {
+    label = status.status ?? "stopped";
+    colorFn = chalk.dim;
+  }
   return colorFn(label.padEnd(width));
 }
 
@@ -40,9 +51,7 @@ export const list = command({
 
     if (instances.length === 0) {
       console.log(chalk.dim("No instances found."));
-      console.log(
-        chalk.dim("  Create one with: cloudclaw deploy zeroclaw-basic"),
-      );
+      console.log(chalk.dim("  Create one with: cloudclaw deploy zeroclaw-basic"));
       return;
     }
 

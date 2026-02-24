@@ -3,6 +3,7 @@ import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import {
   getInstance,
+  readConfig,
   destroyInstance,
   instanceDir,
   instanceDeployDir,
@@ -55,13 +56,18 @@ export const destroy = command({
     }
 
     // Delete platform project first (needs project link dir to still exist)
-    const platform = getPlatformProvider();
+    const config = readConfig(name);
+    if (!config) {
+      console.log(chalk.yellow("  No config found — skipping platform project deletion."));
+      destroyInstance(name);
+      return;
+    }
+
+    const platform = getPlatformProvider(config.instance.provider);
     const handle = platform.readProjectLink(instanceDeployDir(name));
 
     if (!handle) {
-      console.log(
-        chalk.yellow("  No project link found — skipping platform project deletion."),
-      );
+      console.log(chalk.yellow("  No project link found — skipping platform project deletion."));
     } else {
       console.log(chalk.dim(`  Removing project (${handle.projectId})...`));
       try {
@@ -69,9 +75,7 @@ export const destroy = command({
         console.log(chalk.green("  Project deleted."));
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.log(
-          chalk.yellow(`  Could not delete project: ${msg.slice(0, 200)}`),
-        );
+        console.log(chalk.yellow(`  Could not delete project: ${msg.slice(0, 200)}`));
       }
     }
 

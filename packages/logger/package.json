@@ -1,0 +1,29 @@
+{
+  "name": "@cloudclaw/logger",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "format:check": "prettier --check src"
+  },
+  "dependencies": {
+    "consola": "^3.4.0"
+  },
+  "devDependencies": {
+    "@cloudclaw/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

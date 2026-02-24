@@ -23,11 +23,7 @@ export function buildDaemonCommand(
 ): SandboxCommand {
   return {
     cmd: binaryPath,
-    args: [
-      "daemon",
-      "--port", String(options?.port ?? 3000),
-      "--host", options?.host ?? "0.0.0.0",
-    ],
+    args: ["daemon", "--port", String(options?.port ?? 3000), "--host", options?.host ?? "0.0.0.0"],
     env,
   };
 }

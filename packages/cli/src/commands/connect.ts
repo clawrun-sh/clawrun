@@ -22,7 +22,11 @@ export const connect = command({
     const { deployedUrl } = config.instance;
     const { cronSecret } = config.secrets;
     if (!deployedUrl || !cronSecret) {
-      console.error(chalk.red(`Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`));
+      console.error(
+        chalk.red(
+          `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+        ),
+      );
       process.exit(1);
     }
 

@@ -2,7 +2,11 @@
   "name": "zeroclaw-napi-darwin-x64",
   "version": "0.0.1",
   "private": true,
-  "os": ["darwin"],
-  "cpu": ["x64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "zeroclaw-napi.darwin-x64.node"
 }

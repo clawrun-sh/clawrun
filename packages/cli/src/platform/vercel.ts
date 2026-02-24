@@ -142,9 +142,7 @@ export class VercelPlatformProvider implements PlatformProvider {
       const currentTeam = await this.getCurrentTeam();
 
       if (currentTeam) {
-        const { stdout } = await execa("vercel", [
-          "api", `/v2/teams/${currentTeam.id}`, "--raw",
-        ]);
+        const { stdout } = await execa("vercel", ["api", `/v2/teams/${currentTeam.id}`, "--raw"]);
         const data = JSON.parse(stdout) as {
           billing?: { plan?: string };
         };
@@ -175,9 +173,12 @@ export class VercelPlatformProvider implements PlatformProvider {
     console.log(chalk.dim(`  Creating Vercel project "${name}"...`));
 
     const { stdout } = await execa("vercel", [
-      "api", "/v9/projects",
-      "-X", "POST",
-      "-f", `name=${name}`,
+      "api",
+      "/v9/projects",
+      "-X",
+      "POST",
+      "-f",
+      `name=${name}`,
       "--raw",
     ]);
     const project = JSON.parse(stdout) as {
@@ -195,8 +196,10 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   async deleteProject(handle: ProjectHandle): Promise<void> {
     await execa("vercel", [
-      "api", `/v9/projects/${handle.projectId}?teamId=${handle.orgId}`,
-      "-X", "DELETE",
+      "api",
+      `/v9/projects/${handle.projectId}?teamId=${handle.orgId}`,
+      "-X",
+      "DELETE",
       "--raw",
       "--dangerously-skip-permissions",
     ]);
@@ -204,9 +207,10 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   readProjectLink(dir: string): ProjectHandle | null {
     try {
-      const data = JSON.parse(
-        readFileSync(join(dir, ".vercel", "project.json"), "utf-8"),
-      ) as { projectId?: string; orgId?: string };
+      const data = JSON.parse(readFileSync(join(dir, ".vercel", "project.json"), "utf-8")) as {
+        projectId?: string;
+        orgId?: string;
+      };
       if (data.projectId && data.orgId) {
         return { provider: "vercel", projectId: data.projectId, orgId: data.orgId };
       }
@@ -229,10 +233,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   async listStateStores(): Promise<StateStoreEntry[]> {
     try {
-      const { stdout } = await execa(
-        "vercel",
-        ["integration", "list", "--all", "--format=json"],
-      );
+      const { stdout } = await execa("vercel", ["integration", "list", "--all", "--format=json"]);
       const parsed = JSON.parse(stdout) as { resources?: StateStoreEntry[] };
       return (parsed.resources ?? []).filter(
         (r) => r.status === "available" && isKvProduct(r.product),
@@ -251,12 +252,18 @@ export class VercelPlatformProvider implements PlatformProvider {
     spinner.start(`Connecting store "${store.name}" to project`);
 
     try {
-      await execa("vercel", [
-        "api",
-        `-X`, `POST`,
-        `/v1/integrations/installations/${store.installationId}/resources/${store.id}/connections`,
-        `-F`, `projectId=${projectId}`,
-      ], { cwd: linkedDir });
+      await execa(
+        "vercel",
+        [
+          "api",
+          `-X`,
+          `POST`,
+          `/v1/integrations/installations/${store.installationId}/resources/${store.id}/connections`,
+          `-F`,
+          `projectId=${projectId}`,
+        ],
+        { cwd: linkedDir },
+      );
 
       spinner.stop(`Connected "${store.name}" to project.`);
     } catch (err) {
@@ -284,11 +291,11 @@ export class VercelPlatformProvider implements PlatformProvider {
       // ignore — proceed with provisioning
     }
 
-    const addResult = await execa(
-      "vercel",
-      ["integration", "add", "upstash/upstash-kv"],
-      { cwd: linkedDir, stdio: "inherit", reject: false },
-    );
+    const addResult = await execa("vercel", ["integration", "add", "upstash/upstash-kv"], {
+      cwd: linkedDir,
+      stdio: "inherit",
+      reject: false,
+    });
 
     if (addResult.exitCode !== 0) {
       clack.log.warn("State store setup cancelled.");
@@ -319,10 +326,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   // ---- Env vars ---------------------------------------------------------
 
-  async persistEnvVars(
-    dir: string,
-    vars: Record<string, string>,
-  ): Promise<void> {
+  async persistEnvVars(dir: string, vars: Record<string, string>): Promise<void> {
     // Vercel Cron requires CRON_SECRET (exact name) to set the Authorization header
     if (vars["CLOUDCLAW_CRON_SECRET"] && !vars["CRON_SECRET"]) {
       vars = { ...vars, CRON_SECRET: vars["CLOUDCLAW_CRON_SECRET"] };
@@ -356,9 +360,7 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
     }
 
-    console.log(
-      chalk.green(`  ${succeeded}/${entries.length} env vars persisted to project.`),
-    );
+    console.log(chalk.green(`  ${succeeded}/${entries.length} env vars persisted to project.`));
   }
 
   // ---- Platform config --------------------------------------------------
@@ -392,20 +394,30 @@ export class VercelPlatformProvider implements PlatformProvider {
   async disableDeploymentProtection(dir: string): Promise<void> {
     const handle = this.readProjectLink(dir);
     if (!handle) {
-      console.log(chalk.yellow("  Could not read Vercel project config — skipping deployment protection config."));
+      console.log(
+        chalk.yellow(
+          "  Could not read Vercel project config — skipping deployment protection config.",
+        ),
+      );
       return;
     }
 
     try {
-      await execa("vercel", [
-        "api",
-        `/v9/projects/${handle.projectId}?teamId=${handle.orgId}`,
-        "-X", "PATCH",
-        "--input", "-",
-        "--raw",
-      ], {
-        input: JSON.stringify({ ssoProtection: null }),
-      });
+      await execa(
+        "vercel",
+        [
+          "api",
+          `/v9/projects/${handle.projectId}?teamId=${handle.orgId}`,
+          "-X",
+          "PATCH",
+          "--input",
+          "-",
+          "--raw",
+        ],
+        {
+          input: JSON.stringify({ ssoProtection: null }),
+        },
+      );
       console.log(chalk.green("  Deployment protection disabled (SSO bypass)."));
     } catch {
       console.log(chalk.yellow("  Could not disable deployment protection."));
@@ -414,10 +426,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   // ---- Deploy -----------------------------------------------------------
 
-  async deploy(
-    dir: string,
-    envVars: Record<string, string>,
-  ): Promise<string> {
+  async deploy(dir: string, envVars: Record<string, string>): Promise<string> {
     console.log(chalk.cyan("\nDeploying to Vercel...\n"));
 
     const envArgs: string[] = [];
@@ -452,11 +461,11 @@ export class VercelPlatformProvider implements PlatformProvider {
     // vercel logs <url> implies --follow. Use --no-follow unless explicitly requested.
     const args = ["logs", deploymentUrl];
     if (!options?.follow) args.push("--no-follow");
-    if (options?.limit)   args.push("--limit", String(options.limit));
-    if (options?.json)    args.push("--json");
-    if (options?.query)   args.push("--query", options.query);
-    if (options?.since)   args.push("--since", options.since);
-    if (options?.level)   args.push("--level", options.level);
+    if (options?.limit) args.push("--limit", String(options.limit));
+    if (options?.json) args.push("--json");
+    if (options?.query) args.push("--query", options.query);
+    if (options?.since) args.push("--since", options.since);
+    if (options?.level) args.push("--level", options.level);
 
     await execa("vercel", args, { cwd: dir, stdio: "inherit" });
   }
@@ -479,9 +488,7 @@ export class VercelPlatformProvider implements PlatformProvider {
   private async waitForStateStoreVars(linkedDir: string): Promise<boolean> {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
 
-    process.stdout.write(
-      chalk.dim("  Waiting for state store provisioning to complete"),
-    );
+    process.stdout.write(chalk.dim("  Waiting for state store provisioning to complete"));
 
     while (Date.now() < deadline) {
       try {
@@ -511,11 +518,9 @@ export class VercelPlatformProvider implements PlatformProvider {
     const envTempPath = join(linkedDir, ".env.state.tmp");
 
     try {
-      await execa(
-        "vercel",
-        ["env", "pull", envTempPath, "--yes", "--environment=production"],
-        { cwd: linkedDir },
-      );
+      await execa("vercel", ["env", "pull", envTempPath, "--yes", "--environment=production"], {
+        cwd: linkedDir,
+      });
 
       const pulled = parseEnvFile(readFileSync(envTempPath, "utf-8"));
       const vars: Record<string, string> = {};

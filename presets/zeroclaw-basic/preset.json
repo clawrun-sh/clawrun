@@ -2,5 +2,7 @@
   "id": "zeroclaw-basic",
   "name": "ZeroClaw Basic",
   "agent": "zeroclaw",
-  "description": "A ZeroClaw agent with full provider and channel support"
+  "provider": "vercel",
+  "description": "A ZeroClaw agent with full provider and channel support",
+  "bundlePaths": ["node_modules/zeroclaw/dist/bin/**/*"]
 }

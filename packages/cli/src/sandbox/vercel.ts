@@ -27,9 +27,7 @@ export class VercelSandboxClient implements SandboxClient {
   }
 
   async list(): Promise<SandboxEntry[]> {
-    const { stdout } = await execa("node", [
-      sandboxBin(), "list", ...this.scopeArgs(),
-    ]);
+    const { stdout } = await execa("node", [sandboxBin(), "list", ...this.scopeArgs()]);
 
     const entries: SandboxEntry[] = [];
     for (const line of stdout.split("\n")) {
@@ -47,10 +45,7 @@ export class VercelSandboxClient implements SandboxClient {
     env?: Record<string, string>,
     options?: { timeoutMs?: number },
   ): Promise<ExecResult> {
-    const execArgs = [
-      sandboxBin(), "exec", sandboxId,
-      ...this.scopeArgs(),
-    ];
+    const execArgs = [sandboxBin(), "exec", sandboxId, ...this.scopeArgs()];
 
     if (env) {
       for (const [k, v] of Object.entries(env)) {
@@ -84,11 +79,7 @@ export class VercelSandboxClient implements SandboxClient {
 
   async readFile(sandboxId: string, path: string): Promise<Buffer | null> {
     try {
-      const result = await this.exec(
-        sandboxId,
-        "sh",
-        ["-c", `base64 < "${path}" 2>/dev/null`],
-      );
+      const result = await this.exec(sandboxId, "sh", ["-c", `base64 < "${path}" 2>/dev/null`]);
       if (result.exitCode !== 0 || !result.stdout.trim()) {
         return null;
       }

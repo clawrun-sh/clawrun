@@ -11,10 +11,7 @@ export interface ProvisionOptions {
   secretKey: string;
 }
 
-export async function provision(
-  sandbox: ZeroclawSandbox,
-  opts: ProvisionOptions,
-): Promise<void> {
+export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions): Promise<void> {
   const { binPath, agentDir } = opts;
   const binDir = binPath.substring(0, binPath.lastIndexOf("/"));
 
@@ -23,9 +20,7 @@ export async function provision(
 
   // Write binary
   const localBinary = getBinaryPath("linux-x64");
-  await sandbox.writeFiles([
-    { path: binPath, content: readFileSync(localBinary) },
-  ]);
+  await sandbox.writeFiles([{ path: binPath, content: readFileSync(localBinary) }]);
 
   // Make binary executable
   const chmodResult = await sandbox.runCommand("chmod", ["+x", binPath]);
@@ -65,7 +60,5 @@ export async function provision(
   // Write .profile to $HOME (not to root, which is $HOME/.cloudclaw)
   const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
   const home = (await homeResult.stdout()).trim() || "/home/vercel-sandbox";
-  await sandbox.writeFiles([
-    { path: `${home}/.profile`, content: Buffer.from(profile) },
-  ]);
+  await sandbox.writeFiles([{ path: `${home}/.profile`, content: Buffer.from(profile) }]);
 }

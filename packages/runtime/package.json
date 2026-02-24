@@ -1,0 +1,34 @@
+{
+  "name": "@cloudclaw/runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.scripts.json && tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src",
+    "format:check": "prettier --check src"
+  },
+  "dependencies": {
+    "@cloudclaw/agent": "workspace:*",
+    "@cloudclaw/logger": "workspace:*",
+    "@cloudclaw/provider": "workspace:*",
+    "@neondatabase/serverless": "^0.10.0",
+    "@upstash/redis": "^1.34.0",
+    "drizzle-orm": "^0.38.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudclaw/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

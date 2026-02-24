@@ -69,7 +69,11 @@ export interface PlatformProvider {
 
   // --- State store ---
   listStateStores(): Promise<StateStoreEntry[]>;
-  connectStateStore(linkedDir: string, store: StateStoreEntry, projectId: string): Promise<StateStoreResult>;
+  connectStateStore(
+    linkedDir: string,
+    store: StateStoreEntry,
+    projectId: string,
+  ): Promise<StateStoreResult>;
   provisionStateStore(linkedDir: string): Promise<StateStoreResult>;
 
   // --- Env vars ---

@@ -50,7 +50,9 @@ export const logs = command({
     }
 
     if (!config.instance.deployedUrl) {
-      console.error(chalk.red(`Instance "${instanceName}" is not deployed. Run "cloudclaw deploy" first.`));
+      console.error(
+        chalk.red(`Instance "${instanceName}" is not deployed. Run "cloudclaw deploy" first.`),
+      );
       process.exit(1);
     }
 
@@ -58,9 +60,18 @@ export const logs = command({
     const platform = getPlatformProvider(config.instance.provider);
 
     try {
-      await platform.streamLogs(config.instance.deployedUrl!, deployDir, { follow, limit, json, query, since, level });
+      await platform.streamLogs(config.instance.deployedUrl!, deployDir, {
+        follow,
+        limit,
+        json,
+        query,
+        since,
+        level,
+      });
     } catch (err) {
-      console.error(chalk.red(`Failed to stream logs: ${err instanceof Error ? err.message : String(err)}`));
+      console.error(
+        chalk.red(`Failed to stream logs: ${err instanceof Error ? err.message : String(err)}`),
+      );
       process.exit(1);
     }
   },

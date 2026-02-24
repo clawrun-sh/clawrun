@@ -3,6 +3,7 @@ import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { readConfig } from "../instance/index.js";
 import { instance } from "../args/instance.js";
+import { createApiClient } from "../api.js";
 
 export const start = command({
   name: "start",
@@ -20,7 +21,11 @@ export const start = command({
     const { deployedUrl } = config.instance;
     const { cronSecret } = config.secrets;
     if (!deployedUrl || !cronSecret) {
-      console.error(chalk.red(`Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`));
+      console.error(
+        chalk.red(
+          `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+        ),
+      );
       process.exit(1);
     }
 
@@ -28,10 +33,8 @@ export const start = command({
     spinner.start("Starting sandbox...");
 
     try {
-      const res = await fetch(`${deployedUrl}/api/v1/sandbox/start`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cronSecret}` },
-      });
+      const api = createApiClient(deployedUrl, cronSecret);
+      const res = await api.post("/api/v1/sandbox/start");
 
       const body = await res.text();
 
@@ -51,7 +54,9 @@ export const start = command({
         spinner.stop(chalk.yellow(`Unexpected result: ${JSON.stringify(result)}`));
       }
     } catch (err) {
-      spinner.stop(chalk.red(`Failed to start sandbox: ${err instanceof Error ? err.message : String(err)}`));
+      spinner.stop(
+        chalk.red(`Failed to start sandbox: ${err instanceof Error ? err.message : String(err)}`),
+      );
       process.exit(1);
     }
   },

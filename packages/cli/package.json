@@ -8,7 +8,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "eslint src",
+    "format:check": "prettier --check src"
   },
   "files": [
     "dist"
@@ -16,6 +18,8 @@
   "dependencies": {
     "@cloudclaw/agent": "workspace:*",
     "@cloudclaw/channel": "workspace:*",
+    "@cloudclaw/runtime": "workspace:*",
+    "@cloudclaw/logger": "workspace:*",
     "@clack/prompts": "^0.10.0",
     "@iarna/toml": "^2.2.5",
     "chalk": "^5.4.0",
@@ -28,6 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cloudclaw/tsconfig": "workspace:*",
     "@types/iarna__toml": "^2.0.5",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

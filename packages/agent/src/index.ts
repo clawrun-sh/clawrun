@@ -8,3 +8,4 @@ export type {
   ProvisionOpts,
   Agent,
 } from "./types.js";
+export { createAgent } from "./registry.js";

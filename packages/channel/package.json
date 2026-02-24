@@ -14,9 +14,15 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "eslint src",
+    "format:check": "prettier --check src"
+  },
+  "dependencies": {
+    "@cloudclaw/logger": "workspace:*"
   },
   "devDependencies": {
+    "@cloudclaw/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }

@@ -3,35 +3,45 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { ZeroclawAgent } from "@cloudclaw/agent/zeroclaw";
+import { createAgent } from "@cloudclaw/agent";
 import { createSandboxClient } from "../sandbox/index.js";
 import { createSandboxHandle } from "../sandbox/handle.js";
 import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { instance } from "../args/instance.js";
-import type { CloudClawConfig } from "../instance/config.js";
+import type { CloudClawConfigWithSecrets } from "../instance/config.js";
 
-const agent = new ZeroclawAgent();
-
-/** Resolve the cloudclaw workspace root inside a sandbox by querying $HOME. */
-async function resolveRoot(handle: ReturnType<typeof createSandboxHandle>): Promise<string> {
+/** Resolve the workspace root inside a sandbox by querying $HOME. */
+async function resolveRoot(
+  handle: ReturnType<typeof createSandboxHandle>,
+  sandboxRoot: string,
+): Promise<string> {
   const result = await handle.runCommand("sh", ["-c", "echo $HOME"]);
-  const home = (await result.stdout()).trim() || "/home/vercel-sandbox";
-  return `${home}/.cloudclaw`;
+  const home = (await result.stdout()).trim();
+  if (!home) throw new Error("Could not determine sandbox $HOME");
+  return `${home}/${sandboxRoot}`;
 }
 
 /**
  * Start an interactive chat REPL with the agent in a deployed instance.
  * Reusable from both the `agent` command and post-deploy flow.
  */
-export async function startAgentChat(instanceName: string, config: CloudClawConfig): Promise<void> {
+export async function startAgentChat(
+  instanceName: string,
+  config: CloudClawConfigWithSecrets,
+): Promise<void> {
   const { deployedUrl } = config.instance;
   const { cronSecret } = config.secrets;
   if (!deployedUrl || !cronSecret) {
-    console.error(chalk.red(`Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`));
+    console.error(
+      chalk.red(
+        `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+      ),
+    );
     process.exit(1);
   }
 
+  const agent = createAgent(config.agent.name);
   const client = createSandboxClient(instanceName, config);
 
   const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
@@ -39,15 +49,15 @@ export async function startAgentChat(instanceName: string, config: CloudClawConf
   console.log(chalk.dim(`Sandbox: ${sandboxId}\n`));
 
   const handle = createSandboxHandle(client, sandboxId);
-  const root = await resolveRoot(handle);
+  const root = await resolveRoot(handle, config.instance.sandboxRoot);
 
   async function sendMessage(msg: string): Promise<{ success: boolean; output: string }> {
     const response = await agent.sendMessage(handle, root, msg, {
       signal: AbortSignal.timeout(150_000),
     });
     const output = response.success
-      ? (response.message || "")
-      : (response.error || response.message || "Unknown error");
+      ? response.message || ""
+      : response.error || response.message || "Unknown error";
     return { success: response.success, output };
   }
 
@@ -94,7 +104,12 @@ export const agentCommand = command({
   description: "Chat with the agent running in an instance",
   args: {
     instance,
-    message: option({ long: "message", short: "m", type: optional(string), description: "Single message (non-interactive)" }),
+    message: option({
+      long: "message",
+      short: "m",
+      type: optional(string),
+      description: "Single message (non-interactive)",
+    }),
   },
   async handler({ instance: instanceName, message }) {
     const config = readConfig(instanceName);
@@ -108,14 +123,19 @@ export const agentCommand = command({
       const { deployedUrl } = config.instance;
       const { cronSecret } = config.secrets;
       if (!deployedUrl || !cronSecret) {
-        console.error(chalk.red(`Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`));
+        console.error(
+          chalk.red(
+            `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+          ),
+        );
         process.exit(1);
       }
 
+      const agent = createAgent(config.agent.name);
       const client = createSandboxClient(instanceName, config);
       const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
       const handle = createSandboxHandle(client, sandboxId);
-      const root = await resolveRoot(handle);
+      const root = await resolveRoot(handle, config.instance.sandboxRoot);
 
       const s = clack.spinner();
       s.start("Thinking...");
@@ -126,8 +146,8 @@ export const agentCommand = command({
 
       s.stop(response.success ? "Done" : "Error");
       const output = response.success
-        ? (response.message || "")
-        : (response.error || response.message || "Unknown error");
+        ? response.message || ""
+        : response.error || response.message || "Unknown error";
       console.log(response.success ? chalk.green(output) : chalk.red(output));
       process.exit(response.success ? 0 : 1);
     }

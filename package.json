@@ -1,16 +1,25 @@
 {
   "name": "cloudclaw-workspace",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=20"
   },
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev"
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format:check": "turbo run format:check",
+    "format": "prettier --write .",
+    "test": "turbo run test"
   },
   "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.4.0",
     "turbo": "^2.3.0",
-    "typescript": "^5.7.0"
+    "vitest": "^3.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

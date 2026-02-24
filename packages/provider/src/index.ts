@@ -7,7 +7,9 @@ export type {
   SnapshotInfo,
   CreateSandboxOptions,
   SandboxProvider,
-} from "./types";
+} from "./types.js";
 
-export type { SnapshotRetentionPolicy } from "./retention";
-export { CountBasedRetention } from "./retention";
+export type { SnapshotRetentionPolicy } from "./retention.js";
+export { CountBasedRetention } from "./retention.js";
+
+export { getProvider } from "./registry.js";

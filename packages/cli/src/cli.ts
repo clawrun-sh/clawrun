@@ -5,10 +5,11 @@ import { run, setDefaultHelpFormatter } from "cmd-ts";
 import { createVercelFormatter } from "cmd-ts/dist/esm/batteries/vercel-formatter.js";
 import { app } from "./app.js";
 import { StyledError } from "./error.js";
+import { createLogger } from "@cloudclaw/logger";
 
-setDefaultHelpFormatter(
-  createVercelFormatter({ cliName: "CloudClaw", logo: "\u25B8" }),
-);
+const log = createLogger("cli");
+
+setDefaultHelpFormatter(createVercelFormatter({ cliName: "CloudClaw", logo: "\u25B8" }));
 
 async function main() {
   try {
@@ -18,7 +19,7 @@ async function main() {
       console.error("\n" + e.message);
       process.exit(1);
     }
-    console.error(e);
+    log.error(e);
     process.exit(1);
   }
 }

@@ -7,8 +7,11 @@ export interface CommandResult {
 export interface SandboxHandle {
   runCommand(cmd: string, args?: string[]): Promise<CommandResult>;
   runCommand(opts: {
-    cmd: string; args?: string[]; env?: Record<string, string>;
-    signal?: AbortSignal; detached?: boolean;
+    cmd: string;
+    args?: string[];
+    env?: Record<string, string>;
+    signal?: AbortSignal;
+    detached?: boolean;
   }): Promise<CommandResult>;
   writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
   readFile(path: string): Promise<Buffer | null>;
@@ -44,17 +47,30 @@ export interface Agent {
   readonly id: string;
   readonly name: string;
 
+  /** Key in agent's parsed config that holds per-channel configuration. */
+  readonly channelsConfigKey: string;
+
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
-  sendMessage(sandbox: SandboxHandle, root: string, message: string, opts?: {
-    env?: Record<string, string>;
-    signal?: AbortSignal;
-  }): Promise<AgentResponse>;
+  sendMessage(
+    sandbox: SandboxHandle,
+    root: string,
+    message: string,
+    opts?: {
+      env?: Record<string, string>;
+      signal?: AbortSignal;
+    },
+  ): Promise<AgentResponse>;
 
-  startDaemon(sandbox: SandboxHandle, root: string, opts?: {
-    port?: number; host?: string;
-    env?: Record<string, string>;
-  }): Promise<void>;
+  startDaemon(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: {
+      port?: number;
+      host?: string;
+      env?: Record<string, string>;
+    },
+  ): Promise<void>;
 
   getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo>;
 

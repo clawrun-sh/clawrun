@@ -29,13 +29,13 @@ export interface ChannelEnvMapping {
   configKey: string;
   /** Fields to extract: configField -> envVar name */
   fields: Array<{
-    configField: string;  // e.g. "bot_token"
-    envVar: string;       // e.g. "CLOUDCLAW_TELEGRAM_BOT_TOKEN"
+    configField: string; // e.g. "bot_token"
+    envVar: string; // e.g. "CLOUDCLAW_TELEGRAM_BOT_TOKEN"
   }>;
   /** Auto-generated secrets (not from agent config) */
   generatedSecrets: Array<{
-    envVar: string;       // e.g. "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"
-    purpose: string;      // human-readable, e.g. "webhook request verification"
+    envVar: string; // e.g. "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"
+    purpose: string; // human-readable, e.g. "webhook request verification"
   }>;
 }
 

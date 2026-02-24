@@ -1,0 +1,44 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { cloudClawConfigSchema } from "./schema.js";
+
+export interface RuntimeConfig {
+  instance: { name: string; provider: string; baseUrl?: string; sandboxRoot: string };
+  agent: {
+    name: string;
+    config: string;
+    bundlePaths: string[];
+  };
+  sandbox: {
+    activeDuration: number;
+    cronKeepAliveWindow: number;
+    cronWakeLeadTime: number;
+  };
+}
+
+let cached: RuntimeConfig | null = null;
+
+export function getRuntimeConfig(): RuntimeConfig {
+  if (cached) return cached;
+  const raw = JSON.parse(readFileSync(join(process.cwd(), "cloudclaw.json"), "utf-8"));
+  const parsed = cloudClawConfigSchema.parse(raw);
+  cached = {
+    instance: {
+      name: parsed.instance.name,
+      provider: parsed.instance.provider,
+      baseUrl: parsed.instance.deployedUrl ?? process.env.CLOUDCLAW_BASE_URL,
+      sandboxRoot: parsed.instance.sandboxRoot,
+    },
+    agent: {
+      name: parsed.agent.name,
+      config: parsed.agent.config,
+      bundlePaths: parsed.agent.bundlePaths,
+    },
+    sandbox: {
+      activeDuration: parsed.sandbox.activeDuration,
+      cronKeepAliveWindow: parsed.sandbox.cronKeepAliveWindow,
+      cronWakeLeadTime: parsed.sandbox.cronWakeLeadTime,
+    },
+  };
+  return cached;
+}

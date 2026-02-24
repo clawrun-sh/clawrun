@@ -1,11 +1,10 @@
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import type { SandboxClient } from "./types.js";
+import { createApiClient } from "../api.js";
 
 /** Find the running sandbox ID, or null. */
-export async function getRunningId(
-  client: SandboxClient,
-): Promise<string | null> {
+export async function getRunningId(client: SandboxClient): Promise<string | null> {
   const sandboxes = await client.list();
   const running = sandboxes.find((s) => s.status === "running");
   return running?.id ?? null;
@@ -20,10 +19,8 @@ async function ensureRunning(
   const spinner = clack.spinner();
   spinner.start("Starting sandbox...");
 
-  await fetch(`${deployedUrl}/api/v1/sandbox/restart`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${cronSecret}` },
-  });
+  const api = createApiClient(deployedUrl, cronSecret);
+  await api.post("/api/v1/sandbox/restart");
 
   const POLL_INTERVAL_MS = 3_000;
   const POLL_TIMEOUT_MS = 90_000;

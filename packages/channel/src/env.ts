@@ -12,8 +12,9 @@ import { getAllAdapters } from "./registry.js";
  */
 export function extractChannelEnvVars(
   agentConfig: Record<string, unknown>,
+  channelsConfigKey: string,
 ): Record<string, string> {
-  const channelsConfig = agentConfig.channels_config as
+  const channelsConfig = agentConfig[channelsConfigKey] as
     | Record<string, Record<string, unknown>>
     | undefined;
   if (!channelsConfig) return {};

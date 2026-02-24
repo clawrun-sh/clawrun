@@ -17,9 +17,12 @@ export const app = subcommands({
   cmds: { deploy, list, destroy, agent: agentCommand, connect, start, stop, logs, pull },
   examples: [
     { description: "Deploy a new instance", command: "cloudclaw deploy" },
-    { description: "Deploy with a specific preset", command: "cloudclaw deploy --preset zeroclaw-basic" },
+    {
+      description: "Deploy with a specific preset",
+      command: "cloudclaw deploy --preset zeroclaw-basic",
+    },
     { description: "List all instances", command: "cloudclaw list" },
-    { description: "Chat with an agent", command: "cloudclaw agent my-instance -m \"Hello\"" },
+    { description: "Chat with an agent", command: 'cloudclaw agent my-instance -m "Hello"' },
     { description: "Open a shell in the sandbox", command: "cloudclaw connect my-instance" },
     { description: "Start sandbox if not running", command: "cloudclaw start my-instance" },
     { description: "Stop a running sandbox", command: "cloudclaw stop my-instance" },

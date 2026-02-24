@@ -8,7 +8,13 @@ import { humanId } from "human-id";
 import * as clack from "@clack/prompts";
 import { getPreset, listPresets } from "../presets/index.js";
 import { getPlatformProvider } from "../platform/index.js";
-import type { PlatformTier, PlatformLimits, ProjectHandle, StateStoreEntry } from "../platform/index.js";
+import type {
+  PlatformProvider,
+  PlatformTier,
+  PlatformLimits,
+  ProjectHandle,
+  StateStoreEntry,
+} from "../platform/index.js";
 import {
   createInstance,
   instanceExists,
@@ -25,10 +31,12 @@ import {
   generateSecret,
 } from "../instance/index.js";
 import { extractChannelEnvVars, getChannelSecretDefinitions } from "@cloudclaw/channel";
+import { createAgent } from "@cloudclaw/agent";
 import { readParsedConfig } from "zeroclaw";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
+import { createApiClient } from "../api.js";
 
 function generateInstanceName(): string {
   return `cloudclaw-${humanId({ separator: "-", capitalize: false })}`;
@@ -37,30 +45,23 @@ function generateInstanceName(): string {
 // Default active duration from the Zod schema (600s = 10 min)
 const DEFAULT_ACTIVE_DURATION_S = 600;
 
-async function detectAndPrintTier(): Promise<{
+async function detectAndPrintTier(platform: PlatformProvider): Promise<{
   tier: PlatformTier;
   limits: PlatformLimits;
 }> {
-  const platform = getPlatformProvider();
   const tier = await platform.detectTier();
   const limits = await platform.getLimits(tier);
   const activeDurationMins = Math.round(DEFAULT_ACTIVE_DURATION_S / 60);
 
-  if (tier === "hobby") {
-    clack.log.info(
-      `${chalk.bold("Vercel Hobby (free) plan detected")}\n` +
-      chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (daily)\n`) +
+  const tierLabel = tier === "hobby" ? `${platform.name} free plan` : `${platform.name} paid plan`;
+  const lifecycleMode = tier === "hobby" ? "webhook-driven" : "heartbeat-driven";
+
+  clack.log.info(
+    `${chalk.bold(`${tierLabel} detected`)}\n` +
+      chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron}\n`) +
       chalk.dim(`  Active duration:   ${activeDurationMins} minutes per session\n`) +
-      chalk.dim("  Lifecycle mode:    webhook-driven"),
-    );
-  } else {
-    clack.log.info(
-      `${chalk.bold("Vercel Pro plan detected")}\n` +
-      chalk.dim(`  Heartbeat cron:    ${limits.heartbeatCron} (every minute)\n`) +
-      chalk.dim(`  Active duration:   ${activeDurationMins} minutes per session\n`) +
-      chalk.dim("  Lifecycle mode:    heartbeat-driven"),
-    );
-  }
+      chalk.dim(`  Lifecycle mode:    ${lifecycleMode}`),
+  );
 
   return { tier, limits };
 }
@@ -76,14 +77,8 @@ async function handleNewInstance(
     if (presets.length === 1) {
       presetId = presets[0].id;
     } else {
-      console.error(
-        chalk.red("Please specify a preset: cloudclaw deploy <preset>"),
-      );
-      console.error(
-        chalk.dim(
-          `  Available: ${presets.map((p) => p.id).join(", ")}`,
-        ),
-      );
+      console.error(chalk.red("Please specify a preset: cloudclaw deploy <preset>"));
+      console.error(chalk.dim(`  Available: ${presets.map((p) => p.id).join(", ")}`));
       process.exit(1);
     }
   }
@@ -93,9 +88,7 @@ async function handleNewInstance(
     const available = listPresets()
       .map((p) => p.id)
       .join(", ");
-    console.error(
-      chalk.red(`Unknown preset: "${presetId}". Available: ${available}`),
-    );
+    console.error(chalk.red(`Unknown preset: "${presetId}". Available: ${available}`));
     process.exit(1);
   }
 
@@ -106,13 +99,13 @@ async function handleNewInstance(
   clack.log.step(`Instance: ${chalk.bold(name)}`);
   clack.log.info(`Preset: ${preset.name} — ${preset.description}`);
 
-  const platform = getPlatformProvider();
+  const platform = getPlatformProvider(preset.provider);
 
   // Check prerequisites
   await platform.checkPrerequisites();
 
   // Detect tier
-  const { limits } = await detectAndPrintTier();
+  const { limits } = await detectAndPrintTier(platform);
   const defaultActiveDuration = DEFAULT_ACTIVE_DURATION_S;
 
   // ============================================================
@@ -125,8 +118,8 @@ async function handleNewInstance(
   } catch (err) {
     clack.log.error(
       `ZeroClaw native bridge is required but could not be loaded.\n` +
-      chalk.dim(`  ${err instanceof Error ? err.message : String(err)}\n`) +
-      chalk.dim("  Run: cd packages/zeroclaw-napi && bash build-docker.sh"),
+        chalk.dim(`  ${err instanceof Error ? err.message : String(err)}\n`) +
+        chalk.dim("  Run: cd packages/zeroclaw-napi && bash build-docker.sh"),
     );
     process.exit(1);
   }
@@ -192,7 +185,7 @@ async function handleNewInstance(
   const configTomlPath = join(agentConfigDir, "config.toml");
   const tomlContent = readFileSync(configTomlPath, "utf-8");
   const parsed = TOML.parse(tomlContent);
-  parsed.memory = { ...(parsed.memory as Record<string, unknown> ?? {}), backend: memoryBackend };
+  parsed.memory = { ...((parsed.memory as Record<string, unknown>) ?? {}), backend: memoryBackend };
   writeFileSync(configTomlPath, TOML.stringify(parsed as TOML.JsonMap));
 
   // Restore ZEROCLAW_CONFIG_DIR
@@ -217,7 +210,9 @@ async function handleNewInstance(
   try {
     handle = await platform.createProject(name);
   } catch (err) {
-    clack.log.error(`Failed to create project: ${err instanceof Error ? err.message : String(err)}`);
+    clack.log.error(
+      `Failed to create project: ${err instanceof Error ? err.message : String(err)}`,
+    );
     process.exit(1);
   }
 
@@ -279,11 +274,16 @@ async function handleNewInstance(
     webhookSecrets,
     sandboxSecret,
     provider: platform.id,
+    bundlePaths: preset.bundlePaths,
   });
 
   // Derive env vars: CloudClaw secrets + agent channel tokens
   const agentConfig = readParsedConfig(agentConfigDir);
-  const agentEnv = extractChannelEnvVars(agentConfig as Record<string, unknown>);
+  const agentAdapter = createAgent(preset.agent);
+  const agentEnv = extractChannelEnvVars(
+    agentConfig as Record<string, unknown>,
+    agentAdapter.channelsConfigKey,
+  );
   const cloudclawEnv = toEnvVars(config);
   const allEnvVars: Record<string, string> = {
     ...cloudclawEnv,
@@ -309,16 +309,15 @@ async function handleNewInstance(
   // Deploy from .deploy/
   const url = await platform.deploy(deployDir, allEnvVars);
   saveDeployedUrl(name, url);
+  await platform.persistEnvVars(deployDir, { CLOUDCLAW_BASE_URL: url });
 
   // Start sandbox
   clack.log.step("Starting sandbox...");
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/v1/sandbox/restart`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cronSecret}` },
-      });
-      const result = await res.json() as Record<string, unknown>;
+      const api = createApiClient(url, cronSecret);
+      const res = await api.post("/api/v1/sandbox/restart");
+      const result = (await res.json()) as Record<string, unknown>;
       clack.log.success(`Sandbox: ${result.status ?? "ok"}`);
     } catch {
       clack.log.warn("Could not start sandbox — it will start on first message.");
@@ -332,10 +331,7 @@ async function handleNewInstance(
   await offerChat(name);
 }
 
-async function handleExistingInstance(
-  name: string,
-  options: { yes?: boolean },
-): Promise<void> {
+async function handleExistingInstance(name: string, options: { yes?: boolean }): Promise<void> {
   const meta = getInstance(name);
   if (!meta) {
     console.error(chalk.red(`Instance "${name}" not found.`));
@@ -351,13 +347,20 @@ async function handleExistingInstance(
     clack.log.info(`Last deployed to: ${meta.deployedUrl}`);
   }
 
-  const platform = getPlatformProvider();
+  // Read config early to determine platform provider
+  const existingConfig = readConfig(name);
+  if (!existingConfig) {
+    clack.log.error(`No cloudclaw.json found for instance "${name}".`);
+    process.exit(1);
+  }
+
+  const platform = getPlatformProvider(existingConfig.instance.provider);
 
   // Check prerequisites
   await platform.checkPrerequisites();
 
   // Detect tier
-  const { limits } = await detectAndPrintTier();
+  const { limits } = await detectAndPrintTier(platform);
 
   // Offer reconfiguration — two separate yes/no prompts
   // (napi may or may not be loaded depending on user choices)
@@ -376,7 +379,7 @@ async function handleExistingInstance(
       } catch (err) {
         clack.log.error(
           `ZeroClaw native bridge is required but could not be loaded.\n` +
-          chalk.dim(`  ${err instanceof Error ? err.message : String(err)}`),
+            chalk.dim(`  ${err instanceof Error ? err.message : String(err)}`),
         );
         process.exit(1);
       }
@@ -420,7 +423,7 @@ async function handleExistingInstance(
           if (active.length > 0) {
             clack.log.info(
               `Currently configured: ${active.map((c) => chalk.green(c)).join(", ")}\n` +
-              chalk.dim("  These will be preserved unless you reconfigure them."),
+                chalk.dim("  These will be preserved unless you reconfigure them."),
             );
           }
         }
@@ -441,7 +444,7 @@ async function handleExistingInstance(
   // Patch platform config in .deploy/
   platform.patchPlatformConfig(deployDir, limits);
 
-  // Read config
+  // Re-read config after upgrade (upgradeInstance may modify it on disk)
   const config = readConfig(name);
   if (!config) {
     clack.log.error(`No cloudclaw.json found for instance "${name}".`);
@@ -454,7 +457,11 @@ async function handleExistingInstance(
   // Derive env vars: CloudClaw secrets + agent channel tokens
   const agentDir = instanceAgentDir(name);
   const agentConfig = readParsedConfig(agentDir);
-  const agentEnv = extractChannelEnvVars(agentConfig as Record<string, unknown>);
+  const agentAdapter = createAgent(config.agent.name);
+  const agentEnv = extractChannelEnvVars(
+    agentConfig as Record<string, unknown>,
+    agentAdapter.channelsConfigKey,
+  );
   const cloudclawEnv = { ...toEnvVars(config), ...agentEnv };
 
   // Persist env vars to .deploy/
@@ -463,17 +470,16 @@ async function handleExistingInstance(
   // Deploy from .deploy/
   const url = await platform.deploy(deployDir, cloudclawEnv);
   saveDeployedUrl(name, url);
+  await platform.persistEnvVars(deployDir, { CLOUDCLAW_BASE_URL: url });
 
   // Restart sandbox
   clack.log.step("Restarting sandbox...");
   const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
   if (cronSecret) {
     try {
-      const res = await fetch(`${url}/api/v1/sandbox/restart`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cronSecret}` },
-      });
-      const result = await res.json() as Record<string, unknown>;
+      const api = createApiClient(url, cronSecret);
+      const res = await api.post("/api/v1/sandbox/restart");
+      const result = (await res.json()) as Record<string, unknown>;
       clack.log.success(`Sandbox: ${result.status ?? "ok"}`);
     } catch (err) {
       clack.log.warn("Could not restart sandbox — it will start on first message.");
@@ -488,22 +494,14 @@ async function handleExistingInstance(
   await offerChat(name);
 }
 
-function printSuccess(
-  name: string,
-  url: string,
-  botToken: string | null,
-): void {
+function printSuccess(name: string, url: string, botToken: string | null): void {
   clack.log.success(chalk.bold.green("Deployment successful!"));
   console.log(`  ${chalk.bold("Instance:")} ${chalk.cyan(name)}`);
   console.log(`  ${chalk.bold("URL:")} ${chalk.cyan(url)}`);
   console.log(`  ${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/v1/health`)}`);
 
   if (botToken) {
-    console.log(
-      chalk.dim(
-        "\n  Your agent is live!",
-      ),
-    );
+    console.log(chalk.dim("\n  Your agent is live!"));
   }
 
   clack.outro("Done!");
@@ -530,9 +528,18 @@ export const deploy = command({
   name: "deploy",
   description: "Create or upgrade and deploy an instance",
   args: {
-    nameOrPreset: positional({ type: optional(string), displayName: "name", description: "Instance name or preset" }),
+    nameOrPreset: positional({
+      type: optional(string),
+      displayName: "name",
+      description: "Instance name or preset",
+    }),
     yes,
-    preset: option({ long: "preset", short: "p", type: optional(string), description: "Preset to use" }),
+    preset: option({
+      long: "preset",
+      short: "p",
+      type: optional(string),
+      description: "Preset to use",
+    }),
   },
   async handler({ nameOrPreset, yes, preset }) {
     printBanner();
