@@ -79,6 +79,9 @@ importers:
       '@clawrun/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@clawrun/server':
+        specifier: workspace:*
+        version: link:../server
       '@iarna/toml':
         specifier: ^2.2.5
         version: 2.2.5
