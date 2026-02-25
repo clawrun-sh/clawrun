@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SandboxLifecycleManager, getRuntimeConfig } from "@cloudclaw/runtime";
+import { SandboxLifecycleManager, getRuntimeConfig } from "@clawrun/runtime";
 
 export async function GET() {
   const config = getRuntimeConfig();

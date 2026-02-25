@@ -1,5 +1,5 @@
 {
-  "name": "@cloudclaw/logger",
+  "name": "@clawrun/logger",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -22,7 +22,7 @@
     "consola": "^3.4.0"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }

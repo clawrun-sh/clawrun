@@ -29,14 +29,14 @@ importers:
 
   packages/agent:
     dependencies:
-      '@cloudclaw/logger':
+      '@clawrun/logger':
         specifier: workspace:*
         version: link:../logger
       zeroclaw:
         specifier: workspace:*
         version: link:../zeroclaw
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -48,11 +48,11 @@ importers:
 
   packages/channel:
     dependencies:
-      '@cloudclaw/logger':
+      '@clawrun/logger':
         specifier: workspace:*
         version: link:../logger
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -67,16 +67,16 @@ importers:
       '@clack/prompts':
         specifier: ^0.10.0
         version: 0.10.1
-      '@cloudclaw/agent':
+      '@clawrun/agent':
         specifier: workspace:*
         version: link:../agent
-      '@cloudclaw/channel':
+      '@clawrun/channel':
         specifier: workspace:*
         version: link:../channel
-      '@cloudclaw/logger':
+      '@clawrun/logger':
         specifier: workspace:*
         version: link:../logger
-      '@cloudclaw/runtime':
+      '@clawrun/runtime':
         specifier: workspace:*
         version: link:../runtime
       '@iarna/toml':
@@ -107,7 +107,7 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/iarna__toml':
@@ -126,7 +126,7 @@ importers:
         specifier: ^3.4.0
         version: 3.4.2
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -142,7 +142,7 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -154,13 +154,13 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@cloudclaw/agent':
+      '@clawrun/agent':
         specifier: workspace:*
         version: link:../agent
-      '@cloudclaw/logger':
+      '@clawrun/logger':
         specifier: workspace:*
         version: link:../logger
-      '@cloudclaw/provider':
+      '@clawrun/provider':
         specifier: workspace:*
         version: link:../provider
       '@neondatabase/serverless':
@@ -176,7 +176,7 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -188,19 +188,19 @@ importers:
 
   packages/server:
     dependencies:
-      '@cloudclaw/agent':
+      '@clawrun/agent':
         specifier: workspace:*
         version: link:../agent
-      '@cloudclaw/channel':
+      '@clawrun/channel':
         specifier: workspace:*
         version: link:../channel
-      '@cloudclaw/logger':
+      '@clawrun/logger':
         specifier: workspace:*
         version: link:../logger
-      '@cloudclaw/provider':
+      '@clawrun/provider':
         specifier: workspace:*
         version: link:../provider
-      '@cloudclaw/runtime':
+      '@clawrun/runtime':
         specifier: workspace:*
         version: link:../runtime
       next:
@@ -213,7 +213,7 @@ importers:
         specifier: ^19.0.0
         version: 19.2.4(react@19.2.4)
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/node':
@@ -237,7 +237,7 @@ importers:
         specifier: ^2.2.5
         version: 2.2.5
     devDependencies:
-      '@cloudclaw/tsconfig':
+      '@clawrun/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/iarna__toml':

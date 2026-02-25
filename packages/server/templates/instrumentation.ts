@@ -1,6 +1,6 @@
-import { setupLifecycleHooks } from "@cloudclaw/server/setup";
-import { registerAgent, getRuntimeConfig } from "@cloudclaw/runtime";
-import { createAgent } from "@cloudclaw/agent";
+import { setupLifecycleHooks } from "@clawrun/server/setup";
+import { registerAgent, getRuntimeConfig } from "@clawrun/runtime";
+import { createAgent } from "@clawrun/agent";
 
 export function register() {
   const { agent } = getRuntimeConfig();

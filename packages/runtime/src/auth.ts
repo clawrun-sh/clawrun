@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("auth");
 
@@ -16,15 +16,15 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Require Bearer token auth using CLOUDCLAW_CRON_SECRET.
+ * Require Bearer token auth using CLAWRUN_CRON_SECRET.
  *
  * Returns null on success, or a Response to send back on failure.
  * Fail-closed: returns 500 if the secret env var is not configured.
  */
 export function requireBearerAuth(req: Request): Response | null {
-  const secret = process.env.CLOUDCLAW_CRON_SECRET;
+  const secret = process.env.CLAWRUN_CRON_SECRET;
   if (!secret) {
-    log.error("CLOUDCLAW_CRON_SECRET is not configured — rejecting request");
+    log.error("CLAWRUN_CRON_SECRET is not configured — rejecting request");
     return new Response("Server misconfigured", { status: 500 });
   }
 
@@ -42,19 +42,19 @@ export function requireBearerAuth(req: Request): Response | null {
 }
 
 /**
- * Require sandbox-tier auth using CLOUDCLAW_SANDBOX_SECRET.
+ * Require sandbox-tier auth using CLAWRUN_SANDBOX_SECRET.
  *
  * Used by the sandbox extend loop callback. This secret is injected into the
- * sandbox — keeping it separate from CLOUDCLAW_CRON_SECRET means untrusted agent code
+ * sandbox — keeping it separate from CLAWRUN_CRON_SECRET means untrusted agent code
  * inside the sandbox cannot call admin endpoints (restart, stop).
  *
  * Returns null on success, or a Response to send back on failure.
  * Fail-closed: returns 500 if the secret env var is not configured.
  */
 export function requireSandboxAuth(req: Request): Response | null {
-  const secret = process.env.CLOUDCLAW_SANDBOX_SECRET;
+  const secret = process.env.CLAWRUN_SANDBOX_SECRET;
   if (!secret) {
-    log.error("CLOUDCLAW_SANDBOX_SECRET is not configured — rejecting request");
+    log.error("CLAWRUN_SANDBOX_SECRET is not configured — rejecting request");
     return new Response("Server misconfigured", { status: 500 });
   }
 

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { SandboxProvider, ManagedSandbox } from "@cloudclaw/provider";
-import { getProvider } from "@cloudclaw/provider";
-import type { Agent, AgentResponse } from "@cloudclaw/agent";
+import type { SandboxProvider, ManagedSandbox } from "@clawrun/provider";
+import { getProvider } from "@clawrun/provider";
+import type { Agent, AgentResponse } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 
@@ -32,7 +32,7 @@ export async function runAgent(
   let sandbox: ManagedSandbox | null = null;
 
   try {
-    const snapshotId = process.env.CLOUDCLAW_SANDBOX_SNAPSHOT_ID;
+    const snapshotId = process.env.CLAWRUN_SANDBOX_SNAPSHOT_ID;
     const databaseUrl = getDatabaseUrl();
 
     // Create sandbox

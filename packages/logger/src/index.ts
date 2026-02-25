@@ -3,7 +3,7 @@ import { createConsola, type ConsolaInstance } from "consola";
 const isProd = process.env.NODE_ENV === "production";
 
 const rootLogger = createConsola({
-  level: parseLevel(process.env.CLOUDCLAW_LOG_LEVEL) ?? (isProd ? 3 : 4),
+  level: parseLevel(process.env.CLAWRUN_LOG_LEVEL) ?? (isProd ? 3 : 4),
   fancy: !isProd,
 });
 

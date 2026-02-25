@@ -1,5 +1,5 @@
 {
-  "extends": "@cloudclaw/tsconfig/nextjs.json",
+  "extends": "@clawrun/tsconfig/nextjs.json",
   "compilerOptions": {
     "paths": {
       "@/*": ["./*"]

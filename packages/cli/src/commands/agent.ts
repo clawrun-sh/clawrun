@@ -3,13 +3,13 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { createAgent } from "@cloudclaw/agent";
+import { createAgent } from "@clawrun/agent";
 import { createSandboxClient } from "../sandbox/index.js";
 import { createSandboxHandle } from "../sandbox/handle.js";
 import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { instance } from "../args/instance.js";
-import type { CloudClawConfigWithSecrets } from "../instance/config.js";
+import type { ClawRunConfigWithSecrets } from "../instance/config.js";
 
 /** Resolve the workspace root inside a sandbox by querying $HOME. */
 async function resolveRoot(
@@ -28,14 +28,14 @@ async function resolveRoot(
  */
 export async function startAgentChat(
   instanceName: string,
-  config: CloudClawConfigWithSecrets,
+  config: ClawRunConfigWithSecrets,
 ): Promise<void> {
   const { deployedUrl } = config.instance;
   const { cronSecret } = config.secrets;
   if (!deployedUrl || !cronSecret) {
     console.error(
       chalk.red(
-        `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+        `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       ),
     );
     process.exit(1);
@@ -125,7 +125,7 @@ export const agentCommand = command({
       if (!deployedUrl || !cronSecret) {
         console.error(
           chalk.red(
-            `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+            `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
           ),
         );
         process.exit(1);

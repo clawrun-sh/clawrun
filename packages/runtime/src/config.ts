@@ -20,13 +20,13 @@ let cached: RuntimeConfig | null = null;
 
 export function getRuntimeConfig(): RuntimeConfig {
   if (cached) return cached;
-  const raw = JSON.parse(readFileSync(join(process.cwd(), "cloudclaw.json"), "utf-8"));
+  const raw = JSON.parse(readFileSync(join(process.cwd(), "clawrun.json"), "utf-8"));
   const parsed = cloudClawConfigSchema.parse(raw);
   cached = {
     instance: {
       name: parsed.instance.name,
       provider: parsed.instance.provider,
-      baseUrl: parsed.instance.deployedUrl ?? process.env.CLOUDCLAW_BASE_URL,
+      baseUrl: parsed.instance.deployedUrl ?? process.env.CLAWRUN_BASE_URL,
       sandboxRoot: parsed.instance.sandboxRoot,
     },
     agent: {

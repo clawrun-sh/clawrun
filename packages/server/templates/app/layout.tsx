@@ -1,1 +1,1 @@
-export { default, metadata } from "@cloudclaw/server/pages/layout";
+export { default, metadata } from "@clawrun/server/pages/layout";

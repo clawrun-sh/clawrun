@@ -1,4 +1,4 @@
-import type { CronInfo } from "@cloudclaw/agent";
+import type { CronInfo } from "@clawrun/agent";
 import type { ExtendPayload } from "./lifecycle.js";
 
 /**

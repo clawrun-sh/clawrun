@@ -1,10 +1,10 @@
 {
-  "name": "cloudclaw",
+  "name": "clawrun",
   "version": "0.1.0",
-  "description": "CLI for deploying CloudClaw AI agent hosting",
+  "description": "CLI for deploying ClawRun AI agent hosting",
   "type": "module",
   "bin": {
-    "cloudclaw": "./dist/cli.js"
+    "clawrun": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -16,10 +16,10 @@
     "dist"
   ],
   "dependencies": {
-    "@cloudclaw/agent": "workspace:*",
-    "@cloudclaw/channel": "workspace:*",
-    "@cloudclaw/runtime": "workspace:*",
-    "@cloudclaw/logger": "workspace:*",
+    "@clawrun/agent": "workspace:*",
+    "@clawrun/channel": "workspace:*",
+    "@clawrun/runtime": "workspace:*",
+    "@clawrun/logger": "workspace:*",
     "@clack/prompts": "^0.10.0",
     "@iarna/toml": "^2.2.5",
     "chalk": "^5.4.0",
@@ -32,7 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/iarna__toml": "^2.0.5",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

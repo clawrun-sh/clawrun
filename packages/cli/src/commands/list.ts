@@ -51,7 +51,7 @@ export const list = command({
 
     if (instances.length === 0) {
       console.log(chalk.dim("No instances found."));
-      console.log(chalk.dim("  Create one with: cloudclaw deploy zeroclaw-basic"));
+      console.log(chalk.dim("  Create one with: clawrun deploy zeroclaw-basic"));
       return;
     }
 

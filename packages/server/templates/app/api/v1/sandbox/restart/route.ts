@@ -1,2 +1,2 @@
 export const dynamic = "force-dynamic";
-export { POST } from "@cloudclaw/server/api/sandbox-restart";
+export { POST } from "@clawrun/server/api/sandbox-restart";

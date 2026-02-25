@@ -4,7 +4,7 @@ import { getAllAdapters } from "./registry.js";
  * Extract channel-related env vars from a parsed agent config object.
  *
  * Iterates over all registered wake hook adapters, checks if the agent has
- * that channel configured, and maps the agent's config fields to CloudClaw
+ * that channel configured, and maps the agent's config fields to ClawRun
  * env var names.
  *
  * Generated secrets (webhook verification tokens) are NOT extracted here —
@@ -41,7 +41,7 @@ export function extractChannelEnvVars(
  * Get all generated secret env var names across all adapters.
  *
  * Used by the CLI to know which per-channel secrets to generate.
- * Returns entries like: { envVar: "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET", purpose: "..." }
+ * Returns entries like: { envVar: "CLAWRUN_TELEGRAM_WEBHOOK_SECRET", purpose: "..." }
  */
 export function getChannelSecretDefinitions(): Array<{
   channelId: string;

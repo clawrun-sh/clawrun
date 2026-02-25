@@ -1,5 +1,5 @@
 import { getConfiguredAdapters } from "./registry.js";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("channel");
 
@@ -7,7 +7,7 @@ const log = createLogger("channel");
  * Register wake hooks for all configured programmable-webhook channels.
  *
  * Called when the sandbox stops — each adapter registers its webhook so the
- * platform pushes messages to CloudClaw's endpoint.
+ * platform pushes messages to ClawRun's endpoint.
  *
  * Always-on channels (programmableWebhook === false) are skipped — their
  * webhooks are permanently configured and the handler checks sandbox state.

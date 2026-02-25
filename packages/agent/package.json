@@ -1,7 +1,7 @@
 {
-  "name": "@cloudclaw/agent",
+  "name": "@clawrun/agent",
   "version": "0.1.0",
-  "description": "Abstract Agent interface and adapters for CloudClaw",
+  "description": "Abstract Agent interface and adapters for ClawRun",
   "type": "module",
   "exports": {
     ".": {
@@ -23,11 +23,11 @@
     "format:check": "prettier --check src"
   },
   "dependencies": {
-    "@cloudclaw/logger": "workspace:*",
+    "@clawrun/logger": "workspace:*",
     "zeroclaw": "workspace:*"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }

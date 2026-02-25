@@ -5,11 +5,11 @@ import { run, setDefaultHelpFormatter } from "cmd-ts";
 import { createVercelFormatter } from "cmd-ts/dist/esm/batteries/vercel-formatter.js";
 import { app } from "./app.js";
 import { StyledError } from "./error.js";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("cli");
 
-setDefaultHelpFormatter(createVercelFormatter({ cliName: "CloudClaw", logo: "\u25B8" }));
+setDefaultHelpFormatter(createVercelFormatter({ cliName: "ClawRun", logo: "\u25B8" }));
 
 async function main() {
   try {

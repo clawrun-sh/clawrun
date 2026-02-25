@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "CloudClaw",
+  title: "ClawRun",
   description: "AI agent hosting platform",
 };
 

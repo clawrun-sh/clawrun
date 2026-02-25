@@ -30,8 +30,8 @@ import {
   readConfig,
   generateSecret,
 } from "../instance/index.js";
-import { extractChannelEnvVars, getChannelSecretDefinitions } from "@cloudclaw/channel";
-import { createAgent } from "@cloudclaw/agent";
+import { extractChannelEnvVars, getChannelSecretDefinitions } from "@clawrun/channel";
+import { createAgent } from "@clawrun/agent";
 import { readParsedConfig } from "zeroclaw";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
@@ -39,7 +39,7 @@ import { printBanner } from "../banner.js";
 import { createApiClient } from "../api.js";
 
 function generateInstanceName(): string {
-  return `cloudclaw-${humanId({ separator: "-", capitalize: false })}`;
+  return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
 }
 
 // Default active duration from the Zod schema (600s = 10 min)
@@ -77,7 +77,7 @@ async function handleNewInstance(
     if (presets.length === 1) {
       presetId = presets[0].id;
     } else {
-      console.error(chalk.red("Please specify a preset: cloudclaw deploy <preset>"));
+      console.error(chalk.red("Please specify a preset: clawrun deploy <preset>"));
       console.error(chalk.dim(`  Available: ${presets.map((p) => p.id).join(", ")}`));
       process.exit(1);
     }
@@ -92,7 +92,7 @@ async function handleNewInstance(
     process.exit(1);
   }
 
-  clack.intro(chalk.bold.cyan("CloudClaw Setup"));
+  clack.intro(chalk.bold.cyan("ClawRun Setup"));
 
   // Instance name
   const name = instanceName ?? generateInstanceName();
@@ -192,7 +192,7 @@ async function handleNewInstance(
   if (prevConfigDir !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prevConfigDir;
   else delete process.env.ZEROCLAW_CONFIG_DIR;
 
-  // CloudClaw-specific settings
+  // ClawRun-specific settings
   const activeDuration = defaultActiveDuration;
   const cronSecret = generateSecret();
   const nextAuthSecret = generateSecret();
@@ -217,7 +217,7 @@ async function handleNewInstance(
   }
 
   // Temp dir for integration provisioning
-  const tempDir = join(tmpdir(), `cloudclaw-setup-${name}-${Date.now()}`);
+  const tempDir = join(tmpdir(), `clawrun-setup-${name}-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   platform.writeProjectLink(tempDir, handle);
 
@@ -277,16 +277,16 @@ async function handleNewInstance(
     bundlePaths: preset.bundlePaths,
   });
 
-  // Derive env vars: CloudClaw secrets + agent channel tokens
+  // Derive env vars: ClawRun secrets + agent channel tokens
   const agentConfig = readParsedConfig(agentConfigDir);
   const agentAdapter = createAgent(preset.agent);
   const agentEnv = extractChannelEnvVars(
     agentConfig as Record<string, unknown>,
     agentAdapter.channelsConfigKey,
   );
-  const cloudclawEnv = toEnvVars(config);
+  const clawrunEnv = toEnvVars(config);
   const allEnvVars: Record<string, string> = {
-    ...cloudclawEnv,
+    ...clawrunEnv,
     ...agentEnv,
     ...stateResult.vars,
   };
@@ -309,7 +309,7 @@ async function handleNewInstance(
   // Deploy from .deploy/
   const url = await platform.deploy(deployDir, allEnvVars);
   saveDeployedUrl(name, url);
-  await platform.persistEnvVars(deployDir, { CLOUDCLAW_BASE_URL: url });
+  await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
 
   // Start sandbox
   clack.log.step("Starting sandbox...");
@@ -325,7 +325,7 @@ async function handleNewInstance(
   }
 
   // Success
-  const botToken = allEnvVars["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
+  const botToken = allEnvVars["CLAWRUN_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken);
 
   await offerChat(name);
@@ -350,7 +350,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   // Read config early to determine platform provider
   const existingConfig = readConfig(name);
   if (!existingConfig) {
-    clack.log.error(`No cloudclaw.json found for instance "${name}".`);
+    clack.log.error(`No clawrun.json found for instance "${name}".`);
     process.exit(1);
   }
 
@@ -447,14 +447,14 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   // Re-read config after upgrade (upgradeInstance may modify it on disk)
   const config = readConfig(name);
   if (!config) {
-    clack.log.error(`No cloudclaw.json found for instance "${name}".`);
+    clack.log.error(`No clawrun.json found for instance "${name}".`);
     process.exit(1);
   }
 
   // Copy mirrored files into .deploy/ (picks up updated config.toml)
   copyMirroredFiles(name);
 
-  // Derive env vars: CloudClaw secrets + agent channel tokens
+  // Derive env vars: ClawRun secrets + agent channel tokens
   const agentDir = instanceAgentDir(name);
   const agentConfig = readParsedConfig(agentDir);
   const agentAdapter = createAgent(config.agent.name);
@@ -462,19 +462,19 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
     agentConfig as Record<string, unknown>,
     agentAdapter.channelsConfigKey,
   );
-  const cloudclawEnv = { ...toEnvVars(config), ...agentEnv };
+  const clawrunEnv = { ...toEnvVars(config), ...agentEnv };
 
   // Persist env vars to .deploy/
-  await platform.persistEnvVars(deployDir, cloudclawEnv);
+  await platform.persistEnvVars(deployDir, clawrunEnv);
 
   // Deploy from .deploy/
-  const url = await platform.deploy(deployDir, cloudclawEnv);
+  const url = await platform.deploy(deployDir, clawrunEnv);
   saveDeployedUrl(name, url);
-  await platform.persistEnvVars(deployDir, { CLOUDCLAW_BASE_URL: url });
+  await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
 
   // Restart sandbox
   clack.log.step("Restarting sandbox...");
-  const cronSecret = cloudclawEnv["CLOUDCLAW_CRON_SECRET"];
+  const cronSecret = clawrunEnv["CLAWRUN_CRON_SECRET"];
   if (cronSecret) {
     try {
       const api = createApiClient(url, cronSecret);
@@ -488,7 +488,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   }
 
   // Success
-  const botToken = cloudclawEnv["CLOUDCLAW_TELEGRAM_BOT_TOKEN"];
+  const botToken = clawrunEnv["CLAWRUN_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken ?? null);
 
   await offerChat(name);

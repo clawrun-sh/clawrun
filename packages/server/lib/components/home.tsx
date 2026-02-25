@@ -1,4 +1,4 @@
-import { getRuntimeConfig } from "@cloudclaw/runtime";
+import { getRuntimeConfig } from "@clawrun/runtime";
 
 export default function Home() {
   const config = getRuntimeConfig();
@@ -13,7 +13,7 @@ export default function Home() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <h1>CloudClaw is running.</h1>
+      <h1>ClawRun is running.</h1>
       <p>Agent: {config.agent.name}</p>
     </main>
   );

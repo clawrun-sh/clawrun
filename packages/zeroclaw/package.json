@@ -23,7 +23,7 @@
     "@iarna/toml": "^2.2.5"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/iarna__toml": "^2.0.5",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

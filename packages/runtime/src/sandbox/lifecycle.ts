@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@cloudclaw/provider";
-import { CountBasedRetention, getProvider } from "@cloudclaw/provider";
-import type { Agent, CronInfo } from "@cloudclaw/agent";
+import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
+import { CountBasedRetention, getProvider } from "@clawrun/provider";
+import type { Agent, CronInfo } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 import { getStateStore } from "../storage/state.js";
@@ -10,7 +10,7 @@ import { tryAcquireCreationLock, releaseCreationLock } from "./lock.js";
 import type { StateStore } from "../storage/state-types.js";
 import type { ExtendReason } from "./extend-reasons.js";
 import { GracePeriodReason, FileActivityReason, CronScheduleReason } from "./extend-reasons.js";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("sandbox");
 
@@ -36,17 +36,17 @@ const TTL_BUFFER_MS = 5 * 60 * 1000;
 
 const STATE_NEXT_WAKE_AT = "next_wake_at";
 
-/** Active duration in ms, from cloudclaw.json (default 600s). */
+/** Active duration in ms, from clawrun.json (default 600s). */
 function getActiveDurationMs(): number {
   return getRuntimeConfig().sandbox.activeDuration * 1000;
 }
 
-/** Cron keep-alive window in ms, from cloudclaw.json (default 900s). */
+/** Cron keep-alive window in ms, from clawrun.json (default 900s). */
 function getCronKeepAliveWindowMs(): number {
   return getRuntimeConfig().sandbox.cronKeepAliveWindow * 1000;
 }
 
-/** Cron wake lead time in seconds, from cloudclaw.json (default 60s). */
+/** Cron wake lead time in seconds, from clawrun.json (default 60s). */
 function getCronWakeLeadS(): number {
   return getRuntimeConfig().sandbox.cronWakeLeadTime;
 }
@@ -60,9 +60,9 @@ function readBundledSecretKey(): string {
   return readFileSync(join(process.cwd(), "agent", ".secret_key"), "utf-8").trim();
 }
 
-/** Read the cloudclaw.json content for writing into the sandbox. */
+/** Read the clawrun.json content for writing into the sandbox. */
 function readBundledCloudclawJson(): string {
-  return readFileSync(join(process.cwd(), "cloudclaw.json"), "utf-8");
+  return readFileSync(join(process.cwd(), "clawrun.json"), "utf-8");
 }
 
 export interface SandboxResult {
@@ -569,11 +569,11 @@ export class SandboxLifecycleManager {
       const home = (await homeResult.stdout()).trim();
       const root = `${home}/${sandboxRoot}`;
 
-      // Write cloudclaw.json into the sandbox workspace
-      const cloudclawJson = readBundledCloudclawJson();
+      // Write clawrun.json into the sandbox workspace
+      const clawrunJson = readBundledCloudclawJson();
       await sandbox.runCommand("mkdir", ["-p", root]);
       await sandbox.writeFiles([
-        { path: `${root}/cloudclaw.json`, content: Buffer.from(cloudclawJson) },
+        { path: `${root}/clawrun.json`, content: Buffer.from(clawrunJson) },
       ]);
 
       // Provision agent (binary, config, secret key, .profile)
@@ -602,11 +602,11 @@ export class SandboxLifecycleManager {
    */
   private async startSandboxExtendLoop(sandbox: ManagedSandbox, root: string): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
-    const secret = process.env.CLOUDCLAW_SANDBOX_SECRET;
+    const secret = process.env.CLAWRUN_SANDBOX_SECRET;
     if (!baseUrl || !secret) {
       const missing = [
-        !baseUrl && "baseUrl (set CLOUDCLAW_BASE_URL or deployedUrl in cloudclaw.json)",
-        !secret && "CLOUDCLAW_SANDBOX_SECRET",
+        !baseUrl && "baseUrl (set CLAWRUN_BASE_URL or deployedUrl in clawrun.json)",
+        !secret && "CLAWRUN_SANDBOX_SECRET",
       ].filter(Boolean);
       throw new Error(`Cannot start extend loop — missing: ${missing.join(", ")}`);
     }
@@ -624,7 +624,7 @@ export class SandboxLifecycleManager {
       join(
         process.cwd(),
         "node_modules",
-        "@cloudclaw",
+        "@clawrun",
         "runtime",
         "dist",
         "scripts",

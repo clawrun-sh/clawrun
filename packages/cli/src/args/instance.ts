@@ -12,7 +12,7 @@ const instanceType: Type<string, string> = {
       throw new Error(
         [
           `Instance "${name}" not found.`,
-          `${chalk.bold("hint:")} Use ${chalk.cyan("cloudclaw list")} to see available instances.`,
+          `${chalk.bold("hint:")} Use ${chalk.cyan("clawrun list")} to see available instances.`,
         ].join("\n"),
       );
     }

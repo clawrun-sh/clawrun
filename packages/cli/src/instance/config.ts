@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cloudClawConfigSchema, type CloudClawConfig } from "@cloudclaw/runtime";
+import { cloudClawConfigSchema, type ClawRunConfig } from "@clawrun/runtime";
 export { cloudClawConfigSchema };
-import { getChannelSecretDefinitions } from "@cloudclaw/channel";
+import { getChannelSecretDefinitions } from "@clawrun/channel";
 
 /** Generate a 256-bit base64url secret. */
 export function generateSecret(): string {
@@ -11,14 +11,14 @@ export function generateSecret(): string {
 }
 import { instanceDir } from "./paths.js";
 
-const SCHEMA_URL = "https://cloudclaw.sh/schema.json";
-const CONFIG_FILENAME = "cloudclaw.json";
+const SCHEMA_URL = "https://clawrun.sh/schema.json";
+const CONFIG_FILENAME = "clawrun.json";
 
 // Re-export the shared type and provide a stricter variant for CLI use
 // (CLI configs always have secrets populated).
-export type { CloudClawConfig };
-export type CloudClawConfigWithSecrets = CloudClawConfig & {
-  secrets: NonNullable<CloudClawConfig["secrets"]>;
+export type { ClawRunConfig };
+export type ClawRunConfigWithSecrets = ClawRunConfig & {
+  secrets: NonNullable<ClawRunConfig["secrets"]>;
 };
 
 // --- Builder ---
@@ -40,7 +40,7 @@ export function buildConfig(
     provider?: string;
     bundlePaths?: string[];
   },
-): CloudClawConfigWithSecrets {
+): ClawRunConfigWithSecrets {
   return cloudClawConfigSchema.parse({
     $schema: SCHEMA_URL,
     instance: {
@@ -64,21 +64,21 @@ export function buildConfig(
       webhookSecrets: options.webhookSecrets,
       sandboxSecret: options.sandboxSecret,
     },
-  }) as CloudClawConfigWithSecrets;
+  }) as ClawRunConfigWithSecrets;
 }
 
 // --- Env var derivation ---
 
-/** Derive CloudClaw env vars from a structured config (for .env / Vercel).
+/** Derive ClawRun env vars from a structured config (for .env / Vercel).
  *  Channel env vars (bot tokens, etc.) are NOT included — the caller
  *  extracts those separately via extractChannelEnvVars(). */
-export function toEnvVars(config: CloudClawConfigWithSecrets): Record<string, string> {
+export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, string> {
   const vars: Record<string, string> = {};
 
   // Core secrets
-  vars["CLOUDCLAW_CRON_SECRET"] = config.secrets.cronSecret;
-  vars["CLOUDCLAW_NEXTAUTH_SECRET"] = config.secrets.nextAuthSecret;
-  vars["CLOUDCLAW_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
+  vars["CLAWRUN_CRON_SECRET"] = config.secrets.cronSecret;
+  vars["CLAWRUN_NEXTAUTH_SECRET"] = config.secrets.nextAuthSecret;
+  vars["CLAWRUN_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
 
   // Per-channel webhook secrets
   if (config.secrets.webhookSecrets) {
@@ -108,13 +108,13 @@ export function toEnvVars(config: CloudClawConfigWithSecrets): Record<string, st
 
 // --- I/O ---
 
-/** Return the path to cloudclaw.json for a given instance. */
+/** Return the path to clawrun.json for a given instance. */
 export function configPath(name: string): string {
   return join(instanceDir(name), CONFIG_FILENAME);
 }
 
-/** Read and validate cloudclaw.json for an instance. Returns null if not found. */
-export function readConfig(name: string): CloudClawConfigWithSecrets | null {
+/** Read and validate clawrun.json for an instance. Returns null if not found. */
+export function readConfig(name: string): ClawRunConfigWithSecrets | null {
   const path = configPath(name);
   if (!existsSync(path)) return null;
 
@@ -124,16 +124,16 @@ export function readConfig(name: string): CloudClawConfigWithSecrets | null {
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(
-      `Invalid cloudclaw.json for "${name}":\n${issues}\n` +
-        `Re-run "cloudclaw deploy ${name}" to regenerate it.`,
+      `Invalid clawrun.json for "${name}":\n${issues}\n` +
+        `Re-run "clawrun deploy ${name}" to regenerate it.`,
     );
   }
 
-  return result.data as CloudClawConfigWithSecrets;
+  return result.data as ClawRunConfigWithSecrets;
 }
 
-/** Write cloudclaw.json for an instance. */
-export function writeConfig(name: string, config: CloudClawConfig): void {
+/** Write clawrun.json for an instance. */
+export function writeConfig(name: string, config: ClawRunConfig): void {
   const path = configPath(name);
   writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 }

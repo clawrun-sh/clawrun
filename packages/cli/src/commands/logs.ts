@@ -51,7 +51,7 @@ export const logs = command({
 
     if (!config.instance.deployedUrl) {
       console.error(
-        chalk.red(`Instance "${instanceName}" is not deployed. Run "cloudclaw deploy" first.`),
+        chalk.red(`Instance "${instanceName}" is not deployed. Run "clawrun deploy" first.`),
       );
       process.exit(1);
     }

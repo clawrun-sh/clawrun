@@ -1,4 +1,4 @@
-import type { Agent } from "@cloudclaw/agent";
+import type { Agent } from "@clawrun/agent";
 import { getRuntimeConfig } from "../config.js";
 
 const agents: Record<string, Agent> = {};

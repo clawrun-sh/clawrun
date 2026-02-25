@@ -16,7 +16,7 @@ import type {
   ExtendLoopConfig,
   ProvisionOpts,
 } from "./types.js";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("agent:zeroclaw");
 

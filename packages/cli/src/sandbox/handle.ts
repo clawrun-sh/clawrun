@@ -1,4 +1,4 @@
-import type { SandboxHandle, CommandResult } from "@cloudclaw/agent";
+import type { SandboxHandle, CommandResult } from "@clawrun/agent";
 import type { SandboxClient } from "./types.js";
 
 /**

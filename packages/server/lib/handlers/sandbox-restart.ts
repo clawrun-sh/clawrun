@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireBearerAuth, SandboxLifecycleManager } from "@cloudclaw/runtime";
-import { createLogger } from "@cloudclaw/logger";
+import { requireBearerAuth, SandboxLifecycleManager } from "@clawrun/runtime";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:restart");
 

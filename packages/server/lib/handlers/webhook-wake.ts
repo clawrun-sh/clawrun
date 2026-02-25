@@ -1,6 +1,6 @@
-import { getAdapter } from "@cloudclaw/channel";
-import { SandboxLifecycleManager } from "@cloudclaw/runtime";
-import { createLogger } from "@cloudclaw/logger";
+import { getAdapter } from "@clawrun/channel";
+import { SandboxLifecycleManager } from "@clawrun/runtime";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:webhook");
 

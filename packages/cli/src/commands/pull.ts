@@ -38,7 +38,7 @@ export const pull = command({
     if (!sandboxId) {
       console.error(
         chalk.red(
-          "No running sandbox found. Start one first with a message or `cloudclaw deploy`.",
+          "No running sandbox found. Start one first with a message or `clawrun deploy`.",
         ),
       );
       process.exit(1);

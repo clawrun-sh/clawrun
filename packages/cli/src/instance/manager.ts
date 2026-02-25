@@ -6,7 +6,7 @@ import chalk from "chalk";
 import { execa } from "execa";
 import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
-import type { CloudClawConfig } from "./config.js";
+import type { ClawRunConfig } from "./config.js";
 import { readConfig, writeConfig } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,15 +41,15 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
   const deps: Record<string, string> = {};
 
   // pnpm pack must be run from the workspace root so it can resolve workspace:* deps
-  // Pack in dependency order: zeroclaw and provider first since @cloudclaw/server depends on both
+  // Pack in dependency order: zeroclaw and provider first since @clawrun/server depends on both
   const packages = [
     { name: "zeroclaw", dir: join(root, "packages", "zeroclaw") },
-    { name: "@cloudclaw/agent", dir: join(root, "packages", "agent") },
-    { name: "@cloudclaw/provider", dir: join(root, "packages", "provider") },
-    { name: "@cloudclaw/channel", dir: join(root, "packages", "channel") },
-    { name: "@cloudclaw/runtime", dir: join(root, "packages", "runtime") },
-    { name: "@cloudclaw/logger", dir: join(root, "packages", "logger") },
-    { name: "@cloudclaw/server", dir: join(root, "packages", "server") },
+    { name: "@clawrun/agent", dir: join(root, "packages", "agent") },
+    { name: "@clawrun/provider", dir: join(root, "packages", "provider") },
+    { name: "@clawrun/channel", dir: join(root, "packages", "channel") },
+    { name: "@clawrun/runtime", dir: join(root, "packages", "runtime") },
+    { name: "@clawrun/logger", dir: join(root, "packages", "logger") },
+    { name: "@clawrun/server", dir: join(root, "packages", "server") },
   ];
 
   for (const pkg of packages) {
@@ -67,7 +67,7 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
 }
 
 // Direct dependencies every instance needs for `next build` to succeed.
-// These are transitive deps of @cloudclaw/server but must be available
+// These are transitive deps of @clawrun/server but must be available
 // as top-level deps for Vercel's build step.
 const INSTANCE_PEER_DEPS: Record<string, string> = {
   next: "^16.0.0",
@@ -99,7 +99,7 @@ function writeEnvFile(dir: string, envVars: Record<string, string>): void {
 
 export async function createInstance(
   name: string,
-  config: CloudClawConfig,
+  config: ClawRunConfig,
   envVars: Record<string, string>,
 ): Promise<string> {
   const dir = instanceDir(name);
@@ -108,7 +108,7 @@ export async function createInstance(
   const devMode = isDevMode();
 
   // Tolerate pre-existing dir (wizard may have already created agent/ subdir)
-  if (existsSync(join(dir, "cloudclaw.json"))) {
+  if (existsSync(join(dir, "clawrun.json"))) {
     throw new Error(`Instance "${name}" already exists at ${dir}`);
   }
 
@@ -121,7 +121,7 @@ export async function createInstance(
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(deployDir, { recursive: true });
 
-  // Write cloudclaw.json at instance root (canonical config)
+  // Write clawrun.json at instance root (canonical config)
   writeConfig(name, config);
 
   // Generate .secret_key at agent/ dir (source of truth for agent identity)
@@ -137,12 +137,12 @@ export async function createInstance(
     deps = await packLocalDeps(deployDir);
   } else {
     deps = {
-      "@cloudclaw/agent": "0.1.0",
-      "@cloudclaw/provider": "0.1.0",
-      "@cloudclaw/channel": "0.1.0",
-      "@cloudclaw/logger": "0.1.0",
-      "@cloudclaw/runtime": "0.1.0",
-      "@cloudclaw/server": "0.1.0",
+      "@clawrun/agent": "0.1.0",
+      "@clawrun/provider": "0.1.0",
+      "@clawrun/channel": "0.1.0",
+      "@clawrun/logger": "0.1.0",
+      "@clawrun/runtime": "0.1.0",
+      "@clawrun/server": "0.1.0",
       zeroclaw: "0.1.0",
     };
   }
@@ -164,7 +164,7 @@ export async function createInstance(
     stdio: "inherit",
   });
 
-  // Apply templates from installed @cloudclaw/server into .deploy/
+  // Apply templates from installed @clawrun/server into .deploy/
   console.log(chalk.cyan("\n  Applying templates..."));
   applyTemplates(deployDir);
 
@@ -182,10 +182,10 @@ export function copyMirroredFiles(name: string): void {
   const agentDir = instanceAgentDir(name);
   const deployDir = instanceDeployDir(name);
 
-  // cloudclaw.json
-  const configSrc = join(dir, "cloudclaw.json");
+  // clawrun.json
+  const configSrc = join(dir, "clawrun.json");
   if (existsSync(configSrc)) {
-    writeFileSync(join(deployDir, "cloudclaw.json"), readFileSync(configSrc));
+    writeFileSync(join(deployDir, "clawrun.json"), readFileSync(configSrc));
   }
 
   // agent/config.toml
@@ -216,8 +216,8 @@ export function listInstances(): InstanceMetadata[] {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    // Check for cloudclaw.json at instance root (not package.json)
-    const cfgPath = join(dir, entry.name, "cloudclaw.json");
+    // Check for clawrun.json at instance root (not package.json)
+    const cfgPath = join(dir, entry.name, "clawrun.json");
     if (!existsSync(cfgPath)) continue;
 
     const config = readConfig(entry.name);
@@ -228,7 +228,7 @@ export function listInstances(): InstanceMetadata[] {
     let appVersion = "unknown";
     if (existsSync(deployPkgPath)) {
       const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-      appVersion = pkg.dependencies?.["@cloudclaw/server"] ?? "unknown";
+      appVersion = pkg.dependencies?.["@clawrun/server"] ?? "unknown";
     }
 
     instances.push({
@@ -254,7 +254,7 @@ export function getInstance(name: string): InstanceMetadata | null {
   let appVersion = "unknown";
   if (existsSync(deployPkgPath)) {
     const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-    appVersion = pkg.dependencies?.["@cloudclaw/server"] ?? "unknown";
+    appVersion = pkg.dependencies?.["@clawrun/server"] ?? "unknown";
   }
 
   return {
@@ -267,13 +267,13 @@ export function getInstance(name: string): InstanceMetadata | null {
 }
 
 export function instanceExists(name: string): boolean {
-  return existsSync(join(instanceDir(name), "cloudclaw.json"));
+  return existsSync(join(instanceDir(name), "clawrun.json"));
 }
 
 export function saveDeployedUrl(name: string, url: string): void {
   const config = readConfig(name);
   if (!config) {
-    throw new Error(`No cloudclaw.json found for instance "${name}"`);
+    throw new Error(`No clawrun.json found for instance "${name}"`);
   }
   config.instance.deployedUrl = url;
   writeConfig(name, config);
@@ -336,7 +336,7 @@ export async function upgradeInstance(name: string): Promise<void> {
     stdio: "inherit",
   });
 
-  // Reapply templates from the updated @cloudclaw/server
+  // Reapply templates from the updated @clawrun/server
   console.log(chalk.cyan("\n  Reapplying templates..."));
   applyTemplates(deployDir);
 

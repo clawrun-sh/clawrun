@@ -25,4 +25,4 @@ export { requireBearerAuth, requireSandboxAuth } from "./auth.js";
 export { getRuntimeConfig } from "./config.js";
 export type { RuntimeConfig } from "./config.js";
 export { cloudClawConfigSchema } from "./schema.js";
-export type { CloudClawConfig } from "./schema.js";
+export type { ClawRunConfig } from "./schema.js";

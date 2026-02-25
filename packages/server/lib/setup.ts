@@ -1,5 +1,5 @@
-import { SandboxLifecycleManager } from "@cloudclaw/runtime";
-import { registerWakeHooks, teardownWakeHooks } from "@cloudclaw/channel";
+import { SandboxLifecycleManager } from "@clawrun/runtime";
+import { registerWakeHooks, teardownWakeHooks } from "@clawrun/channel";
 
 export function setupLifecycleHooks(): void {
   SandboxLifecycleManager.setHooks({

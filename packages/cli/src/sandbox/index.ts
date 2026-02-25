@@ -1,4 +1,4 @@
-import type { CloudClawConfig } from "../instance/config.js";
+import type { ClawRunConfig } from "../instance/config.js";
 import { instanceDeployDir } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type { SandboxClient } from "./types.js";
@@ -8,7 +8,7 @@ export type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
 
 const clientFactories: Record<
   string,
-  (instance: string, config: CloudClawConfig) => SandboxClient
+  (instance: string, config: ClawRunConfig) => SandboxClient
 > = {
   vercel: (instance) => {
     const dir = instanceDeployDir(instance);
@@ -17,7 +17,7 @@ const clientFactories: Record<
     if (!handle) {
       throw new Error(
         `No project link found for instance "${instance}". ` +
-          `Re-run "cloudclaw deploy ${instance}" to fix this.`,
+          `Re-run "clawrun deploy ${instance}" to fix this.`,
       );
     }
     return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
@@ -27,7 +27,7 @@ const clientFactories: Record<
 /**
  * Create a SandboxClient for the given instance based on its configured provider.
  */
-export function createSandboxClient(instance: string, config: CloudClawConfig): SandboxClient {
+export function createSandboxClient(instance: string, config: ClawRunConfig): SandboxClient {
   const { provider } = config.instance;
 
   const factory = clientFactories[provider];

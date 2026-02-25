@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { WakeHookAdapter, WakeSignal, AuthResult, ChannelEnvMapping } from "../types.js";
-import { createLogger } from "@cloudclaw/logger";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("channel:telegram");
 
@@ -15,18 +15,18 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
   readonly envMapping: ChannelEnvMapping = {
     channelId: "telegram",
     configKey: "telegram",
-    fields: [{ configField: "bot_token", envVar: "CLOUDCLAW_TELEGRAM_BOT_TOKEN" }],
+    fields: [{ configField: "bot_token", envVar: "CLAWRUN_TELEGRAM_BOT_TOKEN" }],
     generatedSecrets: [
-      { envVar: "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET", purpose: "webhook request verification" },
+      { envVar: "CLAWRUN_TELEGRAM_WEBHOOK_SECRET", purpose: "webhook request verification" },
     ],
   };
 
   private get token(): string | undefined {
-    return process.env.CLOUDCLAW_TELEGRAM_BOT_TOKEN;
+    return process.env.CLAWRUN_TELEGRAM_BOT_TOKEN;
   }
 
   private get webhookSecret(): string | undefined {
-    return process.env.CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET;
+    return process.env.CLAWRUN_TELEGRAM_WEBHOOK_SECRET;
   }
 
   isConfigured(): boolean {
@@ -39,7 +39,7 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
 
     const secret = this.webhookSecret;
     if (!secret) {
-      log.warn("CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET not set — skipping webhook registration");
+      log.warn("CLAWRUN_TELEGRAM_WEBHOOK_SECRET not set — skipping webhook registration");
       return;
     }
 
@@ -68,7 +68,7 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
   async verifyRequest(req: Request, _body: Buffer): Promise<AuthResult> {
     const secret = this.webhookSecret;
     if (!secret) {
-      log.error("CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET is not configured — rejecting request");
+      log.error("CLAWRUN_TELEGRAM_WEBHOOK_SECRET is not configured — rejecting request");
       return { valid: false, error: "Server misconfigured" };
     }
 

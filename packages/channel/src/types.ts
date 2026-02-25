@@ -18,10 +18,10 @@ export interface WakeSignal {
 }
 
 /**
- * Maps an agent's channel configuration to CloudClaw env vars.
+ * Maps an agent's channel configuration to ClawRun env vars.
  *
  * Used by the CLI to extract tokens from the agent's config.toml (via napi)
- * and surface them as CLOUDCLAW_* env vars for the deployed app.
+ * and surface them as CLAWRUN_* env vars for the deployed app.
  */
 export interface ChannelEnvMapping {
   channelId: string;
@@ -30,11 +30,11 @@ export interface ChannelEnvMapping {
   /** Fields to extract: configField -> envVar name */
   fields: Array<{
     configField: string; // e.g. "bot_token"
-    envVar: string; // e.g. "CLOUDCLAW_TELEGRAM_BOT_TOKEN"
+    envVar: string; // e.g. "CLAWRUN_TELEGRAM_BOT_TOKEN"
   }>;
   /** Auto-generated secrets (not from agent config) */
   generatedSecrets: Array<{
-    envVar: string; // e.g. "CLOUDCLAW_TELEGRAM_WEBHOOK_SECRET"
+    envVar: string; // e.g. "CLAWRUN_TELEGRAM_WEBHOOK_SECRET"
     purpose: string; // human-readable, e.g. "webhook request verification"
   }>;
 }

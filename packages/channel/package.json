@@ -1,7 +1,7 @@
 {
-  "name": "@cloudclaw/channel",
+  "name": "@clawrun/channel",
   "version": "0.1.0",
-  "description": "Wake hook adapters for CloudClaw messaging channels",
+  "description": "Wake hook adapters for ClawRun messaging channels",
   "type": "module",
   "exports": {
     ".": {
@@ -19,10 +19,10 @@
     "format:check": "prettier --check src"
   },
   "dependencies": {
-    "@cloudclaw/logger": "workspace:*"
+    "@clawrun/logger": "workspace:*"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }

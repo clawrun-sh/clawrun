@@ -328,8 +328,8 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   async persistEnvVars(dir: string, vars: Record<string, string>): Promise<void> {
     // Vercel Cron requires CRON_SECRET (exact name) to set the Authorization header
-    if (vars["CLOUDCLAW_CRON_SECRET"] && !vars["CRON_SECRET"]) {
-      vars = { ...vars, CRON_SECRET: vars["CLOUDCLAW_CRON_SECRET"] };
+    if (vars["CLAWRUN_CRON_SECRET"] && !vars["CRON_SECRET"]) {
+      vars = { ...vars, CRON_SECRET: vars["CLAWRUN_CRON_SECRET"] };
     }
 
     const entries = Object.entries(vars);

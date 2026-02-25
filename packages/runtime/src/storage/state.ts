@@ -15,10 +15,10 @@ function getRedisClient(): RedisClient | null {
   return _redisClient;
 }
 
-/** Key prefix for multi-instance isolation: "cloudclaw:{instance}:" */
+/** Key prefix for multi-instance isolation: "clawrun:{instance}:" */
 function getKeyPrefix(): string {
   const instance = getRuntimeConfig().instance.name;
-  return `cloudclaw:${instance}:`;
+  return `clawrun:${instance}:`;
 }
 
 export function getStateStore(): StateStore | null {

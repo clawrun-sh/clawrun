@@ -1,5 +1,5 @@
 {
-  "name": "@cloudclaw/server",
+  "name": "@clawrun/server",
   "version": "0.1.2",
   "type": "module",
   "scripts": {
@@ -61,17 +61,17 @@
     "package.json"
   ],
   "dependencies": {
-    "@cloudclaw/agent": "workspace:*",
-    "@cloudclaw/channel": "workspace:*",
-    "@cloudclaw/logger": "workspace:*",
-    "@cloudclaw/provider": "workspace:*",
-    "@cloudclaw/runtime": "workspace:*",
+    "@clawrun/agent": "workspace:*",
+    "@clawrun/channel": "workspace:*",
+    "@clawrun/logger": "workspace:*",
+    "@clawrun/provider": "workspace:*",
+    "@clawrun/runtime": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@cloudclaw/tsconfig": "workspace:*",
+    "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

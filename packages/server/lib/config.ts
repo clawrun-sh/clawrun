@@ -7,20 +7,20 @@ import type { NextConfig } from "next";
 // agent registry and config cache.
 const externalPackages = [
   "@vercel/sandbox",
-  "@cloudclaw/runtime",
-  "@cloudclaw/agent",
-  "@cloudclaw/channel",
-  "@cloudclaw/provider",
-  "@cloudclaw/logger",
+  "@clawrun/runtime",
+  "@clawrun/agent",
+  "@clawrun/channel",
+  "@clawrun/provider",
+  "@clawrun/logger",
 ];
 
 export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   const monorepoRoot = join(process.cwd(), "../..");
   const isMonorepo = existsSync(join(monorepoRoot, "pnpm-workspace.yaml"));
 
-  // Read agent bundle paths from cloudclaw.json (written by CLI at deploy time).
+  // Read agent bundle paths from clawrun.json (written by CLI at deploy time).
   let agentBundlePaths: string[] = [];
-  const configPath = join(process.cwd(), "cloudclaw.json");
+  const configPath = join(process.cwd(), "clawrun.json");
   if (existsSync(configPath)) {
     const raw = JSON.parse(readFileSync(configPath, "utf-8"));
     agentBundlePaths = raw.agent?.bundlePaths ?? [];
@@ -29,10 +29,10 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   const resolvedAgentPaths = agentBundlePaths.map((p) => `./${p}`);
 
   // Config files that must be bundled with every function.
-  const configPaths = ["./cloudclaw.json", "./agent/config.toml", "./agent/.secret_key"];
+  const configPaths = ["./clawrun.json", "./agent/config.toml", "./agent/.secret_key"];
 
   // Extend-loop script injected into sandbox for keep-alive reporting.
-  const extendLoopPaths = ["./node_modules/@cloudclaw/runtime/dist/scripts/extend-loop.js"];
+  const extendLoopPaths = ["./node_modules/@clawrun/runtime/dist/scripts/extend-loop.js"];
 
   const allPaths = [...resolvedAgentPaths, ...configPaths, ...extendLoopPaths];
 

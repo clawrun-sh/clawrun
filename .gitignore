@@ -16,7 +16,7 @@ dist/
 .vercel/
 
 # Scaffolded deploy directories
-cloudclaw-*/
+clawrun-*/
 
 # OS files
 .DS_Store

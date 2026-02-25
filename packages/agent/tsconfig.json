@@ -1,5 +1,5 @@
 {
-  "extends": "@cloudclaw/tsconfig/base.json",
+  "extends": "@clawrun/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src"

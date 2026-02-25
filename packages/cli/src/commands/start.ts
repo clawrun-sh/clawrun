@@ -23,7 +23,7 @@ export const start = command({
     if (!deployedUrl || !cronSecret) {
       console.error(
         chalk.red(
-          `Instance "${instanceName}" is not fully deployed. Run "cloudclaw deploy ${instanceName}" first.`,
+          `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
         ),
       );
       process.exit(1);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireSandboxAuth, SandboxLifecycleManager } from "@cloudclaw/runtime";
-import type { ExtendPayload } from "@cloudclaw/runtime";
-import { createLogger } from "@cloudclaw/logger";
+import { requireSandboxAuth, SandboxLifecycleManager } from "@clawrun/runtime";
+import type { ExtendPayload } from "@clawrun/runtime";
+import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:sandbox-hb");
 

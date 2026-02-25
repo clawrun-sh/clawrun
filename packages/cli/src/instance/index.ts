@@ -1,5 +1,5 @@
 export {
-  cloudclawHome,
+  clawrunHome,
   instancesDir,
   instanceDir,
   instanceAgentDir,
@@ -26,4 +26,4 @@ export {
   writeConfig,
   generateSecret,
 } from "./config.js";
-export type { CloudClawConfig, CloudClawConfigWithSecrets } from "./config.js";
+export type { ClawRunConfig, ClawRunConfigWithSecrets } from "./config.js";

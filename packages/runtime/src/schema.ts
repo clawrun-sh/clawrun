@@ -14,7 +14,7 @@ export const cloudClawConfigSchema = z.object({
     preset: z.string().optional(),
     provider: z.string(),
     deployedUrl: z.string().optional(),
-    sandboxRoot: z.string().default(".cloudclaw"),
+    sandboxRoot: z.string().default(".clawrun"),
   }),
   agent: z.object({
     name: z.string(),
@@ -37,4 +37,4 @@ export const cloudClawConfigSchema = z.object({
   state: stateSchema.optional(),
 });
 
-export type CloudClawConfig = z.infer<typeof cloudClawConfigSchema>;
+export type ClawRunConfig = z.infer<typeof cloudClawConfigSchema>;
