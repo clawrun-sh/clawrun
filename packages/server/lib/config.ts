@@ -33,12 +33,7 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
 
   // Sidecar scripts injected into sandbox (daemon supervisor + heartbeat + health).
   const sidecarPaths = [
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/index.js",
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/types.js",
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/health.js",
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/supervisor.js",
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/heartbeat.js",
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/mtime.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/*",
   ];
 
   const allPaths = [...resolvedAgentPaths, ...configPaths, ...sidecarPaths];

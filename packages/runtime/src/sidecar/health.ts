@@ -5,7 +5,7 @@ export function startHealthServer(config: SidecarConfig, state: SidecarState): v
   const server = createServer((req, res) => {
     if (req.url === "/health" || req.url === "/") {
       const body = JSON.stringify({
-        ok: state.daemonStatus === "running" || state.daemonStatus === "starting",
+        ok: state.daemonStatus === "running",
         daemon: {
           status: state.daemonStatus,
           pid: state.daemonPid,

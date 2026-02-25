@@ -92,6 +92,10 @@ export interface ExtendPayload {
   sandboxCreatedAt?: number;
   /** Workspace root inside the sandbox. */
   root: string;
+  /** Daemon status reported by sidecar supervisor. */
+  daemonStatus?: string;
+  /** Number of daemon restarts since last stable reset. */
+  daemonRestarts?: number;
 }
 
 export interface ExtendResult {
@@ -141,8 +145,8 @@ export class SandboxLifecycleManager {
     return this.provider.list();
   }
 
-  private isTerminal(s: SandboxInfo): boolean {
-    return s.status === "stopped" || s.status === "failed" || s.status === "aborted";
+  private isActive(s: SandboxInfo): boolean {
+    return s.status === "running" || s.status === "pending";
   }
 
   /** Stop the given sandboxes. Re-fetches each to get current status. */
@@ -260,7 +264,7 @@ export class SandboxLifecycleManager {
     const now = Date.now();
 
     // Find all non-terminal sandboxes
-    const active = sandboxes.filter((s) => !this.isTerminal(s));
+    const active = sandboxes.filter((s) => this.isActive(s));
 
     // RUNNING SANDBOX: extend loop owns keep-alive decisions
     if (active.length > 0) {
@@ -288,7 +292,7 @@ export class SandboxLifecycleManager {
             ` (nextCronAt=${nextWakeAtStr}, in ${secsUntilCron}s,` +
             ` lead=${cronWakeLeadS}s)`,
         );
-        return this.startNew(sandboxes);
+        return this.startNew();
       }
 
       // Not yet time — log and fall through to sleeping
@@ -301,7 +305,7 @@ export class SandboxLifecycleManager {
       const hasEverRun = sandboxes.some((s) => s.stoppedAt || s.status === "running");
       if (!hasEverRun && sandboxes.length === 0) {
         log.info("Heartbeat: action=wake, reason=first boot");
-        return this.startNew(sandboxes);
+        return this.startNew();
       }
 
       log.info(`Heartbeat: action=none, reason=sleeping (no cron scheduled)`);
@@ -327,7 +331,7 @@ export class SandboxLifecycleManager {
    */
   async wake(): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
-    const active = sandboxes.filter((s) => !this.isTerminal(s));
+    const active = sandboxes.filter((s) => this.isActive(s));
 
     if (active.length > 0) {
       const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -335,7 +339,7 @@ export class SandboxLifecycleManager {
     }
 
     log.info("Wake: no active sandbox, starting one");
-    return this.startNew(sandboxes);
+    return this.startNew();
   }
 
   /**
@@ -358,6 +362,20 @@ export class SandboxLifecycleManager {
 
     if (sandbox.status !== "running") {
       return { action: "error", error: `Sandbox not running (status: ${sandbox.status})` };
+    }
+
+    // Daemon is dead and supervisor gave up — no point extending
+    if (payload.daemonStatus === "failed") {
+      log.error(
+        `Daemon failed in sandbox ${payload.sandboxId} (${payload.daemonRestarts} restarts), stopping`,
+      );
+      try {
+        await this.snapshotAndStop(payload.sandboxId);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { action: "error", error: `Daemon failed, snapshot failed: ${msg}` };
+      }
+      return { action: "stopped" };
     }
 
     const now = Date.now();
@@ -446,9 +464,13 @@ export class SandboxLifecycleManager {
       return { action: "error", error: `Snapshot failed, sandbox kept running: ${msg}` };
     }
 
-    // Only register wake hooks if no new sandbox was created during our stop.
-    const freshActive = (await this.listSandboxes()).filter((s) => !this.isTerminal(s));
-    if (freshActive.length === 0) {
+    // Register wake hooks unless a NEW sandbox was created during our stop.
+    // Exclude the sandbox we just stopped — the list API may still report it
+    // as "running" due to eventual consistency.
+    const otherActive = (await this.listSandboxes()).filter(
+      (s) => s.id !== payload.sandboxId && this.isActive(s),
+    );
+    if (otherActive.length === 0) {
       try {
         await this.registerWakeHooks();
       } catch (err) {
@@ -456,6 +478,11 @@ export class SandboxLifecycleManager {
         log.error(`handleExtend: wake hook registration failed: ${msg}`);
         return { action: "error", error: `Sandbox stopped but wake hooks failed: ${msg}` };
       }
+    } else {
+      log.info(
+        `Skipping wake hooks: ${otherActive.length} other active sandbox(es)` +
+          ` (${otherActive.map((s) => `${s.id}:${s.status}`).join(", ")})`,
+      );
     }
 
     return { action: "stopped", nextWakeAt: nextCronAt ?? undefined };
@@ -469,7 +496,7 @@ export class SandboxLifecycleManager {
 
     try {
       const sandboxes = await this.listSandboxes();
-      const active = sandboxes.filter((s) => !this.isTerminal(s));
+      const active = sandboxes.filter((s) => this.isActive(s));
 
       if (active.length > 0) {
         const sorted = [...active].sort((a, b) => b.createdAt - a.createdAt);
@@ -485,7 +512,7 @@ export class SandboxLifecycleManager {
         }
       }
 
-      return await this.startNewLocked(sandboxes);
+      return await this.startNewLocked();
     } finally {
       await releaseCreationLock(nonce);
     }
@@ -497,7 +524,7 @@ export class SandboxLifecycleManager {
    */
   async gracefulStop(): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
-    const active = sandboxes.filter((s) => !this.isTerminal(s));
+    const active = sandboxes.filter((s) => this.isActive(s));
 
     if (active.length === 0) {
       // No active sandbox — still register wake hooks in case the sandbox
@@ -565,13 +592,13 @@ export class SandboxLifecycleManager {
     return { running: false };
   }
 
-  private async startNew(_sandboxes: SandboxInfo[]): Promise<SandboxResult> {
+  private async startNew(): Promise<SandboxResult> {
     const nonce = await tryAcquireCreationLock();
     if (!nonce) {
       // Another caller is creating — wait briefly and re-check
       await new Promise((r) => setTimeout(r, 5_000));
       const fresh = await this.listSandboxes();
-      const active = fresh.filter((s) => !this.isTerminal(s));
+      const active = fresh.filter((s) => this.isActive(s));
       if (active.length > 0) {
         const newest = [...active].sort((a, b) => b.createdAt - a.createdAt)[0];
         return { status: "running", sandboxId: newest.id };
@@ -580,13 +607,13 @@ export class SandboxLifecycleManager {
     }
 
     try {
-      return await this.startNewLocked(_sandboxes);
+      return await this.startNewLocked();
     } finally {
       await releaseCreationLock(nonce);
     }
   }
 
-  private async startNewLocked(_sandboxes: SandboxInfo[]): Promise<SandboxResult> {
+  private async startNewLocked(): Promise<SandboxResult> {
     try {
       let sandbox: ManagedSandbox | null = null;
 

@@ -25,11 +25,18 @@ async function heartbeatTick(
         lastChangedAt: state.lastChangedAt,
         sandboxCreatedAt: state.createdAt,
         root: config.root,
+        daemonStatus: state.daemonStatus,
+        daemonRestarts: state.daemonRestarts,
       }),
     });
-    state.lastHeartbeatSuccess = true;
+    if (res.ok) {
+      state.lastHeartbeatSuccess = true;
+      console.log("[sidecar:heartbeat]", await res.text());
+    } else {
+      state.lastHeartbeatSuccess = false;
+      console.error(`[sidecar:heartbeat] HTTP ${res.status}:`, await res.text());
+    }
     state.lastHeartbeatTick = Date.now();
-    console.log("[sidecar:heartbeat]", await res.text());
   } catch (err: unknown) {
     state.lastHeartbeatSuccess = false;
     state.lastHeartbeatTick = Date.now();

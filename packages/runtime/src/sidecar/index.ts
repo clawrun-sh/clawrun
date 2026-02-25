@@ -49,11 +49,11 @@ function main(): void {
   const heartbeat = startHeartbeat(config, state);
 
   // Graceful shutdown — stop restarting daemon, drain heartbeat, exit
-  process.on("SIGTERM", () => {
+  process.on("SIGTERM", async () => {
     console.log("[sidecar] SIGTERM received, shutting down");
-    supervisor.shutdown();
     heartbeat.stop();
-    setTimeout(() => process.exit(0), 1000);
+    await supervisor.shutdown();
+    process.exit(0);
   });
 }
 

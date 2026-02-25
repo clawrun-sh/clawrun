@@ -5,6 +5,7 @@ import type { SidecarConfig, SidecarState } from "./types.js";
 const MAX_RESTARTS = 5;
 const RESTART_DELAY_MS = 2000;
 const PROBE_INTERVAL_MS = 500;
+const STABLE_RESET_MS = 60_000;
 
 /** Try a TCP connect to port. Resolves true if the port accepts connections. */
 function probePort(port: number): Promise<boolean> {
@@ -26,7 +27,10 @@ function probePort(port: number): Promise<boolean> {
   });
 }
 
-export function superviseDaemon(config: SidecarConfig, state: SidecarState): { shutdown(): void } {
+export function superviseDaemon(
+  config: SidecarConfig,
+  state: SidecarState,
+): { shutdown(): Promise<void> } {
   let shuttingDown = false;
   let currentChild: ReturnType<typeof spawn> | null = null;
 
@@ -70,6 +74,12 @@ export function superviseDaemon(config: SidecarConfig, state: SidecarState): { s
         if (await probePort(config.daemon.port)) {
           if (state.daemonStatus === "starting") {
             state.daemonStatus = "running";
+            // Reset restart counter after stable running
+            setTimeout(() => {
+              if (state.daemonStatus === "running" && state.daemonPid === child.pid) {
+                state.daemonRestarts = 0;
+              }
+            }, STABLE_RESET_MS);
             console.log(
               `[sidecar:supervisor] daemon running` +
                 ` (pid=${state.daemonPid}, port=${config.daemon.port}, ready in ${Date.now() - start}ms)`,
@@ -117,11 +127,17 @@ export function superviseDaemon(config: SidecarConfig, state: SidecarState): { s
   launch();
 
   return {
-    shutdown() {
+    shutdown(): Promise<void> {
       shuttingDown = true;
-      if (currentChild) {
-        currentChild.kill("SIGTERM");
-      }
+      if (!currentChild) return Promise.resolve();
+      return new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 5000);
+        currentChild!.on("exit", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        currentChild!.kill("SIGTERM");
+      });
     },
   };
 }
