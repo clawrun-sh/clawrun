@@ -6,23 +6,21 @@ import { VercelSandboxClient } from "./vercel.js";
 
 export type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
 
-const clientFactories: Record<
-  string,
-  (instance: string, config: ClawRunConfig) => SandboxClient
-> = {
-  vercel: (instance) => {
-    const dir = instanceDeployDir(instance);
-    const platform = getPlatformProvider("vercel");
-    const handle = platform.readProjectLink(dir);
-    if (!handle) {
-      throw new Error(
-        `No project link found for instance "${instance}". ` +
-          `Re-run "clawrun deploy ${instance}" to fix this.`,
-      );
-    }
-    return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
-  },
-};
+const clientFactories: Record<string, (instance: string, config: ClawRunConfig) => SandboxClient> =
+  {
+    vercel: (instance) => {
+      const dir = instanceDeployDir(instance);
+      const platform = getPlatformProvider("vercel");
+      const handle = platform.readProjectLink(dir);
+      if (!handle) {
+        throw new Error(
+          `No project link found for instance "${instance}". ` +
+            `Re-run "clawrun deploy ${instance}" to fix this.`,
+        );
+      }
+      return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
+    },
+  };
 
 /**
  * Create a SandboxClient for the given instance based on its configured provider.

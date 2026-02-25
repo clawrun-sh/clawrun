@@ -1,12 +1,14 @@
 {
   "name": "zeroclaw-napi-linux-x64-gnu",
   "version": "0.0.1",
-  "private": true,
   "os": [
     "linux"
   ],
   "cpu": [
     "x64"
   ],
-  "main": "zeroclaw-napi.linux-x64-gnu.node"
+  "main": "zeroclaw-napi.linux-x64-gnu.node",
+  "files": [
+    "zeroclaw-napi.linux-x64-gnu.node"
+  ]
 }

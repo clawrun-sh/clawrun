@@ -37,9 +37,7 @@ export const pull = command({
     const sandboxId = await getRunningId(client);
     if (!sandboxId) {
       console.error(
-        chalk.red(
-          "No running sandbox found. Start one first with a message or `clawrun deploy`.",
-        ),
+        chalk.red("No running sandbox found. Start one first with a message or `clawrun deploy`."),
       );
       process.exit(1);
     }
