@@ -1,36 +1,72 @@
 {
   "name": "@cloudclaw/server",
   "version": "0.1.2",
+  "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsc -p tsconfig.lib.json && next build",
     "start": "next start",
     "lint": "eslint lib",
     "format:check": "prettier --check lib"
   },
   "exports": {
-    "./api/health": "./lib/handlers/health.ts",
-    "./api/webhook-wake": "./lib/handlers/webhook-wake.ts",
-    "./api/heartbeat": "./lib/handlers/heartbeat.ts",
-    "./api/sandbox-heartbeat": "./lib/handlers/sandbox-heartbeat.ts",
-    "./api/sandbox-restart": "./lib/handlers/sandbox-restart.ts",
-    "./api/sandbox-start": "./lib/handlers/sandbox-start.ts",
-    "./api/sandbox-stop": "./lib/handlers/sandbox-stop.ts",
-    "./pages/home": "./lib/components/home.tsx",
-    "./pages/layout": "./lib/components/root-layout.tsx",
-    "./config": "./lib/config.ts",
-    "./setup": "./lib/setup.ts"
+    "./api/health": {
+      "types": "./dist/handlers/health.d.ts",
+      "default": "./dist/handlers/health.js"
+    },
+    "./api/webhook-wake": {
+      "types": "./dist/handlers/webhook-wake.d.ts",
+      "default": "./dist/handlers/webhook-wake.js"
+    },
+    "./api/heartbeat": {
+      "types": "./dist/handlers/heartbeat.d.ts",
+      "default": "./dist/handlers/heartbeat.js"
+    },
+    "./api/sandbox-heartbeat": {
+      "types": "./dist/handlers/sandbox-heartbeat.d.ts",
+      "default": "./dist/handlers/sandbox-heartbeat.js"
+    },
+    "./api/sandbox-restart": {
+      "types": "./dist/handlers/sandbox-restart.d.ts",
+      "default": "./dist/handlers/sandbox-restart.js"
+    },
+    "./api/sandbox-start": {
+      "types": "./dist/handlers/sandbox-start.d.ts",
+      "default": "./dist/handlers/sandbox-start.js"
+    },
+    "./api/sandbox-stop": {
+      "types": "./dist/handlers/sandbox-stop.d.ts",
+      "default": "./dist/handlers/sandbox-stop.js"
+    },
+    "./pages/home": {
+      "types": "./dist/components/home.d.ts",
+      "default": "./dist/components/home.js"
+    },
+    "./pages/layout": {
+      "types": "./dist/components/root-layout.d.ts",
+      "default": "./dist/components/root-layout.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./setup": {
+      "types": "./dist/setup.d.ts",
+      "default": "./dist/setup.js"
+    }
   },
   "files": [
-    "lib",
+    "dist",
     "templates",
     "package.json"
   ],
   "dependencies": {
+    "@cloudclaw/agent": "workspace:*",
     "@cloudclaw/channel": "workspace:*",
     "@cloudclaw/logger": "workspace:*",
+    "@cloudclaw/provider": "workspace:*",
     "@cloudclaw/runtime": "workspace:*",
-    "next": "^15.1.0",
+    "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

@@ -1,1 +1,2 @@
-export { dynamic, POST } from "@/lib/handlers/sandbox-stop";
+export const dynamic = "force-dynamic";
+export { POST } from "@/lib/handlers/sandbox-stop";

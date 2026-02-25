@@ -3,33 +3,8 @@
   "regions": ["iad1"],
   "crons": [{ "path": "/api/v1/heartbeat", "schedule": "* * * * *" }],
   "functions": {
-    "app/api/v1/health/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/webhook/[channel]/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/heartbeat/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/sandbox/restart/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/sandbox/start/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/sandbox/stop/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
-    },
-    "app/api/v1/sandbox/heartbeat/route.ts": {
-      "maxDuration": 60,
-      "includeFiles": "{cloudclaw.json,agent/config.toml,agent/.secret_key}"
+    "app/api/v1/**/*.ts": {
+      "maxDuration": 60
     }
   }
 }

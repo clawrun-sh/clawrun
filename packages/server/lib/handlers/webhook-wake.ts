@@ -1,6 +1,3 @@
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-
 import { getAdapter } from "@cloudclaw/channel";
 import { SandboxLifecycleManager } from "@cloudclaw/runtime";
 import { createLogger } from "@cloudclaw/logger";

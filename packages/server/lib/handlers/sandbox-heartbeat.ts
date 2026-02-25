@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { requireSandboxAuth, SandboxLifecycleManager } from "@cloudclaw/runtime";
 import type { ExtendPayload } from "@cloudclaw/runtime";

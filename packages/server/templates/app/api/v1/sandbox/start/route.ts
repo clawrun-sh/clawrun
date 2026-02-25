@@ -1,1 +1,2 @@
-export { dynamic, POST } from "@cloudclaw/server/api/sandbox-start";
+export const dynamic = "force-dynamic";
+export { POST } from "@cloudclaw/server/api/sandbox-start";

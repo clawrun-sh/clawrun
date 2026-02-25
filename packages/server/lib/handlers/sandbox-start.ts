@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { requireBearerAuth, SandboxLifecycleManager } from "@cloudclaw/runtime";
 import { createLogger } from "@cloudclaw/logger";

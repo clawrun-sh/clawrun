@@ -1,1 +1,2 @@
-export { dynamic, GET } from "@cloudclaw/server/api/heartbeat";
+export const dynamic = "force-dynamic";
+export { GET } from "@cloudclaw/server/api/heartbeat";

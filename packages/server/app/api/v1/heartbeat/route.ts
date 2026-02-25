@@ -1,1 +1,2 @@
-export { dynamic, GET } from "@/lib/handlers/heartbeat";
+export const dynamic = "force-dynamic";
+export { GET } from "@/lib/handlers/heartbeat";

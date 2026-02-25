@@ -70,7 +70,7 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
 // These are transitive deps of @cloudclaw/server but must be available
 // as top-level deps for Vercel's build step.
 const INSTANCE_PEER_DEPS: Record<string, string> = {
-  next: "^15.1.0",
+  next: "^16.0.0",
   react: "^19.0.0",
   "react-dom": "^19.0.0",
   typescript: "^5.7.0",
@@ -297,11 +297,11 @@ export async function upgradeInstance(name: string): Promise<void> {
     console.log(chalk.cyan("  Repacking local packages...\n"));
     const deps = await packLocalDeps(deployDir);
 
-    // Update package.json with new tarball paths
+    // Update package.json with new tarball paths and current peer deps
     const pkgPath = join(deployDir, "package.json");
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-      Object.assign(pkg.dependencies, deps);
+      Object.assign(pkg.dependencies, INSTANCE_PEER_DEPS, deps);
       writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
     }
   }

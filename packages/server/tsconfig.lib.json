@@ -1,0 +1,12 @@
+{
+  "extends": "@cloudclaw/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./lib",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx"
+  },
+  "include": ["lib"],
+  "exclude": ["node_modules", "dist"]
+}
