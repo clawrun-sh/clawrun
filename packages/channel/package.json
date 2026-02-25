@@ -2,6 +2,14 @@
   "name": "@clawrun/channel",
   "version": "0.1.0",
   "description": "Wake hook adapters for ClawRun messaging channels",
+  "license": "Apache-2.0",
+  "author": "Afshin Mehrabani",
+  "homepage": "https://clawrun.sh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clawrun-sh/clawrun.git",
+    "directory": "packages/channel"
+  },
   "type": "module",
   "exports": {
     ".": {
