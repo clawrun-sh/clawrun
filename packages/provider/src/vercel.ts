@@ -60,12 +60,17 @@ class VercelManagedSandbox implements ManagedSandbox {
   extendTimeout(ms: number): Promise<void> {
     return this.sandbox.extendTimeout(ms);
   }
+
+  domain(port: number): string {
+    return this.sandbox.domain(port);
+  }
 }
 
 export class VercelSandboxProvider implements SandboxProvider {
   async create(opts: CreateSandboxOptions): Promise<ManagedSandbox> {
     const createOpts: Record<string, unknown> = { timeout: opts.timeout };
     if (opts.ports) createOpts.ports = opts.ports;
+    if (opts.resources) createOpts.resources = opts.resources;
     if (opts.snapshotId) {
       createOpts.source = { type: "snapshot", snapshotId: opts.snapshotId };
     }

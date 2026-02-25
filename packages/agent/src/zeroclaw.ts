@@ -6,19 +6,16 @@ import {
   buildDaemonCommand,
   buildCronListCommand,
   HOUSEKEEPING_FILES,
-  DAEMON_PROCESS_PATTERN,
 } from "zeroclaw";
 import type {
   Agent,
   SandboxHandle,
   AgentResponse,
   CronInfo,
-  ExtendLoopConfig,
+  DaemonCommand,
+  MonitorConfig,
   ProvisionOpts,
 } from "./types.js";
-import { createLogger } from "@clawrun/logger";
-
-const log = createLogger("agent:zeroclaw");
 
 export class ZeroclawAgent implements Agent {
   readonly id = "zeroclaw";
@@ -63,41 +60,20 @@ export class ZeroclawAgent implements Agent {
     return { success: parsed.success, message: parsed.message, error: parsed.error };
   }
 
-  async startDaemon(
-    sandbox: SandboxHandle,
+  getDaemonCommand(
     root: string,
     opts?: {
       port?: number;
       host?: string;
       env?: Record<string, string>;
     },
-  ): Promise<void> {
+  ): DaemonCommand {
     const cmd = buildDaemonCommand(`${root}/bin/zeroclaw`, this.env(root), opts);
-    await sandbox.runCommand({
+    return {
       cmd: cmd.cmd,
       args: cmd.args,
       env: { ...cmd.env, ...opts?.env },
-      detached: true,
-    });
-
-    // Wait for daemon to initialize
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-
-    // Verify daemon is running
-    try {
-      const ps = await sandbox.runCommand("sh", [
-        "-c",
-        `ps aux | grep '${DAEMON_PROCESS_PATTERN}' | grep -v grep`,
-      ]);
-      const psOut = await ps.stdout();
-      if (psOut.trim()) {
-        log.info(`Daemon started (PID ${psOut.trim().split(/\s+/)[1]})`);
-      } else {
-        log.warn("Daemon process not found after start");
-      }
-    } catch {
-      // best-effort check
-    }
+    };
   }
 
   async getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo> {
@@ -113,9 +89,9 @@ export class ZeroclawAgent implements Agent {
     return parseCronListOutput(stdout);
   }
 
-  getExtendLoopConfig(root: string): ExtendLoopConfig {
+  getMonitorConfig(root: string): MonitorConfig {
     return {
-      monitorDir: `${root}/agent`,
+      dir: `${root}/agent`,
       ignoreFiles: HOUSEKEEPING_FILES,
     };
   }

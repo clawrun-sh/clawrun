@@ -33,6 +33,7 @@ export function buildConfig(
     activeDuration?: number;
     cronKeepAliveWindow?: number;
     cronWakeLeadTime?: number;
+    resources?: { vcpus: number };
     cronSecret: string;
     nextAuthSecret: string;
     webhookSecrets?: Record<string, string>;
@@ -57,6 +58,7 @@ export function buildConfig(
       activeDuration: options.activeDuration,
       cronKeepAliveWindow: options.cronKeepAliveWindow,
       cronWakeLeadTime: options.cronWakeLeadTime,
+      resources: options.resources,
     },
     secrets: {
       cronSecret: options.cronSecret,

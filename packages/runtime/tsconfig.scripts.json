@@ -4,10 +4,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "outDir": "./dist/scripts",
+    "rootDir": "./src",
     "declaration": false,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/sandbox/extend-loop.ts"]
+  "include": ["src/sidecar/**/*.ts"]
 }

@@ -33,8 +33,14 @@ export interface CronInfo {
   jobs: CronEntry[];
 }
 
-export interface ExtendLoopConfig {
-  monitorDir: string;
+export interface DaemonCommand {
+  cmd: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
+export interface MonitorConfig {
+  dir: string;
   ignoreFiles: string[];
 }
 
@@ -62,17 +68,16 @@ export interface Agent {
     },
   ): Promise<AgentResponse>;
 
-  startDaemon(
-    sandbox: SandboxHandle,
+  getDaemonCommand(
     root: string,
     opts?: {
       port?: number;
       host?: string;
       env?: Record<string, string>;
     },
-  ): Promise<void>;
+  ): DaemonCommand;
 
   getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo>;
 
-  getExtendLoopConfig(root: string): ExtendLoopConfig;
+  getMonitorConfig(root: string): MonitorConfig;
 }

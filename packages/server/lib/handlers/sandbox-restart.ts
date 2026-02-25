@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     const manager = new SandboxLifecycleManager();
     const result = await manager.forceRestart();
     if (result.status === "failed") {
+      log.error(`Restart failed: ${result.error}`);
       return NextResponse.json(result, { status: 500 });
     }
     return NextResponse.json(result);

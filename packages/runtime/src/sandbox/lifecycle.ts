@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
@@ -11,6 +11,7 @@ import type { StateStore } from "../storage/state-types.js";
 import type { ExtendReason } from "./extend-reasons.js";
 import { GracePeriodReason, FileActivityReason, CronScheduleReason } from "./extend-reasons.js";
 import { createLogger } from "@clawrun/logger";
+import type { SidecarConfig } from "../sidecar/types.js";
 
 const log = createLogger("sandbox");
 
@@ -31,6 +32,17 @@ const EXTEND_INTERVAL_S = 60;
 // Only extend when the native TTL is within this buffer of expiring.
 // ~5 ticks of runway (at 60s intervals) before the sandbox would die.
 const TTL_BUFFER_MS = 5 * 60 * 1000;
+
+// Sidecar health port — exposed alongside the agent daemon port
+const SIDECAR_HEALTH_PORT = 3001;
+
+// Sidecar health check retries during startup verification
+const SIDECAR_HEALTH_RETRIES = 15;
+const SIDECAR_HEALTH_RETRY_MS = 1000;
+
+// Daemon ready timeout (ms) — after this delay the supervisor logs a warning
+// while continuing to probe the daemon port. Not a hard deadline.
+const DAEMON_READY_TIMEOUT_MS = 3000;
 
 // --- State keys ---
 
@@ -206,19 +218,41 @@ export class SandboxLifecycleManager {
     }
   }
 
-  /** Notify hooks that sandbox stopped — e.g. register channel wake hooks. */
+  /**
+   * Register channel wake hooks so the sandbox can be woken by messages.
+   * Throws if baseUrl is not configured or hooks are not initialized.
+   */
   private async registerWakeHooks(): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
-    if (SandboxLifecycleManager.hooks.onSandboxStopped) {
-      await SandboxLifecycleManager.hooks.onSandboxStopped(baseUrl);
+    if (!baseUrl) {
+      throw new Error(
+        "Cannot register wake hooks: baseUrl is not configured." +
+          " Set deployedUrl in clawrun.json or the CLAWRUN_BASE_URL env var.",
+      );
     }
+    if (!SandboxLifecycleManager.hooks.onSandboxStopped) {
+      throw new Error(
+        "Cannot register wake hooks: lifecycle hooks not initialized." +
+          " Ensure setupLifecycleHooks() is called during server startup.",
+      );
+    }
+    await SandboxLifecycleManager.hooks.onSandboxStopped(baseUrl);
+    log.info(`Wake hooks registered (baseUrl=${baseUrl})`);
   }
 
-  /** Notify hooks that sandbox started — e.g. tear down channel wake hooks. */
+  /**
+   * Tear down channel wake hooks when sandbox starts.
+   * Throws if hooks are not initialized.
+   */
   private async teardownWakeHooks(): Promise<void> {
-    if (SandboxLifecycleManager.hooks.onSandboxStarted) {
-      await SandboxLifecycleManager.hooks.onSandboxStarted();
+    if (!SandboxLifecycleManager.hooks.onSandboxStarted) {
+      throw new Error(
+        "Cannot tear down wake hooks: lifecycle hooks not initialized." +
+          " Ensure setupLifecycleHooks() is called during server startup.",
+      );
     }
+    await SandboxLifecycleManager.hooks.onSandboxStarted();
+    log.info("Wake hooks torn down");
   }
 
   async heartbeat(): Promise<SandboxResult> {
@@ -415,7 +449,13 @@ export class SandboxLifecycleManager {
     // Only register wake hooks if no new sandbox was created during our stop.
     const freshActive = (await this.listSandboxes()).filter((s) => !this.isTerminal(s));
     if (freshActive.length === 0) {
-      await this.registerWakeHooks();
+      try {
+        await this.registerWakeHooks();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error(`handleExtend: wake hook registration failed: ${msg}`);
+        return { action: "error", error: `Sandbox stopped but wake hooks failed: ${msg}` };
+      }
     }
 
     return { action: "stopped", nextWakeAt: nextCronAt ?? undefined };
@@ -460,6 +500,15 @@ export class SandboxLifecycleManager {
     const active = sandboxes.filter((s) => !this.isTerminal(s));
 
     if (active.length === 0) {
+      // No active sandbox — still register wake hooks in case the sandbox
+      // was stopped externally (timeout, platform kill) without hook registration.
+      try {
+        await this.registerWakeHooks();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error(`gracefulStop: wake hook registration failed: ${msg}`);
+        return { status: "stopped", error: `Sandbox already stopped. Wake hooks failed: ${msg}` };
+      }
       return { status: "stopped" };
     }
 
@@ -478,7 +527,13 @@ export class SandboxLifecycleManager {
       await this.stopSandboxes(extras);
     }
 
-    await this.registerWakeHooks();
+    try {
+      await this.registerWakeHooks();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`gracefulStop: wake hook registration failed: ${msg}`);
+      return { status: "stopped", sandboxId: newest.id, error: `Wake hooks failed: ${msg}` };
+    }
 
     return { status: "stopped", sandboxId: newest.id };
   }
@@ -544,10 +599,12 @@ export class SandboxLifecycleManager {
             sandbox = await this.provider.create({
               snapshotId: latest.id,
               timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
-              ports: [3000],
+              ports: [3000, SIDECAR_HEALTH_PORT],
+              resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
             });
             log.info(`Resumed from latest snapshot: ${latest.id}`);
-          } catch {
+          } catch (err) {
+            log.error(`Failed to resume from snapshot ${latest.id}:`, err);
             sandbox = null;
           }
         }
@@ -559,7 +616,8 @@ export class SandboxLifecycleManager {
       if (!sandbox) {
         sandbox = await this.provider.create({
           timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
-          ports: [3000],
+          ports: [3000, SIDECAR_HEALTH_PORT],
+          resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
         });
       }
 
@@ -581,26 +639,26 @@ export class SandboxLifecycleManager {
       const secretKey = readBundledSecretKey();
       await this.agent.provision(sandbox, root, { localAgentDir, secretKey });
 
-      const databaseUrl = getDatabaseUrl();
-      await this.agent.startDaemon(sandbox, root, {
-        env: databaseUrl ? { DATABASE_URL: databaseUrl } : undefined,
-      });
+      // Start sidecar (supervises daemon + heartbeat + health server)
+      await this.startSidecar(sandbox, root);
       await this.teardownWakeHooks();
-      await this.startSandboxExtendLoop(sandbox, root);
 
       return { status: "running", sandboxId: sandbox.id };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
+      log.error(`startNewLocked failed: ${error}`);
       return { status: "failed", error };
     }
   }
 
   /**
-   * Start a background reporter inside the sandbox that calls the parent's
-   * /api/v1/sandbox/heartbeat endpoint every 60s with filesystem mtime data.
-   * The parent queries cron info server-side and decides whether to extend or stop.
+   * Start the sidecar daemon inside the sandbox. The sidecar is a single
+   * Node process that supervises the agent daemon, runs the heartbeat loop,
+   * and exposes an HTTP health endpoint on port 3001.
+   *
+   * Replaces the previous startDaemon() + startSandboxExtendLoop() pair.
    */
-  private async startSandboxExtendLoop(sandbox: ManagedSandbox, root: string): Promise<void> {
+  private async startSidecar(sandbox: ManagedSandbox, root: string): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
     const secret = process.env.CLAWRUN_SANDBOX_SECRET;
     if (!baseUrl || !secret) {
@@ -608,61 +666,130 @@ export class SandboxLifecycleManager {
         !baseUrl && "baseUrl (set CLAWRUN_BASE_URL or deployedUrl in clawrun.json)",
         !secret && "CLAWRUN_SANDBOX_SECRET",
       ].filter(Boolean);
-      throw new Error(`Cannot start extend loop — missing: ${missing.join(", ")}`);
+      throw new Error(`Cannot start sidecar — missing: ${missing.join(", ")}`);
     }
 
-    const url = `${baseUrl}/api/v1/sandbox/heartbeat`;
-    const id = sandbox.id;
-    const agentConfig = this.agent.getExtendLoopConfig(root);
-    const scriptPath = `${root}/scripts/extend-loop.mjs`;
-    const configPath = `${root}/scripts/extend-loop-config.json`;
+    const databaseUrl = getDatabaseUrl();
+    const daemonCmd = this.agent.getDaemonCommand(root, {
+      env: databaseUrl ? { DATABASE_URL: databaseUrl } : undefined,
+    });
+    const monitorConfig = this.agent.getMonitorConfig(root);
 
-    // Read the compiled extend-loop script.
-    // Try cwd first (dev monorepo), then node_modules (deployed instance).
-    const scriptCandidates = [
-      join(process.cwd(), "dist", "scripts", "extend-loop.js"),
-      join(
-        process.cwd(),
-        "node_modules",
-        "@clawrun",
-        "runtime",
-        "dist",
-        "scripts",
-        "extend-loop.js",
-      ),
-    ];
-    const scriptFile = scriptCandidates.find((p) => existsSync(p));
-    if (!scriptFile) {
-      log.error("extend-loop.js not found at:", scriptCandidates);
-      return;
-    }
-    const scriptContent = readFileSync(scriptFile, "utf-8");
-
-    const loopConfig = {
-      url,
-      secret,
-      sandboxId: id,
-      monitorDir: agentConfig.monitorDir,
+    const sidecarConfig: SidecarConfig = {
+      daemon: {
+        cmd: daemonCmd.cmd,
+        args: daemonCmd.args,
+        env: daemonCmd.env,
+        port: 3000,
+        readyTimeout: DAEMON_READY_TIMEOUT_MS,
+      },
+      heartbeat: {
+        url: `${baseUrl}/api/v1/sandbox/heartbeat`,
+        sandboxId: sandbox.id,
+        intervalMs: EXTEND_INTERVAL_S * 1000,
+      },
+      monitor: {
+        dir: monitorConfig.dir,
+        ignoreFiles: monitorConfig.ignoreFiles,
+      },
+      health: {
+        port: SIDECAR_HEALTH_PORT,
+      },
       root,
-      intervalMs: EXTEND_INTERVAL_S * 1000,
-      ignoreFiles: agentConfig.ignoreFiles,
     };
 
-    try {
-      await sandbox.runCommand("mkdir", ["-p", `${root}/scripts`]);
-      await sandbox.writeFiles([
-        { path: scriptPath, content: Buffer.from(scriptContent) },
-        { path: configPath, content: Buffer.from(JSON.stringify(loopConfig)) },
-      ]);
-
-      await sandbox.runCommand({
-        cmd: "node",
-        args: [scriptPath, configPath],
-        detached: true,
-      });
-      log.info(`Extend loop started for sandbox ${id}, url=${url}`);
-    } catch (err) {
-      log.error("Failed to start extend loop:", err);
+    // Read all compiled sidecar scripts from dist/scripts/sidecar/.
+    // Try cwd first (dev monorepo), then node_modules (deployed instance).
+    const sidecarDirCandidates = [
+      join(process.cwd(), "dist", "scripts", "sidecar"),
+      join(process.cwd(), "node_modules", "@clawrun", "runtime", "dist", "scripts", "sidecar"),
+    ];
+    const sidecarDir = sidecarDirCandidates.find((p) => existsSync(p));
+    if (!sidecarDir) {
+      throw new Error(`Sidecar scripts not found. Searched: ${sidecarDirCandidates.join(", ")}`);
     }
+
+    // Read all .js files from the sidecar directory (kept as .js, not renamed)
+    const sidecarFiles: Array<{ path: string; content: Buffer }> = [];
+    const sandboxSidecarDir = `${root}/scripts/sidecar`;
+    for (const file of readdirSync(sidecarDir)) {
+      if (!file.endsWith(".js")) continue;
+      const content = readFileSync(join(sidecarDir, file), "utf-8");
+      sidecarFiles.push({
+        path: `${sandboxSidecarDir}/${file}`,
+        content: Buffer.from(content),
+      });
+    }
+
+    // package.json with "type": "module" so Node treats .js as ESM
+    sidecarFiles.push({
+      path: `${sandboxSidecarDir}/package.json`,
+      content: Buffer.from('{"type":"module"}'),
+    });
+
+    const configPath = `${root}/scripts/sidecar-config.json`;
+    const logPath = `${root}/scripts/sidecar.log`;
+    const entryPath = `${sandboxSidecarDir}/index.js`;
+
+    await sandbox.runCommand("mkdir", ["-p", sandboxSidecarDir]);
+    await sandbox.writeFiles([
+      ...sidecarFiles,
+      { path: configPath, content: Buffer.from(JSON.stringify(sidecarConfig)) },
+    ]);
+
+    // Launch as detached. Secret passed via env option (not in cmdline, so
+    // it won't appear in ps/top/htop inside the sandbox).
+    await sandbox.runCommand({
+      cmd: "sh",
+      args: ["-c", `node ${entryPath} ${configPath} >> ${logPath} 2>&1`],
+      env: { CLAWRUN_HB_SECRET: secret },
+      detached: true,
+    });
+
+    // Verify via HTTP health check (replaces pgrep-based verification)
+    const healthUrl = sandbox.domain(SIDECAR_HEALTH_PORT) + "/health";
+    let lastError: string | undefined;
+
+    for (let i = 0; i < SIDECAR_HEALTH_RETRIES; i++) {
+      await new Promise((r) => setTimeout(r, SIDECAR_HEALTH_RETRY_MS));
+      try {
+        const res = await fetch(healthUrl);
+        if (res.ok) {
+          const body = (await res.json()) as {
+            daemon?: { status?: string; pid?: number; restarts?: number };
+          };
+          const daemonStatus = body.daemon?.status;
+
+          if (daemonStatus === "running") {
+            log.info(
+              `Sidecar healthy for sandbox ${sandbox.id}` +
+                ` (daemon=running, pid=${body.daemon?.pid})`,
+            );
+            return;
+          }
+
+          if (daemonStatus === "failed") {
+            lastError = `daemon failed after ${body.daemon?.restarts ?? "?"} restarts`;
+            break; // No point retrying — supervisor gave up
+          }
+
+          // Daemon still starting — keep polling
+          lastError = `daemon status: ${daemonStatus ?? "unknown"}`;
+        } else {
+          lastError = `HTTP ${res.status}`;
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    // Health check failed — read log for diagnostics
+    const logBuf = await sandbox.readFile(logPath);
+    const logOutput = logBuf ? logBuf.toString("utf-8").trim() : "(no log output)";
+    throw new Error(
+      `Sidecar health check failed for sandbox ${sandbox.id}` +
+        ` after ${SIDECAR_HEALTH_RETRIES} retries (last: ${lastError}).` +
+        ` Log output:\n${logOutput}`,
+    );
   }
 }

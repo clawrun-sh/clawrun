@@ -31,10 +31,17 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   // Config files that must be bundled with every function.
   const configPaths = ["./clawrun.json", "./agent/config.toml", "./agent/.secret_key"];
 
-  // Extend-loop script injected into sandbox for keep-alive reporting.
-  const extendLoopPaths = ["./node_modules/@clawrun/runtime/dist/scripts/extend-loop.js"];
+  // Sidecar scripts injected into sandbox (daemon supervisor + heartbeat + health).
+  const sidecarPaths = [
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/index.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/types.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/health.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/supervisor.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/heartbeat.js",
+    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/mtime.js",
+  ];
 
-  const allPaths = [...resolvedAgentPaths, ...configPaths, ...extendLoopPaths];
+  const allPaths = [...resolvedAgentPaths, ...configPaths, ...sidecarPaths];
 
   return {
     ...(isMonorepo ? { outputFileTracingRoot: monorepoRoot } : {}),

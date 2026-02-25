@@ -25,6 +25,12 @@ export const cloudClawConfigSchema = z.object({
     activeDuration: z.number().default(600),
     cronKeepAliveWindow: z.number().default(900),
     cronWakeLeadTime: z.number().default(60),
+    resources: z
+      .object({
+        // Vercel Sandbox API enforces vcpus >= 2.
+        vcpus: z.number().int().min(2).max(8).default(2),
+      })
+      .default({ vcpus: 2 }),
   }),
   secrets: z
     .object({

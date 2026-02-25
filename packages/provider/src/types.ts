@@ -32,6 +32,7 @@ export interface ManagedSandbox {
   stop(): Promise<void>;
   snapshot(): Promise<SnapshotRef>;
   extendTimeout(ms: number): Promise<void>;
+  domain(port: number): string;
 }
 
 export interface SnapshotRef {
@@ -64,6 +65,7 @@ export interface CreateSandboxOptions {
   timeout: number;
   ports?: number[];
   snapshotId?: string;
+  resources?: { vcpus: number };
 }
 
 export interface SandboxProvider {

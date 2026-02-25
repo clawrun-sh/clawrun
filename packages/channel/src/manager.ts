@@ -13,16 +13,28 @@ const log = createLogger("channel");
  * webhooks are permanently configured and the handler checks sandbox state.
  */
 export async function registerWakeHooks(baseUrl: string): Promise<void> {
-  for (const adapter of getConfiguredAdapters()) {
+  const adapters = getConfiguredAdapters();
+  if (adapters.length === 0) {
+    log.warn("registerWakeHooks: no configured channel adapters found — wake hooks not registered");
+    return;
+  }
+
+  let registered = 0;
+  for (const adapter of adapters) {
     if (!adapter.programmableWebhook) continue;
 
     const webhookUrl = `${baseUrl}/api/v1/webhook/${adapter.channelId}`;
     try {
       await adapter.registerWebhook(webhookUrl);
       log.info(`Registered wake hook: ${adapter.name} → ${webhookUrl}`);
+      registered++;
     } catch (err) {
       log.error(`Failed to register wake hook for ${adapter.name}:`, err);
     }
+  }
+
+  if (registered === 0) {
+    log.warn("registerWakeHooks: no programmable-webhook adapters registered any hooks");
   }
 }
 
@@ -36,7 +48,13 @@ export async function registerWakeHooks(baseUrl: string): Promise<void> {
  * handler returns 200 without waking when it detects the sandbox is running.
  */
 export async function teardownWakeHooks(): Promise<void> {
-  for (const adapter of getConfiguredAdapters()) {
+  const adapters = getConfiguredAdapters();
+  if (adapters.length === 0) {
+    log.warn("teardownWakeHooks: no configured channel adapters found");
+    return;
+  }
+
+  for (const adapter of adapters) {
     if (!adapter.programmableWebhook) continue;
 
     try {

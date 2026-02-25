@@ -38,6 +38,7 @@ export async function runAgent(
     // Create sandbox
     sandbox = await getSandboxProvider().create({
       timeout: SANDBOX_TIMEOUT_MS,
+      resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
       ...(snapshotId ? { snapshotId } : {}),
     });
 

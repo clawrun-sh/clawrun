@@ -13,6 +13,7 @@ export interface RuntimeConfig {
     activeDuration: number;
     cronKeepAliveWindow: number;
     cronWakeLeadTime: number;
+    resources: { vcpus: number; memory: number };
   };
 }
 
@@ -38,6 +39,10 @@ export function getRuntimeConfig(): RuntimeConfig {
       activeDuration: parsed.sandbox.activeDuration,
       cronKeepAliveWindow: parsed.sandbox.cronKeepAliveWindow,
       cronWakeLeadTime: parsed.sandbox.cronWakeLeadTime,
+      resources: {
+        vcpus: parsed.sandbox.resources.vcpus,
+        memory: parsed.sandbox.resources.vcpus * 2048,
+      },
     },
   };
   return cached;

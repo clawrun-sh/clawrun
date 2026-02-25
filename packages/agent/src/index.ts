@@ -4,7 +4,8 @@ export type {
   AgentResponse,
   CronEntry,
   CronInfo,
-  ExtendLoopConfig,
+  DaemonCommand,
+  MonitorConfig,
   ProvisionOpts,
   Agent,
 } from "./types.js";
