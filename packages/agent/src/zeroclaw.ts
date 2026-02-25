@@ -35,6 +35,7 @@ export class ZeroclawAgent implements Agent {
       agentDir: `${root}/agent`,
       localAgentDir: opts.localAgentDir,
       secretKey: opts.secretKey,
+      fromSnapshot: opts.fromSnapshot,
     });
   }
 

@@ -47,6 +47,7 @@ export interface MonitorConfig {
 export interface ProvisionOpts {
   localAgentDir: string;
   secretKey: string;
+  fromSnapshot?: boolean;
 }
 
 export interface Agent {

@@ -1,0 +1,8 @@
+{
+  "id": "starter",
+  "name": "Starter",
+  "agent": "zeroclaw",
+  "provider": "vercel",
+  "description": "An AI agent with full provider and channel support",
+  "bundlePaths": ["node_modules/zeroclaw/dist/bin/**/*"]
+}

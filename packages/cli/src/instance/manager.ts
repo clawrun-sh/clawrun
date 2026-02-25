@@ -202,6 +202,18 @@ export function copyMirroredFiles(name: string): void {
   if (existsSync(secretKeySrc)) {
     writeFileSync(join(agentDeployDir, ".secret_key"), readFileSync(secretKeySrc));
   }
+
+  // agent/workspace/*.md — workspace template files
+  const workspaceSrc = join(agentDir, "workspace");
+  if (existsSync(workspaceSrc)) {
+    const workspaceDeployDir = join(agentDeployDir, "workspace");
+    mkdirSync(workspaceDeployDir, { recursive: true });
+    for (const f of readdirSync(workspaceSrc)) {
+      if (f.endsWith(".md")) {
+        writeFileSync(join(workspaceDeployDir, f), readFileSync(join(workspaceSrc, f)));
+      }
+    }
+  }
 }
 
 export function listInstances(): InstanceMetadata[] {

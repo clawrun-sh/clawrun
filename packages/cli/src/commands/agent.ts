@@ -24,6 +24,8 @@ async function resolveRoot(
 
 /**
  * Start an interactive chat REPL with the agent in a deployed instance.
+ * Routes messages via `agent.sendMessage()` (single-shot `zeroclaw agent -m`),
+ * which executes tools — unlike the daemon's `/webhook` endpoint.
  * Reusable from both the `agent` command and post-deploy flow.
  */
 export async function startAgentChat(
@@ -41,7 +43,6 @@ export async function startAgentChat(
     process.exit(1);
   }
 
-  const agent = createAgent(config.agent.name);
   const client = createSandboxClient(instanceName, config);
 
   const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
@@ -49,17 +50,8 @@ export async function startAgentChat(
   console.log(chalk.dim(`Sandbox: ${sandboxId}\n`));
 
   const handle = createSandboxHandle(client, sandboxId);
-  const root = await resolveRoot(handle, config.instance.sandboxRoot);
-
-  async function sendMessage(msg: string): Promise<{ success: boolean; output: string }> {
-    const response = await agent.sendMessage(handle, root, msg, {
-      signal: AbortSignal.timeout(150_000),
-    });
-    const output = response.success
-      ? response.message || ""
-      : response.error || response.message || "Unknown error";
-    return { success: response.success, output };
-  }
+  const agent = createAgent(config.agent.name);
+  const root = await resolveRoot(handle, config.instance.sandboxRoot ?? ".clawrun");
 
   // Interactive REPL mode
   console.log(chalk.bold(`Connected to ${chalk.cyan(instanceName)}.`));
@@ -83,9 +75,13 @@ export async function startAgentChat(
       const s = clack.spinner();
       s.start("Thinking...");
       try {
-        const { success, output } = await sendMessage(msg);
+        const resp = await agent.sendMessage(handle, root, msg, {
+          signal: AbortSignal.timeout(150_000),
+        });
         s.stop("");
-        console.log(success ? chalk.green(output) : chalk.red(output));
+        console.log(
+          resp.success ? chalk.green(resp.message) : chalk.red(resp.error ?? resp.message),
+        );
       } catch (err) {
         s.stop("");
         console.log(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
@@ -118,38 +114,36 @@ export const agentCommand = command({
       process.exit(1);
     }
 
+    const { deployedUrl } = config.instance;
+    const { cronSecret } = config.secrets;
+    if (!deployedUrl || !cronSecret) {
+      console.error(
+        chalk.red(
+          `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
+        ),
+      );
+      process.exit(1);
+    }
+
+    const client = createSandboxClient(instanceName, config);
+    const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
+    const handle = createSandboxHandle(client, sandboxId);
+
     // Single-shot mode
     if (message) {
-      const { deployedUrl } = config.instance;
-      const { cronSecret } = config.secrets;
-      if (!deployedUrl || !cronSecret) {
-        console.error(
-          chalk.red(
-            `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
-          ),
-        );
-        process.exit(1);
-      }
-
       const agent = createAgent(config.agent.name);
-      const client = createSandboxClient(instanceName, config);
-      const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
-      const handle = createSandboxHandle(client, sandboxId);
-      const root = await resolveRoot(handle, config.instance.sandboxRoot);
+      const root = await resolveRoot(handle, config.instance.sandboxRoot ?? ".clawrun");
 
       const s = clack.spinner();
       s.start("Thinking...");
 
-      const response = await agent.sendMessage(handle, root, message, {
+      const resp = await agent.sendMessage(handle, root, message, {
         signal: AbortSignal.timeout(150_000),
       });
 
-      s.stop(response.success ? "Done" : "Error");
-      const output = response.success
-        ? response.message || ""
-        : response.error || response.message || "Unknown error";
-      console.log(response.success ? chalk.green(output) : chalk.red(output));
-      process.exit(response.success ? 0 : 1);
+      s.stop(resp.success ? "Done" : "Error");
+      console.log(resp.success ? chalk.green(resp.message) : chalk.red(resp.error ?? resp.message));
+      process.exit(resp.success ? 0 : 1);
     }
 
     // Interactive mode

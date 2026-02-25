@@ -616,6 +616,7 @@ export class SandboxLifecycleManager {
   private async startNewLocked(): Promise<SandboxResult> {
     try {
       let sandbox: ManagedSandbox | null = null;
+      let snapshotId: string | undefined;
 
       // 1. Try latest snapshot from provider
       try {
@@ -629,6 +630,7 @@ export class SandboxLifecycleManager {
               ports: [3000, SIDECAR_HEALTH_PORT],
               resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
             });
+            snapshotId = latest.id;
             log.info(`Resumed from latest snapshot: ${latest.id}`);
           } catch (err) {
             log.error(`Failed to resume from snapshot ${latest.id}:`, err);
@@ -661,10 +663,16 @@ export class SandboxLifecycleManager {
         { path: `${root}/clawrun.json`, content: Buffer.from(clawrunJson) },
       ]);
 
-      // Provision agent (binary, config, secret key, .profile)
+      // Provision agent (binary, config, secret key, .profile).
+      // When restoring from snapshot, skip workspace .md files — the snapshot
+      // already contains the agent's customized versions.
       const localAgentDir = join(process.cwd(), "agent");
       const secretKey = readBundledSecretKey();
-      await this.agent.provision(sandbox, root, { localAgentDir, secretKey });
+      await this.agent.provision(sandbox, root, {
+        localAgentDir,
+        secretKey,
+        fromSnapshot: !!snapshotId,
+      });
 
       // Start sidecar (supervises daemon + heartbeat + health server)
       await this.startSidecar(sandbox, root);

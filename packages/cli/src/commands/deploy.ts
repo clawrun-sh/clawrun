@@ -1,12 +1,12 @@
 import { command, positional, option, optional, string } from "cmd-ts";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as TOML from "@iarna/toml";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { humanId } from "human-id";
 import * as clack from "@clack/prompts";
-import { getPreset, listPresets } from "../presets/index.js";
+import { getPreset, listPresets, getWorkspaceFiles } from "../presets/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type {
   PlatformProvider,
@@ -40,6 +40,30 @@ import { createApiClient } from "../api.js";
 
 function generateInstanceName(): string {
   return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
+}
+
+/**
+ * Seed workspace template .md files into the instance agent dir.
+ * Base templates are merged with preset-specific overrides.
+ * Only copies files that don't already exist (preserves user customizations).
+ */
+function seedWorkspaceFiles(presetId: string, agentDir: string): void {
+  // ZeroClaw reads workspace files from {configDir}/workspace/, not configDir itself
+  const workspaceDir = join(agentDir, "workspace");
+  mkdirSync(workspaceDir, { recursive: true });
+
+  const files = getWorkspaceFiles(presetId);
+  let seeded = 0;
+  for (const [filename, srcPath] of files) {
+    const destPath = join(workspaceDir, filename);
+    if (!existsSync(destPath)) {
+      copyFileSync(srcPath, destPath);
+      seeded++;
+    }
+  }
+  if (seeded > 0) {
+    clack.log.info(chalk.dim(`  Seeded ${seeded} workspace template file${seeded > 1 ? "s" : ""}`));
+  }
 }
 
 // Default active duration from the Zod schema (600s = 10 min)
@@ -192,6 +216,9 @@ async function handleNewInstance(
   if (prevConfigDir !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prevConfigDir;
   else delete process.env.ZEROCLAW_CONFIG_DIR;
 
+  // Seed workspace template files into agent dir (only missing files)
+  seedWorkspaceFiles(preset.id, agentConfigDir);
+
   // ClawRun-specific settings
   const activeDuration = defaultActiveDuration;
   const cronSecret = generateSecret();
@@ -328,7 +355,8 @@ async function handleNewInstance(
   const botToken = allEnvVars["CLAWRUN_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken);
 
-  await offerChat(name);
+  // Go straight into chat — the agent's BOOTSTRAP.md handles onboarding
+  await startChat(name);
 }
 
 async function handleExistingInstance(name: string, options: { yes?: boolean }): Promise<void> {
@@ -438,6 +466,11 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
     }
   }
 
+  // Seed any missing workspace template files (upgrade path)
+  if (existingConfig.instance.preset) {
+    seedWorkspaceFiles(existingConfig.instance.preset, instanceAgentDir(name));
+  }
+
   // Upgrade instance
   await upgradeInstance(name);
 
@@ -491,7 +524,8 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   const botToken = clawrunEnv["CLAWRUN_TELEGRAM_BOT_TOKEN"];
   printSuccess(name, url, botToken ?? null);
 
-  await offerChat(name);
+  // Go straight into chat
+  await startChat(name);
 }
 
 function printSuccess(name: string, url: string, botToken: string | null): void {
@@ -507,14 +541,7 @@ function printSuccess(name: string, url: string, botToken: string | null): void 
   clack.outro("Done!");
 }
 
-async function offerChat(name: string): Promise<void> {
-  const chat = await clack.confirm({
-    message: "Start chatting with your agent?",
-    initialValue: true,
-  });
-
-  if (clack.isCancel(chat) || !chat) return;
-
+async function startChat(name: string): Promise<void> {
   const freshConfig = readConfig(name);
   if (!freshConfig) {
     console.error(chalk.red(`Could not read config for "${name}".`));

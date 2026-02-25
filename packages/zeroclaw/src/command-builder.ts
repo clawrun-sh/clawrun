@@ -12,7 +12,7 @@ export function buildAgentCommand(
   return {
     cmd: binaryPath,
     args: ["agent", "-m", message],
-    env,
+    env: { RUST_LOG: "warn", ...env },
   };
 }
 

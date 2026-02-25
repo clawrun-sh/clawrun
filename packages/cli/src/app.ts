@@ -19,7 +19,7 @@ export const app = subcommands({
     { description: "Deploy a new instance", command: "clawrun deploy" },
     {
       description: "Deploy with a specific preset",
-      command: "clawrun deploy --preset zeroclaw-basic",
+      command: "clawrun deploy --preset starter",
     },
     { description: "List all instances", command: "clawrun list" },
     { description: "Chat with an agent", command: 'clawrun agent my-instance -m "Hello"' },

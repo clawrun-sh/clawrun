@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ZeroclawSandbox } from "./types.js";
 import { getBinaryPath } from "./binary.js";
 import { generateDaemonToml } from "./config-generator.js";
@@ -9,6 +10,7 @@ export interface ProvisionOptions {
   agentDir: string;
   localAgentDir: string;
   secretKey: string;
+  fromSnapshot?: boolean;
 }
 
 export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions): Promise<void> {
@@ -40,11 +42,33 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
   const parsed = readParsedConfig(opts.localAgentDir);
   const toml = generateDaemonToml(parsed);
 
-  // Write config + .secret_key (secret key is passed from local — never regenerated)
-  await sandbox.writeFiles([
+  // Always write config + .secret_key (may have been updated by deploy/upgrade)
+  const coreFiles: { path: string; content: Buffer }[] = [
     { path: `${agentDir}/config.toml`, content: Buffer.from(toml) },
     { path: `${agentDir}/.secret_key`, content: Buffer.from(opts.secretKey) },
-  ]);
+  ];
+
+  // Only write workspace .md files on fresh sandbox (not snapshot restore).
+  // Snapshots already contain the agent's customized workspace files
+  // (IDENTITY.md, USER.md, deleted BOOTSTRAP.md, etc.).
+  if (!opts.fromSnapshot) {
+    const localWorkspaceDir = join(opts.localAgentDir, "workspace");
+    try {
+      const mdFiles = readdirSync(localWorkspaceDir).filter((f) => f.endsWith(".md"));
+      const workspaceFiles = mdFiles.map((f) => ({
+        path: `${agentDir}/workspace/${f}`,
+        content: readFileSync(join(localWorkspaceDir, f)),
+      }));
+      coreFiles.push(...workspaceFiles);
+    } catch {
+      // No workspace dir — skip
+    }
+  }
+
+  await sandbox.writeFiles(coreFiles);
+
+  // Restrict permissions on sensitive files so zeroclaw doesn't warn
+  await sandbox.runCommand("chmod", ["600", `${agentDir}/config.toml`, `${agentDir}/.secret_key`]);
 
   // Write .profile so interactive shells (connect) get the right env.
   // Do NOT override HOME — the sandbox's native HOME is correct.
