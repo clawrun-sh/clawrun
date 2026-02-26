@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireSandboxAuth, SandboxLifecycleManager } from "@clawrun/runtime";
+import { requireSandboxAuth } from "@clawrun/auth";
+import { SandboxLifecycleManager } from "@clawrun/runtime";
 import type { ExtendPayload } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
 

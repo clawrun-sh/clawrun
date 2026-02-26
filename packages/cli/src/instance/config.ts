@@ -1,14 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cloudClawConfigSchema, type ClawRunConfig } from "@clawrun/runtime";
 export { cloudClawConfigSchema };
+import { generateSecret } from "@clawrun/auth";
+export { generateSecret };
 import { getChannelSecretDefinitions } from "@clawrun/channel";
-
-/** Generate a 256-bit base64url secret. */
-export function generateSecret(): string {
-  return randomBytes(32).toString("base64url");
-}
 import { instanceDir } from "./paths.js";
 
 const SCHEMA_URL = "https://clawrun.sh/schema.json";
@@ -35,7 +31,7 @@ export function buildConfig(
     cronWakeLeadTime?: number;
     resources?: { vcpus: number };
     cronSecret: string;
-    nextAuthSecret: string;
+    jwtSecret: string;
     webhookSecrets?: Record<string, string>;
     sandboxSecret: string;
     provider?: string;
@@ -62,7 +58,7 @@ export function buildConfig(
     },
     secrets: {
       cronSecret: options.cronSecret,
-      nextAuthSecret: options.nextAuthSecret,
+      jwtSecret: options.jwtSecret,
       webhookSecrets: options.webhookSecrets,
       sandboxSecret: options.sandboxSecret,
     },
@@ -79,7 +75,7 @@ export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, stri
 
   // Core secrets
   vars["CLAWRUN_CRON_SECRET"] = config.secrets.cronSecret;
-  vars["CLAWRUN_NEXTAUTH_SECRET"] = config.secrets.nextAuthSecret;
+  vars["CLAWRUN_JWT_SECRET"] = config.secrets.jwtSecret;
   vars["CLAWRUN_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
 
   // Per-channel webhook secrets

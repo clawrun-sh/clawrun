@@ -203,7 +203,7 @@ async function handleNewInstance(
   // ClawRun-specific settings
   const activeDuration = defaultActiveDuration;
   const cronSecret = generateSecret();
-  const nextAuthSecret = generateSecret();
+  const jwtSecret = generateSecret();
   const webhookSecrets: Record<string, string> = {};
   for (const def of getChannelSecretDefinitions()) {
     webhookSecrets[def.channelId] = generateSecret();
@@ -278,7 +278,7 @@ async function handleNewInstance(
   const config = buildConfig(name, preset.id, preset.agent, {
     activeDuration,
     cronSecret,
-    nextAuthSecret,
+    jwtSecret,
     webhookSecrets,
     sandboxSecret,
     provider: platform.id,
@@ -321,9 +321,9 @@ async function handleNewInstance(
 
   // Start sandbox
   clack.log.step("Starting sandbox...");
-  if (cronSecret) {
+  if (jwtSecret) {
     try {
-      const api = createApiClient(url, cronSecret);
+      const api = createApiClient(url, jwtSecret);
       const res = await api.post("/api/v1/sandbox/restart");
       const result = (await res.json()) as Record<string, unknown>;
       clack.log.success(`Sandbox: ${result.status ?? "ok"}`);
@@ -488,10 +488,10 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
 
   // Restart sandbox
   clack.log.step("Restarting sandbox...");
-  const cronSecret = clawrunEnv["CLAWRUN_CRON_SECRET"];
-  if (cronSecret) {
+  const upgradeJwtSecret = clawrunEnv["CLAWRUN_JWT_SECRET"];
+  if (upgradeJwtSecret) {
     try {
-      const api = createApiClient(url, cronSecret);
+      const api = createApiClient(url, upgradeJwtSecret);
       const res = await api.post("/api/v1/sandbox/restart");
       const result = (await res.json()) as Record<string, unknown>;
       clack.log.success(`Sandbox: ${result.status ?? "ok"}`);

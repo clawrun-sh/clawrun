@@ -8,17 +8,33 @@ import { start } from "./commands/start.js";
 import { stop } from "./commands/stop.js";
 import { logs } from "./commands/logs.js";
 import { pull } from "./commands/pull.js";
+import { web } from "./commands/web.js";
+import { invite } from "./commands/invite.js";
 import { version } from "./pkg.js";
 
 export const app = subcommands({
   name: "clawrun",
   description: "AI agent hosting, simplified.",
   version,
-  cmds: { deploy, list, destroy, agent: agentCommand, connect, start, stop, logs, pull },
+  cmds: {
+    deploy,
+    list,
+    destroy,
+    agent: agentCommand,
+    connect,
+    start,
+    stop,
+    logs,
+    pull,
+    web,
+    invite,
+  },
   examples: [
     { description: "Deploy a new instance", command: "clawrun deploy" },
     { description: "Chat with the agent", command: "clawrun agent my-instance" },
     { description: "Pull agent state from sandbox", command: "clawrun pull my-instance" },
     { description: "Open a shell in the sandbox", command: "clawrun connect my-instance" },
+    { description: "Open web chat in browser", command: "clawrun web my-instance" },
+    { description: "Generate an invite link", command: "clawrun invite my-instance --ttl 2h" },
   ],
 });

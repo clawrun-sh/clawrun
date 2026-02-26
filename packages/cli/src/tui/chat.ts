@@ -15,7 +15,8 @@ import {
   getImageDimensions,
   imageFallback,
 } from "@mariozechner/pi-tui";
-import type { Agent, SandboxHandle } from "@clawrun/agent";
+import { signInviteToken } from "@clawrun/auth";
+import { sendChatMessage } from "../chat-client.js";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -68,9 +69,8 @@ function extractImages(text: string): {
  */
 export async function startChatTUI(
   instanceName: string,
-  agent: Agent,
-  handle: SandboxHandle,
-  root: string,
+  deployedUrl: string,
+  secret: string,
   sandboxId: string,
   opts?: { initialMessage?: string },
 ): Promise<void> {
@@ -231,10 +231,14 @@ export async function startChatTUI(
 
     let responseText: string;
     try {
-      const resp = await agent.sendMessage(handle, root, message, {
-        signal: loader.signal,
-      });
-      responseText = resp.success ? resp.message : colors.error(resp.error ?? resp.message);
+      // Sign a fresh JWT for each request so long-lived sessions don't expire
+      const jwt = await signInviteToken(secret);
+      const result = await sendChatMessage(deployedUrl, jwt, message, loader.signal);
+      if (result.error) {
+        responseText = colors.error(result.error);
+      } else {
+        responseText = result.text;
+      }
     } catch (err) {
       if (loader.aborted) {
         responseText = colors.dim("(cancelled)");

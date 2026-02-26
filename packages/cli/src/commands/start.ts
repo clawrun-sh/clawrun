@@ -19,8 +19,8 @@ export const start = command({
     }
 
     const { deployedUrl } = config.instance;
-    const { cronSecret } = config.secrets;
-    if (!deployedUrl || !cronSecret) {
+    const { jwtSecret } = config.secrets;
+    if (!deployedUrl || !jwtSecret) {
       console.error(
         chalk.red(
           `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
@@ -33,7 +33,7 @@ export const start = command({
     spinner.start("Starting sandbox...");
 
     try {
-      const api = createApiClient(deployedUrl, cronSecret);
+      const api = createApiClient(deployedUrl, jwtSecret);
       const res = await api.post("/api/v1/sandbox/start");
 
       const body = await res.text();

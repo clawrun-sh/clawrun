@@ -45,10 +45,12 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
   const packages = [
     { name: "zeroclaw", dir: join(root, "packages", "zeroclaw") },
     { name: "@clawrun/agent", dir: join(root, "packages", "agent") },
+    { name: "@clawrun/auth", dir: join(root, "packages", "auth") },
     { name: "@clawrun/provider", dir: join(root, "packages", "provider") },
     { name: "@clawrun/channel", dir: join(root, "packages", "channel") },
     { name: "@clawrun/runtime", dir: join(root, "packages", "runtime") },
     { name: "@clawrun/logger", dir: join(root, "packages", "logger") },
+    { name: "@clawrun/ui", dir: join(root, "packages", "ui") },
     { name: "@clawrun/server", dir: join(root, "packages", "server") },
   ];
 
@@ -73,6 +75,13 @@ const INSTANCE_PEER_DEPS: Record<string, string> = {
   next: "^16.0.0",
   react: "^19.0.0",
   "react-dom": "^19.0.0",
+  dexie: "^4.0.0",
+  "next-themes": "^0.4.0",
+  shadcn: "^3.8.5",
+  streamdown: "^2.3.0",
+  tailwindcss: "^4.0.0",
+  "tw-animate-css": "^1.4.0",
+  "@tailwindcss/postcss": "^4.0.0",
   typescript: "^5.7.0",
   "@types/node": "^22.0.0",
   "@types/react": "^19.0.0",
@@ -138,10 +147,12 @@ export async function createInstance(
   } else {
     deps = {
       "@clawrun/agent": "0.1.0",
+      "@clawrun/auth": "0.1.0",
       "@clawrun/provider": "0.1.0",
       "@clawrun/channel": "0.1.0",
       "@clawrun/logger": "0.1.0",
       "@clawrun/runtime": "0.1.0",
+      "@clawrun/ui": "0.1.0",
       "@clawrun/server": "0.1.0",
       zeroclaw: "0.1.0",
     };

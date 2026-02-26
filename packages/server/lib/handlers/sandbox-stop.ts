@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireBearerAuth, SandboxLifecycleManager } from "@clawrun/runtime";
+import { requireBearerAuth } from "@clawrun/auth";
+import { SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:stop");
 
 export async function POST(req: Request) {
-  const denied = requireBearerAuth(req);
+  const denied = await requireBearerAuth(req);
   if (denied) return denied;
 
   try {

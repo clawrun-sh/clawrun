@@ -40,6 +40,7 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
 
   return {
     ...(isMonorepo ? { outputFileTracingRoot: monorepoRoot } : {}),
+    transpilePackages: ["@clawrun/ui"],
     serverExternalPackages: externalPackages,
     outputFileTracingIncludes: {
       "/": allPaths,

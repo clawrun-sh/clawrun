@@ -18,9 +18,6 @@ export { getMessageStore } from "./storage/index.js";
 // Agents
 export { getAgent, registerAgent } from "./agents/registry.js";
 
-// Auth
-export { requireBearerAuth, requireSandboxAuth } from "./auth.js";
-
 // Config
 export { getRuntimeConfig } from "./config.js";
 export type { RuntimeConfig } from "./config.js";

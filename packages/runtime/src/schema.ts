@@ -35,7 +35,7 @@ export const cloudClawConfigSchema = z.object({
   secrets: z
     .object({
       cronSecret: z.string(),
-      nextAuthSecret: z.string(),
+      jwtSecret: z.string(),
       webhookSecrets: z.record(z.string(), z.string()).optional(),
       sandboxSecret: z.string(),
     })

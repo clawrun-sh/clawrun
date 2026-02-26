@@ -1,6 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    "clean": {
+      "cache": false
+    },
     "build:bin": {
       "inputs": ["upstream/**", "build-docker.sh", "Dockerfile", "Cargo.toml"],
       "outputs": ["dist/bin/**", "npm/**/*.node", "index.js", "index.d.ts"]

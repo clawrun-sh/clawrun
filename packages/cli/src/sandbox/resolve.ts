@@ -14,12 +14,12 @@ export async function getRunningId(client: SandboxClient): Promise<string | null
 async function ensureRunning(
   client: SandboxClient,
   deployedUrl: string,
-  cronSecret: string,
+  jwtSecret: string,
 ): Promise<string> {
   const spinner = clack.spinner();
   spinner.start("Starting sandbox...");
 
-  const api = createApiClient(deployedUrl, cronSecret);
+  const api = createApiClient(deployedUrl, jwtSecret);
   await api.post("/api/v1/sandbox/restart");
 
   const POLL_INTERVAL_MS = 3_000;
@@ -45,9 +45,9 @@ async function ensureRunning(
 export async function resolveRunningId(
   client: SandboxClient,
   deployedUrl: string,
-  cronSecret: string,
+  jwtSecret: string,
 ): Promise<string> {
   const id = await getRunningId(client);
   if (id) return id;
-  return ensureRunning(client, deployedUrl, cronSecret);
+  return ensureRunning(client, deployedUrl, jwtSecret);
 }
