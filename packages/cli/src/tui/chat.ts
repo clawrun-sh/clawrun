@@ -9,7 +9,6 @@ import {
   Image,
   CancellableLoader,
   CombinedAutocompleteProvider,
-  getEditorKeybindings,
   matchesKey,
   Key,
   getCapabilities,
@@ -91,12 +90,6 @@ export async function startChatTUI(
   tui.addChild(statusContainer);
 
   // --- editor ---------------------------------------------------------------
-  // Configure newline keybinding: Shift+Enter, Ctrl+Enter, Alt+Enter
-  // (terminal-dependent — Alt+Enter is the most reliable across terminals)
-  getEditorKeybindings().setConfig({
-    newLine: ["shift+enter", "ctrl+enter", "alt+enter"],
-  });
-
   const editor = new Editor(tui, editorTheme, { paddingX: 2 });
   editor.setAutocompleteProvider(
     new CombinedAutocompleteProvider(
