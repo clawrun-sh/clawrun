@@ -25,22 +25,23 @@
     "dist"
   ],
   "dependencies": {
-    "@clawrun/auth": "workspace:*",
+    "@clack/prompts": "^0.10.0",
     "@clawrun/agent": "workspace:*",
+    "@clawrun/auth": "workspace:*",
     "@clawrun/channel": "workspace:*",
     "@clawrun/logger": "workspace:*",
     "@clawrun/runtime": "workspace:*",
     "@clawrun/server": "workspace:*",
-    "@clack/prompts": "^0.10.0",
-    "@mariozechner/pi-tui": "^0.55.1",
     "@iarna/toml": "^2.2.5",
-    "cli-highlight": "^2.1.11",
+    "@mariozechner/pi-tui": "^0.55.1",
     "chalk": "^5.4.0",
+    "cli-highlight": "^2.1.11",
     "cmd-ts": "^0.15.0",
+    "eventsource-parser": "^3.0.6",
     "execa": "^9.5.0",
-    "sandbox": "2.4.0",
     "human-id": "^4.1.1",
     "qrcode-terminal": "^0.12.0",
+    "sandbox": "2.4.0",
     "zeroclaw": "workspace:*",
     "zeroclaw-napi": "workspace:*",
     "zod": "^4.3.6"
@@ -48,8 +49,8 @@
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",
     "@types/iarna__toml": "^2.0.5",
-    "@types/qrcode-terminal": "^0.12.2",
     "@types/node": "^22.0.0",
+    "@types/qrcode-terminal": "^0.12.2",
     "typescript": "^5.7.0"
   },
   "engines": {

@@ -2,8 +2,11 @@
  * Shared SSE chat client for /api/v1/chat.
  *
  * Used by both single-shot mode (agent -m) and the interactive TUI.
- * Parses the `createUIMessageStream` format emitted by the server.
+ * Parses the `createUIMessageStream` format emitted by the server
+ * using eventsource-parser for spec-compliant SSE handling.
  */
+
+import { EventSourceParserStream } from "eventsource-parser/stream";
 
 export interface ChatResult {
   success: boolean;
@@ -39,34 +42,24 @@ export async function sendChatMessage(
     return { success: false, text: "", error: `Request failed: ${resp.status}` };
   }
 
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
   let fullText = "";
   let error: string | undefined;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  const eventStream = resp.body
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new EventSourceParserStream());
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const payload = line.slice(6);
-      if (payload === "[DONE]") break;
-      try {
-        const event = JSON.parse(payload);
-        if (event.type === "text-delta") {
-          fullText += event.delta;
-        } else if (event.type === "error") {
-          error = event.errorText;
-        }
-      } catch {
-        // Malformed SSE data — skip
+  for await (const { data } of eventStream) {
+    if (data === "[DONE]") break;
+    try {
+      const event = JSON.parse(data);
+      if (event.type === "text-delta") {
+        fullText += event.delta;
+      } else if (event.type === "error") {
+        error = event.errorText;
       }
+    } catch {
+      // Malformed event data — skip
     }
   }
 

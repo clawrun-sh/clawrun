@@ -119,6 +119,9 @@ importers:
       cmd-ts:
         specifier: ^0.15.0
         version: 0.15.0
+      eventsource-parser:
+        specifier: ^3.0.6
+        version: 3.0.6
       execa:
         specifier: ^9.5.0
         version: 9.6.1
@@ -227,7 +230,7 @@ importers:
     dependencies:
       '@ai-sdk/react':
         specifier: ^3.0.0
-        version: 3.0.103(react@19.2.4)(zod@3.24.4)
+        version: 3.0.103(react@19.2.4)(zod@4.3.6)
       '@clawrun/agent':
         specifier: workspace:*
         version: link:../agent
@@ -254,7 +257,7 @@ importers:
         version: 4.2.1
       ai:
         specifier: ^6.0.0
-        version: 6.0.101(zod@3.24.4)
+        version: 6.0.101(zod@4.3.6)
       dexie:
         specifier: ^4.0.0
         version: 4.3.0
@@ -263,7 +266,7 @@ importers:
         version: 0.500.0(react@19.2.4)
       next:
         specifier: ^16.0.0
-        version: 16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       next-themes:
         specifier: ^0.4.0
         version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -308,7 +311,7 @@ importers:
     dependencies:
       '@ai-sdk/react':
         specifier: ^3.0.0
-        version: 3.0.103(react@19.2.4)(zod@4.3.6)
+        version: 3.0.103(react@19.2.4)(zod@3.24.4)
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -347,7 +350,7 @@ importers:
         version: 1.0.2(react@19.2.4)
       ai:
         specifier: ^6.0.0
-        version: 6.0.101(zod@4.3.6)
+        version: 6.0.101(zod@3.24.4)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -9597,7 +9600,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  next@16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       '@next/env': 16.1.6
       '@swc/helpers': 0.5.15
@@ -9606,7 +9609,7 @@ snapshots:
       postcss: 8.4.31
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
-      styled-jsx: 5.1.6(@babel/core@7.29.0)(react@19.2.4)
+      styled-jsx: 5.1.6(react@19.2.4)
     optionalDependencies:
       '@next/swc-darwin-arm64': 16.1.6
       '@next/swc-darwin-x64': 16.1.6
@@ -10370,12 +10373,10 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
-  styled-jsx@5.1.6(@babel/core@7.29.0)(react@19.2.4):
+  styled-jsx@5.1.6(react@19.2.4):
     dependencies:
       client-only: 0.0.1
       react: 19.2.4
-    optionalDependencies:
-      '@babel/core': 7.29.0
 
   stylis@4.3.6: {}
 

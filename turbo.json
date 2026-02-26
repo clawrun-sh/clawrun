@@ -12,6 +12,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "!dist/bin/**", ".next/**"]
     },
+    "zeroclaw#build": {
+      "dependsOn": ["^build", "build:bin"],
+      "outputs": ["dist/**", "!dist/bin/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
