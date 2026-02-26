@@ -9,6 +9,7 @@ import {
   Image,
   CancellableLoader,
   CombinedAutocompleteProvider,
+  getEditorKeybindings,
   matchesKey,
   Key,
   getCapabilities,
@@ -16,12 +17,7 @@ import {
   imageFallback,
 } from "@mariozechner/pi-tui";
 import type { Agent, SandboxHandle } from "@clawrun/agent";
-import {
-  editorTheme,
-  markdownTheme,
-  userMessageStyle,
-  colors,
-} from "./theme.js";
+import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
 // Image extraction from markdown data URIs
@@ -68,7 +64,7 @@ function extractImages(text: string): {
  *   TruncatedText header
  *   Container     chatContainer   — per-turn: Spacer + Markdown (user card / agent plain)
  *   Container     statusContainer — CancellableLoader while awaiting response
- *   Editor        editor          — bordered multi-line input with autocomplete + history
+ *   Editor        editor          — bordered input with ❯ prompt in top border, autocomplete + history
  *   TruncatedText footer          — keybinding hints
  */
 export async function startChatTUI(
@@ -83,9 +79,7 @@ export async function startChatTUI(
   const tui = new TUI(terminal);
 
   // --- header ---------------------------------------------------------------
-  const header = new TruncatedText(
-    colors.accent(instanceName) + colors.dim(` · ${sandboxId}`),
-  );
+  const header = new TruncatedText(colors.accent(instanceName) + colors.dim(` · ${sandboxId}`));
   tui.addChild(header);
 
   // --- chat container -------------------------------------------------------
@@ -97,7 +91,13 @@ export async function startChatTUI(
   tui.addChild(statusContainer);
 
   // --- editor ---------------------------------------------------------------
-  const editor = new Editor(tui, editorTheme);
+  // Configure newline keybinding: Shift+Enter, Ctrl+Enter, Alt+Enter
+  // (terminal-dependent — Alt+Enter is the most reliable across terminals)
+  getEditorKeybindings().setConfig({
+    newLine: ["shift+enter", "ctrl+enter", "alt+enter"],
+  });
+
+  const editor = new Editor(tui, editorTheme, { paddingX: 2 });
   editor.setAutocompleteProvider(
     new CombinedAutocompleteProvider(
       [
@@ -107,6 +107,19 @@ export async function startChatTUI(
       process.cwd(),
     ),
   );
+
+  // Render ❯ prompt inside the editor's left padding on the first content line
+  const editorRender = editor.render.bind(editor);
+  (editor as any).render = (width: number): string[] => {
+    const lines = editorRender(width);
+    // lines[0] = top border, lines[1] = first content line
+    if (lines.length > 1) {
+      // paddingX: 2 means the first 2 chars are spaces — replace with "❯ "
+      lines[1] = colors.accent("❯") + " " + lines[1].slice(2);
+    }
+    return lines;
+  };
+
   tui.addChild(editor);
   tui.setFocus(editor);
 
@@ -176,18 +189,21 @@ export async function startChatTUI(
       if (caps.images) {
         msg.addChild(new Spacer(1));
         msg.addChild(
-          new Image(img.base64, img.mimeType, {
-            fallbackColor: colors.dim,
-          }, {
-            maxWidthCells: 60,
-          }),
+          new Image(
+            img.base64,
+            img.mimeType,
+            {
+              fallbackColor: colors.dim,
+            },
+            {
+              maxWidthCells: 60,
+            },
+          ),
         );
       } else {
         const dims = getImageDimensions(img.base64, img.mimeType) ?? undefined;
         msg.addChild(new Spacer(1));
-        msg.addChild(
-          new Markdown(imageFallback(img.mimeType, dims, img.alt), 1, 0, markdownTheme),
-        );
+        msg.addChild(new Markdown(imageFallback(img.mimeType, dims, img.alt), 1, 0, markdownTheme));
       }
     }
 
@@ -211,12 +227,7 @@ export async function startChatTUI(
     }
 
     // Loader in status container; give it focus so Escape cancels
-    const loader = new CancellableLoader(
-      tui,
-      colors.spinnerFn,
-      colors.spinnerMsgFn,
-      "Thinking...",
-    );
+    const loader = new CancellableLoader(tui, colors.spinnerFn, colors.spinnerMsgFn, "Thinking...");
     loader.onAbort = () => {
       loader.setMessage("Cancelling...");
     };
@@ -230,16 +241,12 @@ export async function startChatTUI(
       const resp = await agent.sendMessage(handle, root, message, {
         signal: loader.signal,
       });
-      responseText = resp.success
-        ? resp.message
-        : colors.error(resp.error ?? resp.message);
+      responseText = resp.success ? resp.message : colors.error(resp.error ?? resp.message);
     } catch (err) {
       if (loader.aborted) {
         responseText = colors.dim("(cancelled)");
       } else {
-        responseText = colors.error(
-          `Error: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        responseText = colors.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

@@ -60,6 +60,7 @@ export async function startAgentChat(
 
 export const agentCommand = command({
   name: "agent",
+  aliases: ["tui"],
   description: "Chat with the agent running in an instance",
   args: {
     instance,
