@@ -154,27 +154,8 @@ async function handleNewInstance(
   const prevConfigDir = process.env.ZEROCLAW_CONFIG_DIR;
   process.env.ZEROCLAW_CONFIG_DIR = agentConfigDir;
 
-  // Memory backend
-  let memoryBackend = "sqlite";
-  const backends = napi.getMemoryBackends();
-
-  if (!options.yes) {
-    const selected = await clack.select({
-      message: "Select agent memory backend",
-      options: backends.map((b: { key: string; label: string }) => ({
-        value: b.key,
-        label: b.label,
-      })),
-      initialValue: "sqlite",
-    });
-
-    if (clack.isCancel(selected)) {
-      clack.cancel("Setup cancelled.");
-      process.exit(0);
-    }
-
-    memoryBackend = selected as string;
-  }
+  // Memory backend — always sqlite (fast, hybrid search, snapshot-safe)
+  const memoryBackend = "sqlite";
 
   // Provider setup via ZeroClaw's interactive wizard
   clack.log.step("Configuring LLM provider...");
@@ -548,7 +529,9 @@ async function startChat(name: string): Promise<void> {
     return;
   }
 
-  await startAgentChat(name, freshConfig);
+  await startAgentChat(name, freshConfig, {
+    initialMessage: "Hey! I just set you up. Introduce yourself and let's get started.",
+  });
 }
 
 export const deploy = command({

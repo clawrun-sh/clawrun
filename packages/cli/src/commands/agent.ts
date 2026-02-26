@@ -27,10 +27,14 @@ async function resolveRoot(
  * Routes messages via `agent.sendMessage()` (single-shot `zeroclaw agent -m`),
  * which executes tools — unlike the daemon's `/webhook` endpoint.
  * Reusable from both the `agent` command and post-deploy flow.
+ *
+ * @param initialMessage — if provided, sent automatically before the REPL starts
+ *   (used post-deploy to kick off the BOOTSTRAP.md onboarding flow).
  */
 export async function startAgentChat(
   instanceName: string,
   config: ClawRunConfigWithSecrets,
+  opts?: { initialMessage?: string },
 ): Promise<void> {
   const { deployedUrl } = config.instance;
   const { cronSecret } = config.secrets;
@@ -56,6 +60,23 @@ export async function startAgentChat(
   // Interactive REPL mode
   console.log(chalk.bold(`Connected to ${chalk.cyan(instanceName)}.`));
   console.log(chalk.dim("Type a message (Ctrl+C to exit).\n"));
+
+  // Send initial seed message to kick off the conversation (e.g. post-deploy bootstrap)
+  if (opts?.initialMessage) {
+    const s = clack.spinner();
+    s.start("Thinking...");
+    try {
+      const resp = await agent.sendMessage(handle, root, opts.initialMessage, {
+        signal: AbortSignal.timeout(150_000),
+      });
+      s.stop("");
+      console.log(resp.success ? chalk.green(resp.message) : chalk.red(resp.error ?? resp.message));
+    } catch (err) {
+      s.stop("");
+      console.log(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+    }
+    console.log();
+  }
 
   try {
     while (true) {
