@@ -1,6 +1,4 @@
 import { command, option, optional, string } from "cmd-ts";
-import { createInterface } from "node:readline/promises";
-import { stdin, stdout } from "node:process";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { createAgent } from "@clawrun/agent";
@@ -9,6 +7,7 @@ import { createSandboxHandle } from "../sandbox/handle.js";
 import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { instance } from "../args/instance.js";
+import { startChatTUI } from "../tui/chat.js";
 import type { ClawRunConfigWithSecrets } from "../instance/config.js";
 
 /** Resolve the workspace root inside a sandbox by querying $HOME. */
@@ -50,70 +49,13 @@ export async function startAgentChat(
   const client = createSandboxClient(instanceName, config);
 
   const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
-
-  console.log(chalk.dim(`Sandbox: ${sandboxId}\n`));
-
   const handle = createSandboxHandle(client, sandboxId);
   const agent = createAgent(config.agent.name);
   const root = await resolveRoot(handle, config.instance.sandboxRoot ?? ".clawrun");
 
-  // Interactive REPL mode
-  console.log(chalk.bold(`Connected to ${chalk.cyan(instanceName)}.`));
-  console.log(chalk.dim("Type a message (Ctrl+C to exit).\n"));
-
-  // Send initial seed message to kick off the conversation (e.g. post-deploy bootstrap)
-  if (opts?.initialMessage) {
-    const s = clack.spinner();
-    s.start("Thinking...");
-    try {
-      const resp = await agent.sendMessage(handle, root, opts.initialMessage, {
-        signal: AbortSignal.timeout(150_000),
-      });
-      s.stop("");
-      console.log(resp.success ? chalk.green(resp.message) : chalk.red(resp.error ?? resp.message));
-    } catch (err) {
-      s.stop("");
-      console.log(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
-    }
-    console.log();
-  }
-
-  try {
-    while (true) {
-      const rl = createInterface({ input: stdin, output: stdout });
-      let msg: string;
-      try {
-        msg = await rl.question(chalk.bold("you> "));
-      } catch {
-        // Ctrl+C / Ctrl+D during input
-        rl.close();
-        break;
-      }
-      rl.close();
-
-      if (!msg.trim()) continue;
-
-      const s = clack.spinner();
-      s.start("Thinking...");
-      try {
-        const resp = await agent.sendMessage(handle, root, msg, {
-          signal: AbortSignal.timeout(150_000),
-        });
-        s.stop("");
-        console.log(
-          resp.success ? chalk.green(resp.message) : chalk.red(resp.error ?? resp.message),
-        );
-      } catch (err) {
-        s.stop("");
-        console.log(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
-      }
-      console.log();
-    }
-  } catch {
-    // unexpected
-  }
-
-  console.log(chalk.dim("\nDisconnected."));
+  await startChatTUI(instanceName, agent, handle, root, sandboxId, {
+    initialMessage: opts?.initialMessage,
+  });
 }
 
 export const agentCommand = command({

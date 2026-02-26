@@ -14,7 +14,7 @@ export const app = subcommands({
   name: "clawrun",
   description: "AI agent hosting, simplified.",
   version,
-  cmds: { deploy, list, destroy, agent: agentCommand, connect, start, stop, logs, pull },
+  cmds: { deploy, list, destroy, agent: agentCommand, tui: agentCommand, connect, start, stop, logs, pull },
   examples: [
     { description: "Deploy a new instance", command: "clawrun deploy" },
     {
@@ -23,6 +23,7 @@ export const app = subcommands({
     },
     { description: "List all instances", command: "clawrun list" },
     { description: "Chat with an agent", command: 'clawrun agent my-instance -m "Hello"' },
+    { description: "Chat TUI", command: "clawrun tui my-instance" },
     { description: "Open a shell in the sandbox", command: "clawrun connect my-instance" },
     { description: "Start sandbox if not running", command: "clawrun start my-instance" },
     { description: "Stop a running sandbox", command: "clawrun stop my-instance" },
