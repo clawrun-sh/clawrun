@@ -70,10 +70,7 @@ interface DerivedDomains {
   groups: Array<{ reason: string; domains: string[] }>;
 }
 
-function deriveAllowedDomains(
-  provider?: string,
-  channelNames?: string[],
-): DerivedDomains {
+function deriveAllowedDomains(provider?: string, channelNames?: string[]): DerivedDomains {
   const groups: DerivedDomains["groups"] = [
     { reason: "Sandbox lifecycle (heartbeat, sidecar)", domains: [...INFRA_DOMAINS] },
   ];
@@ -95,9 +92,7 @@ function deriveAllowedDomains(
 
 type NetworkPolicy = ClawRunConfig["sandbox"]["networkPolicy"];
 
-async function promptNetworkPolicy(
-  derived: DerivedDomains,
-): Promise<NetworkPolicy> {
+async function promptNetworkPolicy(derived: DerivedDomains): Promise<NetworkPolicy> {
   const mode = await clack.select({
     message: "Sandbox network access",
     initialValue: "allow-all",
@@ -117,7 +112,10 @@ async function promptNetworkPolicy(
   clack.log.info(
     `These domains are automatically allowed:\n` +
       derived.groups
-        .map((g) => `  ${chalk.bold(g.reason)}\n` + g.domains.map((d) => chalk.dim(`    ${d}`)).join("\n"))
+        .map(
+          (g) =>
+            `  ${chalk.bold(g.reason)}\n` + g.domains.map((d) => chalk.dim(`    ${d}`)).join("\n"),
+        )
         .join("\n"),
   );
 
@@ -131,7 +129,10 @@ async function promptNetworkPolicy(
   }
 
   const extra = domainsInput
-    ? domainsInput.split(",").map((d) => d.trim()).filter(Boolean)
+    ? domainsInput
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean)
     : [];
   const domains = [...new Set([...derived.all, ...extra])];
 
@@ -145,7 +146,10 @@ async function promptNetworkPolicy(
   }
 
   const denyCidrs = cidrsInput
-    ? cidrsInput.split(",").map((c) => c.trim()).filter(Boolean)
+    ? cidrsInput
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
     : [];
 
   return denyCidrs.length > 0
@@ -325,7 +329,9 @@ async function handleNewInstance(
     const configToml = TOML.parse(readFileSync(configTomlPath, "utf-8"));
     const cc = configToml.channels_config as Record<string, unknown> | undefined;
     const channelNames = cc
-      ? Object.entries(cc).filter(([k, v]) => v != null && typeof v === "object" && k !== "cli").map(([k]) => k)
+      ? Object.entries(cc)
+          .filter(([k, v]) => v != null && typeof v === "object" && k !== "cli")
+          .map(([k]) => k)
       : [];
     const derived = deriveAllowedDomains(providerResult.provider, channelNames);
     networkPolicy = await promptNetworkPolicy(derived);
@@ -597,7 +603,9 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         const agentCfg = readParsedConfig(agentConfigDir);
         const cc = agentCfg.channels_config as Record<string, unknown> | undefined;
         const channelNames = cc
-          ? Object.entries(cc).filter(([k, v]) => v != null && typeof v === "object" && k !== "cli").map(([k]) => k)
+          ? Object.entries(cc)
+              .filter(([k, v]) => v != null && typeof v === "object" && k !== "cli")
+              .map(([k]) => k)
           : [];
         const derived = deriveAllowedDomains(undefined, channelNames);
         existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);

@@ -78,6 +78,28 @@ export async function POST(req: Request) {
           });
 
           if (resp.success) {
+            // Emit tool calls as dynamic-tool events
+            if (resp.toolCalls?.length) {
+              for (let i = 0; i < resp.toolCalls.length; i++) {
+                const tc = resp.toolCalls[i];
+                const id = `tc-${i}`;
+                writer.write({
+                  type: "tool-input-available",
+                  toolCallId: id,
+                  toolName: tc.name,
+                  input: tc.arguments,
+                  dynamic: true,
+                });
+                writer.write({
+                  type: "tool-output-available",
+                  toolCallId: id,
+                  output: tc.output ?? "completed",
+                  dynamic: true,
+                });
+              }
+            }
+
+            // Emit text response
             writer.write({ type: "text-start", id: "text-0" });
             writer.write({
               type: "text-delta",

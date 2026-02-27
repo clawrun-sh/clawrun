@@ -1,12 +1,15 @@
 // --- Network policy ---
 
-export type NetworkPolicy = "allow-all" | "deny-all" | {
-  allow?: string[];
-  subnets?: {
-    allow?: string[];
-    deny?: string[];
-  };
-};
+export type NetworkPolicy =
+  | "allow-all"
+  | "deny-all"
+  | {
+      allow?: string[];
+      subnets?: {
+        allow?: string[];
+        deny?: string[];
+      };
+    };
 
 // --- Command execution ---
 

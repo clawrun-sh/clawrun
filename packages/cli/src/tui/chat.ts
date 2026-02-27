@@ -16,7 +16,7 @@ import {
   imageFallback,
 } from "@mariozechner/pi-tui";
 import { signInviteToken } from "@clawrun/auth";
-import { sendChatMessage } from "../chat-client.js";
+import { sendChatMessage, type ToolCallInfo } from "../chat-client.js";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,16 @@ function extractImages(text: string): {
     return alt ? `[${alt}]` : "";
   });
   return { text: cleaned, images };
+}
+
+// ---------------------------------------------------------------------------
+// Tool call formatting
+// ---------------------------------------------------------------------------
+
+function formatToolArgs(args: Record<string, unknown>): string {
+  const entries = Object.entries(args);
+  if (entries.length === 0) return "";
+  return entries.map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ");
 }
 
 // ---------------------------------------------------------------------------
@@ -236,6 +246,11 @@ export async function startChatTUI(
       const result = await sendChatMessage(deployedUrl, jwt, message, loader.signal);
       if (result.error) {
         responseText = colors.error(result.error);
+      } else if (result.toolCalls.length > 0) {
+        const toolLines = result.toolCalls
+          .map((tc) => `\`${tc.name}\` ${formatToolArgs(tc.arguments)}`)
+          .join("\n");
+        responseText = toolLines + "\n\n" + result.text;
       } else {
         responseText = result.text;
       }

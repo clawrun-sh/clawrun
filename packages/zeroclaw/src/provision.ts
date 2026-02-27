@@ -117,10 +117,7 @@ export async function installTools(
   }
 
   // Install Chromium + system deps
-  const installResult = await sandbox.runCommand("sh", [
-    "-c",
-    "agent-browser install --with-deps",
-  ]);
+  const installResult = await sandbox.runCommand("sh", ["-c", "agent-browser install --with-deps"]);
   if (installResult.exitCode !== 0) {
     const stderr = await installResult.stderr();
     throw new Error(`Failed to install browser dependencies: ${stderr}`);

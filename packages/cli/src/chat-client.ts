@@ -8,10 +8,17 @@
 
 import { EventSourceParserStream } from "eventsource-parser/stream";
 
+export interface ToolCallInfo {
+  name: string;
+  arguments: Record<string, unknown>;
+  output?: string;
+}
+
 export interface ChatResult {
   success: boolean;
   text: string;
   error?: string;
+  toolCalls: ToolCallInfo[];
 }
 
 /**
@@ -39,11 +46,12 @@ export async function sendChatMessage(
   });
 
   if (!resp.ok || !resp.body) {
-    return { success: false, text: "", error: `Request failed: ${resp.status}` };
+    return { success: false, text: "", error: `Request failed: ${resp.status}`, toolCalls: [] };
   }
 
   let fullText = "";
   let error: string | undefined;
+  const toolCalls: ToolCallInfo[] = [];
 
   const eventStream = resp.body
     .pipeThrough(new TextDecoderStream())
@@ -55,6 +63,18 @@ export async function sendChatMessage(
       const event = JSON.parse(data);
       if (event.type === "text-delta") {
         fullText += event.delta;
+      } else if (event.type === "tool-input-available") {
+        toolCalls.push({
+          name: event.toolName,
+          arguments: event.input ?? {},
+        });
+      } else if (event.type === "tool-output-available") {
+        // Attach output to the matching tool call
+        const tc = toolCalls.find((t) => !t.output && t.name);
+        if (tc && event.output != null) {
+          tc.output =
+            typeof event.output === "string" ? event.output : JSON.stringify(event.output);
+        }
       } else if (event.type === "error") {
         error = event.errorText;
       }
@@ -64,8 +84,8 @@ export async function sendChatMessage(
   }
 
   if (error) {
-    return { success: false, text: error, error };
+    return { success: false, text: error, error, toolCalls };
   }
 
-  return { success: true, text: fullText };
+  return { success: true, text: fullText, toolCalls };
 }

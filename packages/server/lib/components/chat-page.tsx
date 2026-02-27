@@ -18,6 +18,13 @@ import {
   MessageResponse,
 } from "@clawrun/ui/components/ai-elements/message";
 import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+} from "@clawrun/ui/components/ai-elements/tool";
+import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
@@ -182,25 +189,40 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
             <Message key={m.id} from={m.role}>
               <MessageContent>
                 {m.role === "assistant" ? (
-                  (() => {
-                    const raw = m.parts
-                      .filter((p) => p.type === "text")
-                      .map((p) => p.text)
-                      .join("");
-                    const segments = splitContentParts(raw);
-                    return segments.map((seg, i) =>
-                      seg.type === "text" ? (
-                        <MessageResponse key={i}>{seg.content}</MessageResponse>
-                      ) : (
-                        <img
-                          key={i}
-                          src={seg.src}
-                          alt={seg.alt}
-                          className="my-2 max-w-full rounded-md"
-                        />
-                      ),
-                    );
-                  })()
+                  m.parts.map((part, i) => {
+                    if (part.type === "text") {
+                      const segments = splitContentParts(part.text);
+                      return segments.map((seg, j) =>
+                        seg.type === "text" ? (
+                          <MessageResponse key={`${i}-${j}`}>
+                            {seg.content}
+                          </MessageResponse>
+                        ) : (
+                          <img
+                            key={`${i}-${j}`}
+                            src={seg.src}
+                            alt={seg.alt}
+                            className="my-2 max-w-full rounded-md"
+                          />
+                        ),
+                      );
+                    }
+                    if (part.type === "dynamic-tool") {
+                      return (
+                        <Tool key={i} defaultOpen={false}>
+                          <ToolHeader
+                            toolName={part.toolName}
+                            state={part.state}
+                          />
+                          <ToolContent>
+                            <ToolInput input={part.input} />
+                            <ToolOutput output={part.output} />
+                          </ToolContent>
+                        </Tool>
+                      );
+                    }
+                    return null;
+                  })
                 ) : (
                   m.parts.map((part, i) => {
                     if (part.type === "text")

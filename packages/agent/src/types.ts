@@ -15,12 +15,20 @@ export interface SandboxHandle {
   }): Promise<CommandResult>;
   writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
   readFile(path: string): Promise<Buffer | null>;
+  domain?(port: number): string;
+}
+
+export interface ToolCallInfo {
+  name: string;
+  arguments: Record<string, unknown>;
+  output?: string;
 }
 
 export interface AgentResponse {
   success: boolean;
   message: string;
   error?: string;
+  toolCalls?: ToolCallInfo[];
 }
 
 export interface CronEntry {

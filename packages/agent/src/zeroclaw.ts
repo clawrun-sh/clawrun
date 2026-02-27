@@ -8,10 +8,12 @@ import {
   buildCronListCommand,
   HOUSEKEEPING_FILES,
 } from "zeroclaw";
+import WebSocket from "ws";
 import type {
   Agent,
   SandboxHandle,
   AgentResponse,
+  ToolCallInfo,
   CronInfo,
   DaemonCommand,
   MonitorConfig,
@@ -57,6 +59,22 @@ export class ZeroclawAgent implements Agent {
       signal?: AbortSignal;
     },
   ): Promise<AgentResponse> {
+    // Try daemon WebSocket first (if domain() is available)
+    if (typeof sandbox.domain === "function") {
+      try {
+        return await this.sendMessageViaDaemon(sandbox, root, message, opts);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Don't log abort errors as warnings — they're intentional
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.warn("Daemon WS failed, falling back to CLI:", msg);
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Fallback: CLI one-shot
     const cmd = buildAgentCommand(`${root}/bin/zeroclaw`, message, this.env(root));
     const result = await sandbox.runCommand({
       cmd: cmd.cmd,
@@ -67,16 +85,212 @@ export class ZeroclawAgent implements Agent {
     const stdout = await result.stdout();
     const stderr = await result.stderr();
     const parsed = parseOutput(stdout, stderr, result.exitCode);
+    const { cleanText, toolCalls } = ZeroclawAgent.extractToolCalls(parsed.message);
 
     // Embed any image files referenced in the response as data URIs
-    const enriched = await this.embedImages(sandbox, root, parsed.message);
+    const enriched = await this.embedImages(sandbox, root, cleanText);
 
-    return { success: parsed.success, message: enriched, error: parsed.error };
+    return {
+      success: parsed.success,
+      message: enriched,
+      error: parsed.error,
+      toolCalls,
+    };
+  }
+
+  private async sendMessageViaDaemon(
+    sandbox: SandboxHandle,
+    root: string,
+    message: string,
+    opts?: {
+      env?: Record<string, string>;
+      signal?: AbortSignal;
+    },
+  ): Promise<AgentResponse> {
+    const daemonUrl = sandbox.domain!(3000);
+    const wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws/chat";
+
+    // Accumulate tool calls from intermediate WS messages.
+    // The daemon sends interleaved: chunk* → tool_call → tool_result → … → done
+    const toolCalls: ToolCallInfo[] = [];
+
+    return new Promise<AgentResponse>((resolve, reject) => {
+      const ws = new WebSocket(wsUrl);
+      const signal = opts?.signal;
+      let settled = false;
+
+      const cleanup = () => {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      };
+
+      const settle = (fn: () => void) => {
+        if (!settled) {
+          settled = true;
+          fn();
+        }
+      };
+
+      if (signal) {
+        if (signal.aborted) {
+          cleanup();
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        signal.addEventListener(
+          "abort",
+          () => {
+            cleanup();
+            settle(() => reject(new DOMException("Aborted", "AbortError")));
+          },
+          { once: true },
+        );
+      }
+
+      ws.on("open", () => {
+        ws.send(JSON.stringify({ type: "message", content: message }));
+      });
+
+      // Buffer for streaming text chunks (same pattern as ZeroClaw's web UI)
+      let pendingContent = "";
+
+      ws.on("message", (data: Buffer) => {
+        // WsMessage shape — matches ZeroClaw web/src/types/api.ts
+        let msg: {
+          type?: "message" | "chunk" | "tool_call" | "tool_result" | "done" | "error";
+          content?: string;
+          full_response?: string;
+          name?: string;
+          args?: Record<string, unknown>;
+          output?: string;
+          message?: string;
+        };
+        try {
+          msg = JSON.parse(data.toString()) as typeof msg;
+        } catch {
+          return; // ignore malformed frames
+        }
+
+        switch (msg.type) {
+          case "chunk": {
+            // Streaming text delta — accumulate in buffer
+            pendingContent += msg.content ?? "";
+            break;
+          }
+          case "tool_call": {
+            // Daemon is invoking a tool — capture name + arguments
+            toolCalls.push({
+              name: msg.name ?? "unknown",
+              arguments: msg.args ?? {},
+            });
+            break;
+          }
+          case "tool_result": {
+            // Tool finished — attach output to the most recent tool call
+            if (toolCalls.length > 0) {
+              toolCalls[toolCalls.length - 1].output = msg.output ?? "";
+            }
+            break;
+          }
+          case "message":
+          case "done": {
+            // Final response — use full_response, content, or accumulated chunks
+            const raw = (msg.full_response ?? msg.content ?? pendingContent).trim();
+            const finalContent =
+              raw || "Tool execution completed, but no final response text was returned.";
+            const { cleanText, toolCalls: extractedTools } =
+              ZeroclawAgent.extractToolCalls(finalContent);
+            // Prefer WS-streamed tool calls; fall back to XML extraction
+            // (for older daemon versions that embed XML in full_response)
+            const finalTools = toolCalls.length > 0 ? toolCalls : extractedTools;
+            pendingContent = "";
+            cleanup();
+            // Embed images then resolve
+            this.embedImages(sandbox, root, cleanText).then(
+              (enriched) =>
+                settle(() =>
+                  resolve({
+                    success: true,
+                    message: enriched,
+                    toolCalls: finalTools,
+                  }),
+                ),
+              (err) => settle(() => reject(err)),
+            );
+            break;
+          }
+          case "error": {
+            pendingContent = "";
+            cleanup();
+            settle(() =>
+              resolve({
+                success: false,
+                message: "",
+                error: msg.message ?? "Unknown error",
+              }),
+            );
+            break;
+          }
+        }
+      });
+
+      ws.on("error", (err: Error) => {
+        cleanup();
+        settle(() => reject(err));
+      });
+
+      ws.on("close", (code: number) => {
+        // Normal close (1000) after we've already resolved is fine
+        if (code !== 1000) {
+          settle(() => reject(new Error(`WebSocket closed with code ${code}`)));
+        }
+      });
+    });
+  }
+
+  /**
+   * Extract `<tool_call>` XML blocks from agent output, returning the cleaned
+   * text and structured tool call info.
+   *
+   * Handles multiple attribute variants emitted by different ZeroClaw versions:
+   *   - `<tool_call name="...">JSON</tool_call>`   (current stable)
+   *   - `<tool_call type="...">JSON</tool_call>`   (newer builds)
+   *
+   * Also strips `<tool_result ... />` self-closing tags and
+   * `<tool_result ...>...</tool_result>` content-bearing tags.
+   */
+  private static extractToolCalls(text: string): {
+    cleanText: string;
+    toolCalls: ToolCallInfo[];
+  } {
+    const toolCalls: ToolCallInfo[] = [];
+    // Match name="..." or type="..." attribute — capture whichever is present
+    const CALL_RE = /<tool_call\s+(?:name|type)="([^"]+)">\s*(\{[\s\S]*?\})\s*<\/tool_call>/g;
+    const RESULT_SELF_RE = /<tool_result\s+[^>]*\/>/g;
+    const RESULT_BLOCK_RE = /<tool_result\s+[^>]*>[\s\S]*?<\/tool_result>/g;
+
+    const cleanText = text
+      .replace(CALL_RE, (_, name, json) => {
+        try {
+          const parsed = JSON.parse(json);
+          toolCalls.push({
+            name,
+            arguments: typeof parsed === "object" && parsed !== null ? parsed : {},
+          });
+        } catch {}
+        return "";
+      })
+      .replace(RESULT_BLOCK_RE, "")
+      .replace(RESULT_SELF_RE, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    return { cleanText, toolCalls };
   }
 
   // Markdown image with attachment: URI — ![alt](attachment:filename.png)
-  private static readonly ATTACHMENT_RE =
-    /!\[([^\]]*)\]\(attachment:([\w][\w.-]*)\)/g;
+  private static readonly ATTACHMENT_RE = /!\[([^\]]*)\]\(attachment:([\w][\w.-]*)\)/g;
 
   // ZeroClaw native marker — [IMAGE:/path/to/file.png]
   private static readonly IMAGE_MARKER_RE = /\[IMAGE:(\/[^\]]+)\]/g;
@@ -84,8 +298,7 @@ export class ZeroclawAgent implements Agent {
   // Bare image filename — catches filenames regardless of LLM formatting
   // (backticks, "File:", list items, "(attached)", etc.)
   // Validated by actually reading the file from the sandbox.
-  private static readonly BARE_IMAGE_RE =
-    /\b([\w][\w.-]*\.(?:png|jpe?g|gif|webp|bmp))\b/gi;
+  private static readonly BARE_IMAGE_RE = /\b([\w][\w.-]*\.(?:png|jpe?g|gif|webp|bmp))\b/gi;
 
   private static readonly MIME_TYPES: Record<string, string> = {
     png: "image/png",
@@ -112,11 +325,7 @@ export class ZeroclawAgent implements Agent {
    * Reads the referenced file from the sandbox and replaces with:
    *   ![alt](data:image/png;base64,…)
    */
-  private async embedImages(
-    sandbox: SandboxHandle,
-    root: string,
-    text: string,
-  ): Promise<string> {
+  private async embedImages(sandbox: SandboxHandle, root: string, text: string): Promise<string> {
     const agentDir = `${root}/agent`;
 
     // 1. Handle ![alt](attachment:filename)
@@ -170,9 +379,9 @@ export class ZeroclawAgent implements Agent {
       // Replace the first occurrence (with surrounding formatting) with data URI
       text = text.replace(
         new RegExp(
-          `(?:[-*]\\s+|File:\\s*)?` +           // optional list marker or "File:"
-          `\`?${escapeRegExp(filename)}\`?` +    // filename, optionally backtick-wrapped
-          `(?:\\s*\\(attached\\))?`,              // optional "(attached)"
+          `(?:[-*]\\s+|File:\\s*)?` + // optional list marker or "File:"
+            `\`?${escapeRegExp(filename)}\`?` + // filename, optionally backtick-wrapped
+            `(?:\\s*\\(attached\\))?`, // optional "(attached)"
         ),
         `![${filename}](data:${mime};base64,${b64})`,
       );

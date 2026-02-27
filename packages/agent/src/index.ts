@@ -2,6 +2,7 @@ export type {
   SandboxHandle,
   CommandResult,
   AgentResponse,
+  ToolCallInfo,
   CronEntry,
   CronInfo,
   DaemonCommand,

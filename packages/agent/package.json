@@ -33,11 +33,13 @@
   },
   "dependencies": {
     "@clawrun/logger": "workspace:*",
+    "ws": "^8.19.0",
     "zeroclaw": "workspace:*"
   },
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.7.0"
   }
 }
