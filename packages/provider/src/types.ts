@@ -1,3 +1,13 @@
+// --- Network policy ---
+
+export type NetworkPolicy = "allow-all" | "deny-all" | {
+  allow?: string[];
+  subnets?: {
+    allow?: string[];
+    deny?: string[];
+  };
+};
+
 // --- Command execution ---
 
 export interface RunCommandOptions {
@@ -27,6 +37,7 @@ export interface ManagedSandbox {
   runCommand(cmd: string, args?: string[]): Promise<CommandResult>;
   runCommand(opts: RunCommandOptions): Promise<CommandResult>;
 
+  updateNetworkPolicy(policy: NetworkPolicy): Promise<void>;
   writeFiles(files: Array<{ path: string; content: Buffer }>): Promise<void>;
   readFile(path: string): Promise<Buffer | null>;
   stop(): Promise<void>;
@@ -66,6 +77,7 @@ export interface CreateSandboxOptions {
   ports?: number[];
   snapshotId?: string;
   resources?: { vcpus: number };
+  networkPolicy?: NetworkPolicy;
 }
 
 export interface SandboxProvider {

@@ -1,6 +1,6 @@
 export type { ZeroclawSandbox, CommandResult } from "./types.js";
-export { provision } from "./provision.js";
-export type { ProvisionOptions } from "./provision.js";
+export { provision, installTools } from "./provision.js";
+export type { ProvisionOptions, InstallToolsOptions } from "./provision.js";
 export { getBinaryPath } from "./binary.js";
 export { parseOutput, parseCronListOutput } from "./output-parser.js";
 export { buildAgentCommand, buildDaemonCommand, buildCronListCommand } from "./command-builder.js";

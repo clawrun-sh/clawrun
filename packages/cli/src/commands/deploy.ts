@@ -15,6 +15,7 @@ import type {
   ProjectHandle,
   StateStoreEntry,
 } from "../platform/index.js";
+import type { ClawRunConfig } from "@clawrun/runtime";
 import {
   createInstance,
   instanceExists,
@@ -28,6 +29,7 @@ import {
   buildConfig,
   toEnvVars,
   readConfig,
+  writeConfig,
   generateSecret,
 } from "../instance/index.js";
 import { extractChannelEnvVars, getChannelSecretDefinitions } from "@clawrun/channel";
@@ -40,6 +42,115 @@ import { createApiClient } from "../api.js";
 
 function generateInstanceName(): string {
   return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
+}
+
+/** Map known provider/channel names to their API domains. */
+const PROVIDER_DOMAINS: Record<string, string[]> = {
+  openai: ["api.openai.com"],
+  openrouter: ["openrouter.ai"],
+  anthropic: ["api.anthropic.com"],
+  google: ["generativelanguage.googleapis.com"],
+  groq: ["api.groq.com"],
+  mistral: ["api.mistral.ai"],
+  deepseek: ["api.deepseek.com"],
+};
+
+const CHANNEL_DOMAINS: Record<string, string[]> = {
+  telegram: ["api.telegram.org"],
+  discord: ["discord.com", "gateway.discord.gg"],
+  slack: ["slack.com"],
+};
+
+const INFRA_DOMAINS = ["*.vercel.app", "*.vercel.sh"];
+
+interface DerivedDomains {
+  /** All domains flat, for the allowlist. */
+  all: string[];
+  /** Labeled groups for display. */
+  groups: Array<{ reason: string; domains: string[] }>;
+}
+
+function deriveAllowedDomains(
+  provider?: string,
+  channelNames?: string[],
+): DerivedDomains {
+  const groups: DerivedDomains["groups"] = [
+    { reason: "Sandbox lifecycle (heartbeat, sidecar)", domains: [...INFRA_DOMAINS] },
+  ];
+  if (provider) {
+    const domains = PROVIDER_DOMAINS[provider.toLowerCase()];
+    if (domains) {
+      groups.push({ reason: `LLM provider (${provider})`, domains: [...domains] });
+    }
+  }
+  for (const ch of channelNames ?? []) {
+    const domains = CHANNEL_DOMAINS[ch.toLowerCase()];
+    if (domains) {
+      groups.push({ reason: `${ch} channel`, domains: [...domains] });
+    }
+  }
+  const all = [...new Set(groups.flatMap((g) => g.domains))];
+  return { all, groups };
+}
+
+type NetworkPolicy = ClawRunConfig["sandbox"]["networkPolicy"];
+
+async function promptNetworkPolicy(
+  derived: DerivedDomains,
+): Promise<NetworkPolicy> {
+  const mode = await clack.select({
+    message: "Sandbox network access",
+    initialValue: "allow-all",
+    options: [
+      { value: "allow-all", label: "Allow all", hint: "unrestricted internet (default)" },
+      { value: "restricted", label: "Restricted", hint: "specify allowed domains/CIDRs" },
+    ],
+  });
+
+  if (clack.isCancel(mode)) {
+    clack.cancel("Setup cancelled.");
+    process.exit(0);
+  }
+
+  if (mode === "allow-all") return "allow-all";
+
+  clack.log.info(
+    `These domains are automatically allowed:\n` +
+      derived.groups
+        .map((g) => `  ${chalk.bold(g.reason)}\n` + g.domains.map((d) => chalk.dim(`    ${d}`)).join("\n"))
+        .join("\n"),
+  );
+
+  const domainsInput = await clack.text({
+    message: "Additional allowed domains, e.g. myapi.example.com, *.cdn.net (comma-separated)",
+  });
+
+  if (clack.isCancel(domainsInput)) {
+    clack.cancel("Setup cancelled.");
+    process.exit(0);
+  }
+
+  const extra = domainsInput
+    ? domainsInput.split(",").map((d) => d.trim()).filter(Boolean)
+    : [];
+  const domains = [...new Set([...derived.all, ...extra])];
+
+  const cidrsInput = await clack.text({
+    message: "Blocked CIDRs, e.g. 10.0.0.0/8 (comma-separated, optional)",
+  });
+
+  if (clack.isCancel(cidrsInput)) {
+    clack.cancel("Setup cancelled.");
+    process.exit(0);
+  }
+
+  const denyCidrs = cidrsInput
+    ? cidrsInput.split(",").map((c) => c.trim()).filter(Boolean)
+    : [];
+
+  return denyCidrs.length > 0
+    ? { allow: domains, subnets: { deny: denyCidrs } }
+    : { allow: domains };
 }
 
 /**
@@ -186,11 +297,19 @@ async function handleNewInstance(
     }
   }
 
-  // Write memory backend into zeroclaw config.toml
+  // Write memory + browser config into zeroclaw config.toml
   const configTomlPath = join(agentConfigDir, "config.toml");
   const tomlContent = readFileSync(configTomlPath, "utf-8");
   const parsed = TOML.parse(tomlContent);
   parsed.memory = { ...((parsed.memory as Record<string, unknown>) ?? {}), backend: memoryBackend };
+  // Enable browser with agent-browser (Chromium) backend.
+  // Domains are unrestricted at the agent level — the sandbox firewall is the real boundary.
+  parsed.browser = {
+    ...((parsed.browser as Record<string, unknown>) ?? {}),
+    enabled: true,
+    backend: "agent_browser",
+    allowed_domains: ["*"],
+  };
   writeFileSync(configTomlPath, TOML.stringify(parsed as TOML.JsonMap));
 
   // Restore ZEROCLAW_CONFIG_DIR
@@ -199,6 +318,18 @@ async function handleNewInstance(
 
   // Seed workspace template files into agent dir (only missing files)
   seedWorkspaceFiles(preset.id, agentConfigDir);
+
+  // Network policy prompt
+  let networkPolicy: NetworkPolicy = "allow-all";
+  if (!options.yes) {
+    const configToml = TOML.parse(readFileSync(configTomlPath, "utf-8"));
+    const cc = configToml.channels_config as Record<string, unknown> | undefined;
+    const channelNames = cc
+      ? Object.entries(cc).filter(([k, v]) => v != null && typeof v === "object" && k !== "cli").map(([k]) => k)
+      : [];
+    const derived = deriveAllowedDomains(providerResult.provider, channelNames);
+    networkPolicy = await promptNetworkPolicy(derived);
+  }
 
   // ClawRun-specific settings
   const activeDuration = defaultActiveDuration;
@@ -283,6 +414,7 @@ async function handleNewInstance(
     sandboxSecret,
     provider: platform.id,
     bundlePaths: preset.bundlePaths,
+    networkPolicy,
   });
 
   // Derive env vars: ClawRun secrets + agent channel tokens
@@ -445,7 +577,39 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       if (prev !== undefined) process.env.ZEROCLAW_CONFIG_DIR = prev;
       else delete process.env.ZEROCLAW_CONFIG_DIR;
     }
+
+    // Network policy reconfig
+    const currentPolicy = existingConfig.sandbox.networkPolicy;
+    const currentLabel = typeof currentPolicy === "string" ? currentPolicy : "restricted";
+
+    const policyAction = await clack.select({
+      message: "Reconfigure network policy?",
+      initialValue: "keep",
+      options: [
+        { value: "keep", label: "Keep current", hint: currentLabel },
+        { value: "restricted", label: "Change to restricted" },
+        { value: "allow-all", label: "Change to allow-all" },
+      ],
+    });
+
+    if (!clack.isCancel(policyAction) && policyAction !== "keep") {
+      if (policyAction === "restricted") {
+        const agentCfg = readParsedConfig(agentConfigDir);
+        const cc = agentCfg.channels_config as Record<string, unknown> | undefined;
+        const channelNames = cc
+          ? Object.entries(cc).filter(([k, v]) => v != null && typeof v === "object" && k !== "cli").map(([k]) => k)
+          : [];
+        const derived = deriveAllowedDomains(undefined, channelNames);
+        existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);
+      } else {
+        // Explicit allow-all to clear any previous restricted policy
+        existingConfig.sandbox.networkPolicy = "allow-all";
+      }
+    }
   }
+
+  // Persist any config changes (e.g. network policy) before upgrade copies files
+  writeConfig(name, existingConfig);
 
   // Seed any missing workspace template files (upgrade path)
   if (existingConfig.instance.preset) {
@@ -463,6 +627,20 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   if (!config) {
     clack.log.error(`No clawrun.json found for instance "${name}".`);
     process.exit(1);
+  }
+
+  // Ensure browser is enabled with agent-browser backend (backfill for older instances).
+  // Domains are unrestricted at the agent level — the sandbox firewall is the real boundary.
+  const agentTomlPath = join(instanceAgentDir(name), "config.toml");
+  if (existsSync(agentTomlPath)) {
+    const agentToml = TOML.parse(readFileSync(agentTomlPath, "utf-8"));
+    agentToml.browser = {
+      ...((agentToml.browser as Record<string, unknown>) ?? {}),
+      enabled: true,
+      backend: "agent_browser",
+      allowed_domains: ["*"],
+    };
+    writeFileSync(agentTomlPath, TOML.stringify(agentToml as TOML.JsonMap));
   }
 
   // Copy mirrored files into .deploy/ (picks up updated config.toml)

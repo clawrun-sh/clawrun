@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cloudClawConfigSchema } from "./schema.js";
+import { cloudClawConfigSchema, type ClawRunConfig } from "./schema.js";
 
 export interface RuntimeConfig {
   instance: { name: string; provider: string; baseUrl?: string; sandboxRoot: string };
@@ -14,6 +14,7 @@ export interface RuntimeConfig {
     cronKeepAliveWindow: number;
     cronWakeLeadTime: number;
     resources: { vcpus: number; memory: number };
+    networkPolicy: ClawRunConfig["sandbox"]["networkPolicy"];
   };
 }
 
@@ -43,6 +44,7 @@ export function getRuntimeConfig(): RuntimeConfig {
         vcpus: parsed.sandbox.resources.vcpus,
         memory: parsed.sandbox.resources.vcpus * 2048,
       },
+      networkPolicy: parsed.sandbox.networkPolicy,
     },
   };
   return cached;

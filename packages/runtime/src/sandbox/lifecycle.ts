@@ -618,7 +618,11 @@ export class SandboxLifecycleManager {
       let sandbox: ManagedSandbox | null = null;
       let snapshotId: string | undefined;
 
-      // 1. Try latest snapshot from provider
+      const networkPolicy = getRuntimeConfig().sandbox.networkPolicy;
+
+      // 1. Try latest snapshot from provider.
+      // Always create with allow-all — installTools needs unrestricted
+      // internet (npm, CDN). Network policy is applied after installTools.
       try {
         const snapshots = await this.provider.listSnapshots();
         const latest = snapshots.sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -673,6 +677,26 @@ export class SandboxLifecycleManager {
         secretKey,
         fromSnapshot: !!snapshotId,
       });
+
+      // Install external tools (browsers, etc.).
+      // Runs on both fresh and snapshot-restored sandboxes so config changes
+      // (e.g. enabling browser) take effect even on stale snapshots.
+      // installTools is idempotent — already-installed tools are a no-op.
+      if (this.agent.installTools) {
+        await this.agent.installTools(sandbox, root, {
+          localAgentDir,
+          secretKey,
+          fromSnapshot: !!snapshotId,
+        });
+      }
+
+      // Lock down network after tool installation.
+      // Both fresh and snapshot-restored sandboxes start with allow-all
+      // so installTools can reach npm/CDN, then we apply the real policy.
+      if (networkPolicy !== "allow-all") {
+        log.info(`Applying network policy to sandbox ${sandbox.id}`);
+        await sandbox.updateNetworkPolicy(networkPolicy);
+      }
 
       // Start sidecar (supervises daemon + heartbeat + health server)
       await this.startSidecar(sandbox, root);

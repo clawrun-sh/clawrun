@@ -8,6 +8,7 @@ import type {
   RunCommandOptions,
   CommandResult,
   SnapshotRef,
+  NetworkPolicy,
 } from "./types.js";
 
 class VercelManagedSandbox implements ManagedSandbox {
@@ -27,6 +28,10 @@ class VercelManagedSandbox implements ManagedSandbox {
 
   get createdAt(): number {
     return this.sandbox.createdAt.getTime();
+  }
+
+  async updateNetworkPolicy(policy: NetworkPolicy): Promise<void> {
+    await this.sandbox.updateNetworkPolicy(policy);
   }
 
   runCommand(cmdOrOpts: string | RunCommandOptions, args?: string[]): Promise<CommandResult> {
@@ -71,6 +76,7 @@ export class VercelSandboxProvider implements SandboxProvider {
     const createOpts: Record<string, unknown> = { timeout: opts.timeout };
     if (opts.ports) createOpts.ports = opts.ports;
     if (opts.resources) createOpts.resources = opts.resources;
+    if (opts.networkPolicy) createOpts.networkPolicy = opts.networkPolicy;
     if (opts.snapshotId) {
       createOpts.source = { type: "snapshot", snapshotId: opts.snapshotId };
     }

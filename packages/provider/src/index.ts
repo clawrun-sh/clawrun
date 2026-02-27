@@ -7,6 +7,7 @@ export type {
   SnapshotInfo,
   CreateSandboxOptions,
   SandboxProvider,
+  NetworkPolicy,
 } from "./types.js";
 
 export type { SnapshotRetentionPolicy } from "./retention.js";

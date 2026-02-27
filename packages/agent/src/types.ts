@@ -59,6 +59,13 @@ export interface Agent {
 
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
+  /**
+   * Install external tools the agent needs (browsers, CLIs, etc.).
+   * Called after provision(), before the daemon starts.
+   * Runs on both fresh and snapshot-restored sandboxes — must be idempotent.
+   */
+  installTools?(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
+
   sendMessage(
     sandbox: SandboxHandle,
     root: string,

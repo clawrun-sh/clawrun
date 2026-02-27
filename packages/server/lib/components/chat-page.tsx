@@ -37,6 +37,30 @@ import { CheckIcon, ClipboardIcon, MessageCircleIcon, Trash2Icon } from "lucide-
 import { useCallback, useEffect, useState } from "react";
 import { useChatHistory } from "../hooks/use-chat-history";
 
+const DATA_URI_IMAGE_RE =
+  /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
+
+type ContentPart =
+  | { type: "text"; content: string }
+  | { type: "image"; alt: string; src: string };
+
+function splitContentParts(text: string): ContentPart[] {
+  const parts: ContentPart[] = [];
+  let lastIndex = 0;
+  for (const match of text.matchAll(DATA_URI_IMAGE_RE)) {
+    const idx = match.index!;
+    if (idx > lastIndex) {
+      parts.push({ type: "text", content: text.slice(lastIndex, idx) });
+    }
+    parts.push({ type: "image", alt: match[1], src: match[2] });
+    lastIndex = idx + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: "text", content: text.slice(lastIndex) });
+  }
+  return parts.length > 0 ? parts : [{ type: "text", content: text }];
+}
+
 const transport = new DefaultChatTransport({
   api: "/api/v1/chat",
   credentials: "same-origin",
@@ -158,12 +182,25 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
             <Message key={m.id} from={m.role}>
               <MessageContent>
                 {m.role === "assistant" ? (
-                  <MessageResponse>
-                    {m.parts
+                  (() => {
+                    const raw = m.parts
                       .filter((p) => p.type === "text")
                       .map((p) => p.text)
-                      .join("")}
-                  </MessageResponse>
+                      .join("");
+                    const segments = splitContentParts(raw);
+                    return segments.map((seg, i) =>
+                      seg.type === "text" ? (
+                        <MessageResponse key={i}>{seg.content}</MessageResponse>
+                      ) : (
+                        <img
+                          key={i}
+                          src={seg.src}
+                          alt={seg.alt}
+                          className="my-2 max-w-full rounded-md"
+                        />
+                      ),
+                    );
+                  })()
                 ) : (
                   m.parts.map((part, i) => {
                     if (part.type === "text")

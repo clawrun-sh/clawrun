@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import * as TOML from "@iarna/toml";
 import type { ZeroclawSandbox } from "./types.js";
 import { getBinaryPath } from "./binary.js";
 import { generateDaemonToml } from "./config-generator.js";
@@ -85,4 +86,43 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
   const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
   const home = (await homeResult.stdout()).trim() || "/home/vercel-sandbox";
   await sandbox.writeFiles([{ path: `${home}/.profile`, content: Buffer.from(profile) }]);
+}
+
+export interface InstallToolsOptions {
+  agentDir: string;
+}
+
+/**
+ * Install external tools that ZeroClaw needs (e.g. agent-browser for web browsing).
+ * Reads config.toml from the sandbox to check if [browser].enabled = true.
+ * Only installs if the user opted in via their config.
+ */
+export async function installTools(
+  sandbox: ZeroclawSandbox,
+  opts: InstallToolsOptions,
+): Promise<void> {
+  // Read the config to check if browser is enabled
+  const configBuf = await sandbox.readFile(`${opts.agentDir}/config.toml`);
+  if (!configBuf) return;
+
+  const config = TOML.parse(configBuf.toString("utf-8"));
+  const browser = config.browser as TOML.JsonMap | undefined;
+  if (!browser?.enabled) return;
+
+  // Install agent-browser CLI globally
+  const npmResult = await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);
+  if (npmResult.exitCode !== 0) {
+    const stderr = await npmResult.stderr();
+    throw new Error(`Failed to install agent-browser: ${stderr}`);
+  }
+
+  // Install Chromium + system deps
+  const installResult = await sandbox.runCommand("sh", [
+    "-c",
+    "agent-browser install --with-deps",
+  ]);
+  if (installResult.exitCode !== 0) {
+    const stderr = await installResult.stderr();
+    throw new Error(`Failed to install browser dependencies: ${stderr}`);
+  }
 }

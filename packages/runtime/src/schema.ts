@@ -31,6 +31,17 @@ export const cloudClawConfigSchema = z.object({
         vcpus: z.number().int().min(2).max(8).default(2),
       })
       .default({ vcpus: 2 }),
+    networkPolicy: z.union([
+      z.literal("allow-all"),
+      z.literal("deny-all"),
+      z.object({
+        allow: z.array(z.string()).optional(),
+        subnets: z.object({
+          allow: z.array(z.string()).optional(),
+          deny: z.array(z.string()).optional(),
+        }).optional(),
+      }),
+    ]).default("allow-all"),
   }),
   secrets: z
     .object({

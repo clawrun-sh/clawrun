@@ -25,5 +25,14 @@ export function generateDaemonToml(config: TOML.JsonMap): string {
     workspace_only: true,
   };
 
+  // Browser: ensure allowed_domains is usable in sandbox mode
+  const browser = cfg.browser as TOML.JsonMap | undefined;
+  if (browser?.enabled) {
+    const domains = browser.allowed_domains as string[] | undefined;
+    if (!domains || domains.length === 0) {
+      browser.allowed_domains = ["*"];
+    }
+  }
+
   return TOML.stringify(cfg);
 }

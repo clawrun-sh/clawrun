@@ -30,6 +30,7 @@ export function buildConfig(
     cronKeepAliveWindow?: number;
     cronWakeLeadTime?: number;
     resources?: { vcpus: number };
+    networkPolicy?: ClawRunConfig["sandbox"]["networkPolicy"];
     cronSecret: string;
     jwtSecret: string;
     webhookSecrets?: Record<string, string>;
@@ -55,6 +56,7 @@ export function buildConfig(
       cronKeepAliveWindow: options.cronKeepAliveWindow,
       cronWakeLeadTime: options.cronWakeLeadTime,
       resources: options.resources,
+      networkPolicy: options.networkPolicy,
     },
     secrets: {
       cronSecret: options.cronSecret,
