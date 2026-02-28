@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/packages/zeroclaw-napi/**"],
+    ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**"],
   },
   ...tseslint.configs.recommended,
   {

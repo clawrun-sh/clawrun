@@ -83,14 +83,17 @@ docker create --name "$CONTAINER_NAME" "$IMAGE_TAG" /bin/true
 mkdir -p "$DIST_DIR"
 
 docker cp "$CONTAINER_NAME:/app/target/release/zeroclaw" "$DEST_BIN"
+docker cp "$CONTAINER_NAME:/zeroclaw-config.schema.json" "$SCRIPT_DIR/src/zeroclaw-config.schema.json"
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
 chmod +x "$DEST_BIN"
 
 # Summary
 SIZE=$(ls -lh "$DEST_BIN" | awk '{print $5}')
+SCHEMA_SIZE=$(ls -lh "$SCRIPT_DIR/src/zeroclaw-config.schema.json" | awk '{print $5}')
 echo ""
 echo "=== Build Summary ==="
 echo "  zeroclaw-linux-amd64: $SIZE"
+echo "  zeroclaw-config.schema.json: $SCHEMA_SIZE"
 echo ""
 echo "Done!"

@@ -22,6 +22,7 @@ export {
   cloudClawConfigSchema,
   buildConfig,
   toEnvVars,
+  sanitizeConfig,
   readConfig,
   writeConfig,
   generateSecret,

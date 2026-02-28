@@ -33,11 +33,14 @@
   },
   "dependencies": {
     "@clawrun/logger": "workspace:*",
+    "@iarna/toml": "^2.2.5",
     "ws": "^8.19.0",
-    "zeroclaw": "workspace:*"
+    "zeroclaw": "workspace:*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",
+    "@types/iarna__toml": "^2.0.5",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
     "typescript": "^5.7.0"

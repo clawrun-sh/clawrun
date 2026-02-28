@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as TOML from "@iarna/toml";
 import type { ZeroclawSandbox } from "./types.js";
+import type { Config as ZeroClawConfig } from "./generated/zeroclaw-config.js";
 import { getBinaryPath } from "./binary.js";
 import { generateDaemonToml } from "./config-generator.js";
 import { readParsedConfig } from "./config-reader.js";
@@ -105,9 +106,8 @@ export async function installTools(
   const configBuf = await sandbox.readFile(`${opts.agentDir}/config.toml`);
   if (!configBuf) return;
 
-  const config = TOML.parse(configBuf.toString("utf-8"));
-  const browser = config.browser as TOML.JsonMap | undefined;
-  if (!browser?.enabled) return;
+  const config = TOML.parse(configBuf.toString("utf-8")) as unknown as ZeroClawConfig;
+  if (!config.browser?.enabled) return;
 
   // Install agent-browser CLI globally
   const npmResult = await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);

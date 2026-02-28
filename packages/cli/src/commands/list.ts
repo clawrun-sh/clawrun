@@ -50,8 +50,7 @@ export const list = command({
     const instances = listInstances();
 
     if (instances.length === 0) {
-      console.log(chalk.dim("No instances found."));
-      console.log(chalk.dim("  Create one with: clawrun deploy starter"));
+      clack.log.info("No instances found.\n  Create one with: clawrun deploy starter");
       return;
     }
 

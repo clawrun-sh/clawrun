@@ -20,14 +20,14 @@ export const pull = command({
   async handler({ instance: instanceName }) {
     const config = readConfig(instanceName);
     if (!config) {
-      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      clack.log.error(`Could not read config for "${instanceName}".`);
       process.exit(1);
     }
 
     const { deployedUrl } = config.instance;
     const { cronSecret } = config.secrets;
     if (!deployedUrl || !cronSecret) {
-      console.error(chalk.red(`Instance "${instanceName}" is not fully deployed.`));
+      clack.log.error(`Instance "${instanceName}" is not fully deployed.`);
       process.exit(1);
     }
 
@@ -36,8 +36,8 @@ export const pull = command({
     // Find running sandbox (don't start one — pull requires an existing sandbox)
     const sandboxId = await getRunningId(client);
     if (!sandboxId) {
-      console.error(
-        chalk.red("No running sandbox found. Start one first with a message or `clawrun deploy`."),
+      clack.log.error(
+        "No running sandbox found. Start one first with a message or `clawrun deploy`.",
       );
       process.exit(1);
     }
@@ -46,7 +46,7 @@ export const pull = command({
     const homeResult = await client.exec(sandboxId, "sh", ["-c", "echo $HOME"]);
     const home = homeResult.stdout.trim();
     if (!home) {
-      console.error(chalk.red("Could not determine sandbox $HOME."));
+      clack.log.error("Could not determine sandbox $HOME.");
       process.exit(1);
     }
     const remoteAgentDir = `${home}/${config.instance.sandboxRoot}/agent`;
@@ -58,7 +58,7 @@ export const pull = command({
     ]);
 
     if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
-      console.log(chalk.yellow("No files found in sandbox agent directory."));
+      clack.log.warn("No files found in sandbox agent directory.");
       return;
     }
 
@@ -69,7 +69,7 @@ export const pull = command({
       .filter((rel) => !LOCAL_OWNED_FILES.has(rel));
 
     if (remoteFiles.length === 0) {
-      console.log(chalk.yellow("No pullable files found (only config files present)."));
+      clack.log.warn("No pullable files found (only config files present).");
       return;
     }
 
@@ -98,15 +98,12 @@ export const pull = command({
 
     s.stop(chalk.green("Done."));
 
-    console.log(`  ${chalk.bold("Pulled:")} ${pulled} file${pulled !== 1 ? "s" : ""}`);
-    if (failed > 0) {
-      console.log(`  ${chalk.dim("Failed:")} ${failed} file${failed !== 1 ? "s" : ""}`);
-    }
-    console.log(`  ${chalk.bold("Destination:")} ${agentDir}`);
-
-    // Show what was pulled
-    for (const relPath of remoteFiles) {
-      console.log(chalk.dim(`    ${relPath}`));
-    }
+    const summary = [
+      `${chalk.bold("Pulled:")} ${pulled} file${pulled !== 1 ? "s" : ""}`,
+      ...(failed > 0 ? [`${chalk.dim("Failed:")} ${failed} file${failed !== 1 ? "s" : ""}`] : []),
+      `${chalk.bold("Destination:")} ${agentDir}`,
+      ...remoteFiles.map((relPath) => chalk.dim(`  ${relPath}`)),
+    ].join("\n");
+    clack.log.info(summary);
   },
 });

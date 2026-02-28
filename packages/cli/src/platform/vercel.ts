@@ -96,7 +96,7 @@ export class VercelPlatformProvider implements PlatformProvider {
       clack.log.error(`Node.js >= 20 is required. You have v${nodeVersion}.`);
       process.exit(1);
     }
-    clack.log.success(`Node.js v${nodeVersion}`);
+    clack.log.step(`Node.js v${nodeVersion}`);
 
     // Vercel CLI
     const vercelSpinner = clack.spinner();
@@ -170,7 +170,8 @@ export class VercelPlatformProvider implements PlatformProvider {
   // ---- Project lifecycle ------------------------------------------------
 
   async createProject(name: string): Promise<ProjectHandle> {
-    console.log(chalk.dim(`  Creating Vercel project "${name}"...`));
+    const s = clack.spinner();
+    s.start(`Creating Vercel project "${name}"...`);
 
     const { stdout } = await execa("vercel", [
       "api",
@@ -187,10 +188,11 @@ export class VercelPlatformProvider implements PlatformProvider {
     };
 
     if (!project.id || !project.accountId) {
+      s.stop(chalk.red("Failed"));
       throw new Error("Vercel API returned an unexpected response (missing id or accountId).");
     }
 
-    console.log(chalk.green(`  Vercel project created: ${name}`));
+    s.stop(chalk.green(`Vercel project created: ${name}`));
     return { provider: "vercel", projectId: project.id, orgId: project.accountId };
   }
 
@@ -335,9 +337,11 @@ export class VercelPlatformProvider implements PlatformProvider {
     const entries = Object.entries(vars);
     if (entries.length === 0) return;
 
-    console.log(chalk.dim("  Persisting env vars to project level..."));
+    const s = clack.spinner();
+    s.start(`Persisting ${entries.length} env vars to project...`);
 
     let succeeded = 0;
+    const warnings: string[] = [];
     for (const [key, value] of entries) {
       // Remove existing (ignore errors — may not exist yet)
       try {
@@ -356,11 +360,14 @@ export class VercelPlatformProvider implements PlatformProvider {
         });
         succeeded++;
       } catch {
-        console.log(chalk.yellow(`  Warning: could not persist ${key} to project.`));
+        warnings.push(key);
       }
     }
 
-    console.log(chalk.green(`  ${succeeded}/${entries.length} env vars persisted to project.`));
+    s.stop(chalk.green(`${succeeded}/${entries.length} env vars persisted to project.`));
+    for (const key of warnings) {
+      clack.log.warn(`Could not persist ${key} to project.`);
+    }
   }
 
   // ---- Platform config --------------------------------------------------
@@ -385,19 +392,17 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
 
       writeFileSync(vercelJsonPath, JSON.stringify(config, null, 2) + "\n");
-      console.log(chalk.green(`  Heartbeat cron set to: ${limits.heartbeatCron}`));
+      clack.log.info(`Heartbeat cron set to: ${limits.heartbeatCron}`);
     } catch {
-      console.log(chalk.yellow("  Could not patch vercel.json cron schedule."));
+      clack.log.warn("Could not patch vercel.json cron schedule.");
     }
   }
 
   async disableDeploymentProtection(dir: string): Promise<void> {
     const handle = this.readProjectLink(dir);
     if (!handle) {
-      console.log(
-        chalk.yellow(
-          "  Could not read Vercel project config — skipping deployment protection config.",
-        ),
+      clack.log.warn(
+        "Could not read Vercel project config — skipping deployment protection config.",
       );
       return;
     }
@@ -418,16 +423,16 @@ export class VercelPlatformProvider implements PlatformProvider {
           input: JSON.stringify({ ssoProtection: null }),
         },
       );
-      console.log(chalk.green("  Deployment protection disabled (SSO bypass)."));
+      clack.log.info("Deployment protection disabled (SSO bypass).");
     } catch {
-      console.log(chalk.yellow("  Could not disable deployment protection."));
+      clack.log.warn("Could not disable deployment protection.");
     }
   }
 
   // ---- Deploy -----------------------------------------------------------
 
   async deploy(dir: string, envVars: Record<string, string>): Promise<string> {
-    console.log(chalk.cyan("\nDeploying to Vercel...\n"));
+    clack.log.step("Deploying to Vercel...");
 
     const envArgs: string[] = [];
     for (const [key, value] of Object.entries(envVars)) {
@@ -447,10 +452,7 @@ export class VercelPlatformProvider implements PlatformProvider {
       const url = stdout.trim().split("\n").pop()?.trim() ?? "";
       return url;
     } catch (error) {
-      console.error(chalk.red("\nDeployment failed."));
-      if (error instanceof Error) {
-        console.error(chalk.red(error.message));
-      }
+      clack.log.error(`Deployment failed.${error instanceof Error ? ` ${error.message}` : ""}`);
       process.exit(1);
     }
   }
@@ -488,7 +490,8 @@ export class VercelPlatformProvider implements PlatformProvider {
   private async waitForStateStoreVars(linkedDir: string): Promise<boolean> {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
 
-    process.stdout.write(chalk.dim("  Waiting for state store provisioning to complete"));
+    const s = clack.spinner();
+    s.start("Waiting for state store provisioning to complete...");
 
     while (Date.now() < deadline) {
       try {
@@ -496,18 +499,17 @@ export class VercelPlatformProvider implements PlatformProvider {
           cwd: linkedDir,
         });
         if (stdout.includes("KV_REST_API_URL")) {
-          process.stdout.write("\n");
+          s.stop("State store provisioned.");
           return true;
         }
       } catch {
         // ignore — keep polling
       }
 
-      process.stdout.write(chalk.dim("."));
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    process.stdout.write("\n");
+    s.stop(chalk.yellow("Timed out waiting for state store."));
     return false;
   }
 

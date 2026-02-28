@@ -26,10 +26,8 @@ export async function startAgentChat(
   const { deployedUrl } = config.instance;
   const { jwtSecret } = config.secrets;
   if (!deployedUrl || !jwtSecret) {
-    console.error(
-      chalk.red(
-        `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
-      ),
+    clack.log.error(
+      `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
     );
     process.exit(1);
   }
@@ -59,17 +57,15 @@ export const agentCommand = command({
   async handler({ instance: instanceName, message }) {
     const config = readConfig(instanceName);
     if (!config) {
-      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      clack.log.error(`Could not read config for "${instanceName}".`);
       process.exit(1);
     }
 
     const { deployedUrl } = config.instance;
     const { jwtSecret } = config.secrets;
     if (!deployedUrl || !jwtSecret) {
-      console.error(
-        chalk.red(
-          `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
-        ),
+      clack.log.error(
+        `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
       process.exit(1);
     }
@@ -81,11 +77,14 @@ export const agentCommand = command({
 
       const jwt = await signInviteToken(jwtSecret);
       const result = await sendChatMessage(deployedUrl, jwt, message, AbortSignal.timeout(150_000));
-      s.stop(result.success ? "Done" : "Error");
 
-      console.log(
-        result.success ? chalk.green(result.text) : chalk.red(result.error ?? result.text),
-      );
+      if (result.success) {
+        s.stop("Done");
+        clack.log.success(result.text);
+      } else {
+        s.stop(chalk.red("Error"));
+        clack.log.error(result.error ?? result.text);
+      }
       process.exit(result.success ? 0 : 1);
     }
 

@@ -1,3 +1,20 @@
+import type {
+  ProviderInfo,
+  ProviderSetup,
+  ChannelInfo,
+  CuratedModel,
+  AgentSetupData,
+} from "./schemas.js";
+
+export type {
+  ProviderInfo,
+  ProviderSetup,
+  ChannelSetupField,
+  ChannelInfo,
+  CuratedModel,
+  AgentSetupData,
+} from "./schemas.js";
+
 export interface CommandResult {
   exitCode: number;
   stdout(): Promise<string>;
@@ -96,4 +113,34 @@ export interface Agent {
   getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo>;
 
   getMonitorConfig(root: string): MonitorConfig;
+
+  /** Providers this agent supports, grouped by tier. */
+  getProviders(): ProviderInfo[];
+
+  /** Default model for a given provider name. */
+  getDefaultModel(provider: string): string;
+
+  /** Curated static model list for a provider. Used as fallback when live fetch fails. */
+  getCuratedModels(provider: string): CuratedModel[];
+
+  /** API endpoint for fetching live model lists. Null if not supported. */
+  getModelsFetchEndpoint(
+    provider: string,
+    apiUrl?: string,
+  ): {
+    url: string;
+    authHeader: (key: string) => Record<string, string>;
+  } | null;
+
+  /** ALL channels this agent supports, with complete setup field declarations. */
+  getSupportedChannels(): ChannelInfo[];
+
+  /** Write agent-specific config from normalized setup data. */
+  writeSetupConfig(agentDir: string, data: AgentSetupData): void;
+
+  /** Read existing setup from agent config dir. Null if no config. */
+  readSetup(agentDir: string): {
+    provider?: Partial<ProviderSetup>;
+    channels?: Record<string, Record<string, string>>;
+  } | null;
 }

@@ -1,4 +1,27 @@
 /**
+ * Result of validating channel credentials during onboarding.
+ */
+export interface ChannelValidationResult {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Validates channel credentials during onboarding.
+ *
+ * Each channel that supports credential verification implements this interface.
+ * Validators make the same HTTP calls ZeroClaw's wizard.rs uses — they are
+ * CLI-time only and have no runtime dependencies.
+ */
+export interface ChannelValidator {
+  /** Unique channel identifier, e.g. "telegram", "discord". */
+  readonly channelId: string;
+
+  /** Verify credentials by calling the platform API. */
+  validate(fields: Record<string, string>): Promise<ChannelValidationResult>;
+}
+
+/**
  * Result of verifying an incoming webhook request.
  */
 export interface AuthResult {
@@ -15,28 +38,6 @@ export interface WakeSignal {
   chatId?: string;
   /** Original webhook payload for debugging/logging. */
   rawPayload: unknown;
-}
-
-/**
- * Maps an agent's channel configuration to ClawRun env vars.
- *
- * Used by the CLI to extract tokens from the agent's config.toml (via napi)
- * and surface them as CLAWRUN_* env vars for the deployed app.
- */
-export interface ChannelEnvMapping {
-  channelId: string;
-  /** Key in agent's channels_config, e.g. "telegram" */
-  configKey: string;
-  /** Fields to extract: configField -> envVar name */
-  fields: Array<{
-    configField: string; // e.g. "bot_token"
-    envVar: string; // e.g. "CLAWRUN_TELEGRAM_BOT_TOKEN"
-  }>;
-  /** Auto-generated secrets (not from agent config) */
-  generatedSecrets: Array<{
-    envVar: string; // e.g. "CLAWRUN_TELEGRAM_WEBHOOK_SECRET"
-    purpose: string; // human-readable, e.g. "webhook request verification"
-  }>;
 }
 
 /**
@@ -65,12 +66,6 @@ export interface WakeHookAdapter {
    * 200 = platform considers it delivered (most others).
    */
   readonly wakeResponseStatus: number;
-
-  /** Env vars this adapter needs. Used by CLI to extract from agent config. */
-  readonly envMapping: ChannelEnvMapping;
-
-  /** Are required env vars set? */
-  isConfigured(): boolean;
 
   /** Register webhook URL with the platform. No-op for always-on channels. */
   registerWebhook(webhookUrl: string): Promise<void>;

@@ -3,11 +3,12 @@ import { join, resolve } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import { execa } from "execa";
 import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
 import type { ClawRunConfig } from "./config.js";
-import { readConfig, writeConfig } from "./config.js";
+import { readConfig, writeConfig, sanitizeConfig } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -55,7 +56,7 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
   ];
 
   for (const pkg of packages) {
-    console.log(chalk.dim(`  Packing ${pkg.name}...`));
+    clack.log.info(chalk.dim(`Packing ${pkg.name}...`));
     const { stdout } = await execa("pnpm", ["pack", "--pack-destination", instancePath], {
       cwd: pkg.dir,
     });
@@ -121,9 +122,11 @@ export async function createInstance(
     throw new Error(`Instance "${name}" already exists at ${dir}`);
   }
 
-  console.log(chalk.cyan(`\nCreating instance "${name}"...`));
-  console.log(chalk.dim(`  Path: ${dir}`));
-  console.log(chalk.dim(`  Mode: ${devMode ? "dev (packed tarballs)" : "production"}`));
+  clack.log.step(
+    `Creating instance "${name}"\n` +
+      chalk.dim(`Path: ${dir}\n`) +
+      chalk.dim(`Mode: ${devMode ? "dev (packed tarballs)" : "production"}`),
+  );
 
   // Create directories
   mkdirSync(dir, { recursive: true });
@@ -142,7 +145,7 @@ export async function createInstance(
   // Resolve dependencies
   let deps: Record<string, string>;
   if (devMode) {
-    console.log(chalk.cyan("\n  Packing local packages...\n"));
+    clack.log.step("Packing local packages...");
     deps = await packLocalDeps(deployDir);
   } else {
     deps = {
@@ -169,17 +172,17 @@ export async function createInstance(
   copyMirroredFiles(name);
 
   // Install dependencies in .deploy/
-  console.log(chalk.cyan("\n  Installing dependencies...\n"));
+  clack.log.step("Installing dependencies...");
   await execa("npm", ["install"], {
     cwd: deployDir,
     stdio: "inherit",
   });
 
   // Apply templates from installed @clawrun/server into .deploy/
-  console.log(chalk.cyan("\n  Applying templates..."));
+  clack.log.step("Applying templates...");
   applyTemplates(deployDir);
 
-  console.log(chalk.green(`\n  Instance "${name}" created.`));
+  clack.log.success(`Instance "${name}" created.`);
   return dir;
 }
 
@@ -193,10 +196,11 @@ export function copyMirroredFiles(name: string): void {
   const agentDir = instanceAgentDir(name);
   const deployDir = instanceDeployDir(name);
 
-  // clawrun.json
-  const configSrc = join(dir, "clawrun.json");
-  if (existsSync(configSrc)) {
-    writeFileSync(join(deployDir, "clawrun.json"), readFileSync(configSrc));
+  // clawrun.json — sanitize before bundling (secrets stay as env vars only)
+  const config = readConfig(name);
+  if (config) {
+    const safe = sanitizeConfig(config);
+    writeFileSync(join(deployDir, "clawrun.json"), JSON.stringify(safe, null, 2) + "\n");
   }
 
   // agent/config.toml
@@ -313,11 +317,11 @@ export async function upgradeInstance(name: string): Promise<void> {
   // Ensure .deploy/ exists (migration from old layout)
   mkdirSync(deployDir, { recursive: true });
 
-  console.log(chalk.cyan(`\nUpgrading instance "${name}"...`));
+  clack.log.step(`Upgrading instance "${name}"...`);
 
   // In dev mode, repack local packages to pick up changes
   if (isDevMode()) {
-    console.log(chalk.cyan("  Repacking local packages...\n"));
+    clack.log.step("Repacking local packages...");
     const deps = await packLocalDeps(deployDir);
 
     // Update package.json with new tarball paths and current peer deps
@@ -332,7 +336,7 @@ export async function upgradeInstance(name: string): Promise<void> {
   // Remove node_modules to force fresh install from new tarballs
   const nodeModulesDir = join(deployDir, "node_modules");
   if (existsSync(nodeModulesDir)) {
-    console.log(chalk.dim("  Cleaning node_modules..."));
+    clack.log.info(chalk.dim("Cleaning node_modules..."));
     rmSync(nodeModulesDir, { recursive: true, force: true });
   }
 
@@ -345,7 +349,7 @@ export async function upgradeInstance(name: string): Promise<void> {
   // Remove .next build cache so Vercel does a clean build
   const nextCacheDir = join(deployDir, ".next");
   if (existsSync(nextCacheDir)) {
-    console.log(chalk.dim("  Cleaning .next cache..."));
+    clack.log.info(chalk.dim("Cleaning .next cache..."));
     rmSync(nextCacheDir, { recursive: true, force: true });
   }
 
@@ -353,17 +357,17 @@ export async function upgradeInstance(name: string): Promise<void> {
   copyMirroredFiles(name);
 
   // Fresh install
-  console.log(chalk.cyan("  Installing dependencies...\n"));
+  clack.log.step("Installing dependencies...");
   await execa("npm", ["install"], {
     cwd: deployDir,
     stdio: "inherit",
   });
 
   // Reapply templates from the updated @clawrun/server
-  console.log(chalk.cyan("\n  Reapplying templates..."));
+  clack.log.step("Reapplying templates...");
   applyTemplates(deployDir);
 
-  console.log(chalk.green(`  Instance "${name}" upgraded.`));
+  clack.log.success(`Instance "${name}" upgraded.`);
 }
 
 export function destroyInstance(name: string): void {
@@ -374,5 +378,5 @@ export function destroyInstance(name: string): void {
   }
 
   rmSync(dir, { recursive: true, force: true });
-  console.log(chalk.green(`  Instance "${name}" destroyed.`));
+  clack.log.success(`Instance "${name}" destroyed.`);
 }

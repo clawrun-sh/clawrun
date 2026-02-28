@@ -4,7 +4,6 @@ import { cloudClawConfigSchema, type ClawRunConfig } from "@clawrun/runtime";
 export { cloudClawConfigSchema };
 import { generateSecret } from "@clawrun/auth";
 export { generateSecret };
-import { getChannelSecretDefinitions } from "@clawrun/channel";
 import { instanceDir } from "./paths.js";
 
 const SCHEMA_URL = "https://clawrun.sh/schema.json";
@@ -70,8 +69,8 @@ export function buildConfig(
 // --- Env var derivation ---
 
 /** Derive ClawRun env vars from a structured config (for .env / Vercel).
- *  Channel env vars (bot tokens, etc.) are NOT included — the caller
- *  extracts those separately via extractChannelEnvVars(). */
+ *  Secrets are env-var-only — they are stripped from the bundled clawrun.json
+ *  so they never appear in the Vercel deployment source viewer. */
 export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, string> {
   const vars: Record<string, string> = {};
 
@@ -80,14 +79,10 @@ export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, stri
   vars["CLAWRUN_JWT_SECRET"] = config.secrets.jwtSecret;
   vars["CLAWRUN_SANDBOX_SECRET"] = config.secrets.sandboxSecret;
 
-  // Per-channel webhook secrets
+  // Per-channel webhook secrets: CLAWRUN_WEBHOOK_SECRET_<CHANNEL>
   if (config.secrets.webhookSecrets) {
-    // Map per-channel secrets to their env var names
-    for (const def of getChannelSecretDefinitions()) {
-      const secret = config.secrets.webhookSecrets[def.channelId];
-      if (secret) {
-        vars[def.envVar] = secret;
-      }
+    for (const [channelId, secret] of Object.entries(config.secrets.webhookSecrets)) {
+      vars[`CLAWRUN_WEBHOOK_SECRET_${channelId.toUpperCase()}`] = secret;
     }
   }
 
@@ -104,6 +99,24 @@ export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, stri
   }
 
   return vars;
+}
+
+// --- Sanitization ---
+
+/**
+ * Return a deploy-safe copy of a config with all secrets removed.
+ *
+ * Uses an allowlist of top-level keys — any new key added to the schema
+ * must be explicitly listed here to be included in the deployment bundle.
+ * This prevents accidental secret leakage if the schema grows.
+ */
+export function sanitizeConfig(config: ClawRunConfig): Omit<ClawRunConfig, "secrets" | "state"> {
+  return {
+    $schema: config.$schema,
+    instance: config.instance,
+    agent: config.agent,
+    sandbox: config.sandbox,
+  };
 }
 
 // --- I/O ---

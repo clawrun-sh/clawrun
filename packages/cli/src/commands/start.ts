@@ -14,17 +14,15 @@ export const start = command({
   async handler({ instance: instanceName }) {
     const config = readConfig(instanceName);
     if (!config) {
-      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      clack.log.error(`Could not read config for "${instanceName}".`);
       process.exit(1);
     }
 
     const { deployedUrl } = config.instance;
     const { jwtSecret } = config.secrets;
     if (!deployedUrl || !jwtSecret) {
-      console.error(
-        chalk.red(
-          `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
-        ),
+      clack.log.error(
+        `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
       process.exit(1);
     }

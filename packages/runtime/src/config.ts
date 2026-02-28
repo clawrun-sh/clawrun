@@ -16,6 +16,23 @@ export interface RuntimeConfig {
     resources: { vcpus: number; memory: number };
     networkPolicy: ClawRunConfig["sandbox"]["networkPolicy"];
   };
+  secrets?: {
+    webhookSecrets?: Record<string, string>;
+  };
+}
+
+const WEBHOOK_SECRET_PREFIX = "CLAWRUN_WEBHOOK_SECRET_";
+
+/** Scan process.env for CLAWRUN_WEBHOOK_SECRET_<CHANNEL> vars. */
+function readWebhookSecretsFromEnv(): Record<string, string> {
+  const secrets: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith(WEBHOOK_SECRET_PREFIX) && value) {
+      const channelId = key.slice(WEBHOOK_SECRET_PREFIX.length).toLowerCase();
+      secrets[channelId] = value;
+    }
+  }
+  return secrets;
 }
 
 let cached: RuntimeConfig | null = null;
@@ -45,6 +62,9 @@ export function getRuntimeConfig(): RuntimeConfig {
         memory: parsed.sandbox.resources.vcpus * 2048,
       },
       networkPolicy: parsed.sandbox.networkPolicy,
+    },
+    secrets: {
+      webhookSecrets: readWebhookSecretsFromEnv(),
     },
   };
   return cached;

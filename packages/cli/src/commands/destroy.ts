@@ -7,8 +7,11 @@ import {
   destroyInstance,
   instanceDir,
   instanceDeployDir,
+  instanceAgentDir,
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
+import { createAgent } from "@clawrun/agent";
+import { initializeAdapters, teardownWakeHooks } from "@clawrun/channel";
 import { instance } from "../args/instance.js";
 import { yes } from "../args/yes.js";
 
@@ -24,15 +27,14 @@ export const destroy = command({
     const meta = getInstance(name);
     const dir = instanceDir(name);
 
-    console.log(chalk.bold(`\nInstance: ${name}`));
-    if (meta) {
-      console.log(chalk.dim(`  Preset: ${meta.preset}`));
-      console.log(chalk.dim(`  Agent: ${meta.agent}`));
-      if (meta.deployedUrl) {
-        console.log(chalk.dim(`  URL: ${meta.deployedUrl}`));
-      }
-    }
-    console.log(chalk.dim(`  Path: ${dir}`));
+    clack.log.step(
+      `Instance: ${chalk.bold(name)}` +
+        (meta
+          ? `\n${chalk.dim(`Preset: ${meta.preset} | Agent: ${meta.agent}`)}` +
+            (meta.deployedUrl ? `\n${chalk.dim(`URL: ${meta.deployedUrl}`)}` : "")
+          : "") +
+        `\n${chalk.dim(`Path: ${dir}`)}`,
+    );
 
     if (!yes) {
       const confirmed = await clack.confirm({
@@ -41,7 +43,7 @@ export const destroy = command({
       });
 
       if (clack.isCancel(confirmed) || !confirmed) {
-        console.log(chalk.yellow("  Aborted."));
+        clack.cancel("Aborted.");
         return;
       }
 
@@ -50,36 +52,55 @@ export const destroy = command({
       });
 
       if (clack.isCancel(confirmation) || confirmation !== "delete my project") {
-        console.log(chalk.yellow("  Aborted."));
+        clack.cancel("Aborted.");
         return;
       }
     }
 
-    // Delete platform project first (needs project link dir to still exist)
+    // Read config before any deletions (needed for hooks + platform)
     const config = readConfig(name);
     if (!config) {
-      console.log(chalk.yellow("  No config found — skipping platform project deletion."));
+      clack.log.warn("No config found — skipping platform project deletion.");
       destroyInstance(name);
+      clack.log.success("Local instance directory removed.");
       return;
     }
 
+    // Unregister wake hooks (e.g. Telegram webhook) before deleting the project.
+    // If left active, the platform keeps delivering messages to a dead URL.
+    try {
+      const agent = createAgent(config.agent.name);
+      const agentDir = instanceAgentDir(name);
+      const setup = agent.readSetup(agentDir);
+      const webhookSecrets = config.secrets?.webhookSecrets ?? {};
+      initializeAdapters(setup?.channels ?? {}, webhookSecrets);
+      await teardownWakeHooks();
+    } catch {
+      // Best-effort — don't block destroy if hooks can't be cleaned up.
+      // The platform will stop delivering after enough failures anyway.
+      clack.log.warn("Could not unregister wake hooks (best-effort, continuing).");
+    }
+
+    // Delete platform project (needs project link dir to still exist)
     const platform = getPlatformProvider(config.instance.provider);
     const handle = platform.readProjectLink(instanceDeployDir(name));
 
     if (!handle) {
-      console.log(chalk.yellow("  No project link found — skipping platform project deletion."));
+      clack.log.warn("No project link found — skipping platform project deletion.");
     } else {
-      console.log(chalk.dim(`  Removing project (${handle.projectId})...`));
+      const s = clack.spinner();
+      s.start(`Removing project (${handle.projectId})...`);
       try {
         await platform.deleteProject(handle);
-        console.log(chalk.green("  Project deleted."));
+        s.stop(chalk.green("Project deleted."));
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.log(chalk.yellow(`  Could not delete project: ${msg.slice(0, 200)}`));
+        s.stop(chalk.yellow(`Could not delete project: ${msg.slice(0, 200)}`));
       }
     }
 
     // Remove local instance directory
     destroyInstance(name);
+    clack.log.success("Instance destroyed.");
   },
 });

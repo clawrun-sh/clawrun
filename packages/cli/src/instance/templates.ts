@@ -1,6 +1,6 @@
 import { cpSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import chalk from "chalk";
+import * as clack from "@clack/prompts";
 
 /**
  * Paths that existed in previous template versions but have since been removed.
@@ -12,10 +12,8 @@ export function applyTemplates(instancePath: string): void {
   const templatesDir = join(instancePath, "node_modules", "@clawrun", "server", "templates");
 
   if (!existsSync(templatesDir)) {
-    console.log(
-      chalk.yellow(
-        "  Warning: templates directory not found in @clawrun/server. Skipping template application.",
-      ),
+    clack.log.warn(
+      "Templates directory not found in @clawrun/server. Skipping template application.",
     );
     return;
   }
@@ -33,5 +31,5 @@ export function applyTemplates(instancePath: string): void {
     force: true,
   });
 
-  console.log(chalk.green("  Templates applied."));
+  clack.log.success("Templates applied.");
 }

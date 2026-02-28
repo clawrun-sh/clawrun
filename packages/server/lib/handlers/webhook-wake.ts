@@ -26,11 +26,6 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
     return new Response("Unknown channel", { status: 404 });
   }
 
-  // Gate on configuration
-  if (!adapter.isConfigured()) {
-    return new Response(`${adapter.name} not configured`, { status: 200 });
-  }
-
   // 2. Read body as Buffer (needed for HMAC/signature verification)
   let bodyBuffer: Buffer;
   try {

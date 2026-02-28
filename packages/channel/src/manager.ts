@@ -1,4 +1,4 @@
-import { getConfiguredAdapters } from "./registry.js";
+import { getAllAdapters } from "./registry.js";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("channel");
@@ -13,7 +13,7 @@ const log = createLogger("channel");
  * webhooks are permanently configured and the handler checks sandbox state.
  */
 export async function registerWakeHooks(baseUrl: string): Promise<void> {
-  const adapters = getConfiguredAdapters();
+  const adapters = getAllAdapters();
   if (adapters.length === 0) {
     log.warn("registerWakeHooks: no configured channel adapters found — wake hooks not registered");
     return;
@@ -48,7 +48,7 @@ export async function registerWakeHooks(baseUrl: string): Promise<void> {
  * handler returns 200 without waking when it detects the sandbox is running.
  */
 export async function teardownWakeHooks(): Promise<void> {
-  const adapters = getConfiguredAdapters();
+  const adapters = getAllAdapters();
   if (adapters.length === 0) {
     log.warn("teardownWakeHooks: no configured channel adapters found");
     return;

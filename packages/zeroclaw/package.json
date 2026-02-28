@@ -22,6 +22,7 @@
   ],
   "scripts": {
     "build:bin": "bash build-docker.sh",
+    "generate:types": "bash scripts/generate-types.sh",
     "clean": "rm -rf dist",
     "build": "tsc",
     "dev": "tsc --watch",
@@ -29,12 +30,14 @@
     "format:check": "prettier --check src"
   },
   "dependencies": {
-    "@iarna/toml": "^2.2.5"
+    "@iarna/toml": "^2.2.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",
     "@types/iarna__toml": "^2.0.5",
     "@types/node": "^22.0.0",
+    "json-schema-to-typescript": "^15.0.0",
     "typescript": "^5.7.0"
   },
   "engines": {

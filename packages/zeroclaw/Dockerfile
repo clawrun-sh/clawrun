@@ -10,3 +10,7 @@ COPY zeroclaw-src/ .
 RUN cargo build --release
 
 RUN strip target/release/zeroclaw
+
+# Extract JSON Schema from the binary (schemars-derived, Draft 2020-12)
+RUN ./target/release/zeroclaw config schema 2>/dev/null \
+    | sed -n '/^{/,$ p' > /zeroclaw-config.schema.json

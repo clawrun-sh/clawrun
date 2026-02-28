@@ -1,5 +1,7 @@
-import { SandboxLifecycleManager } from "@clawrun/runtime";
-import { registerWakeHooks, teardownWakeHooks } from "@clawrun/channel";
+import { join, dirname } from "node:path";
+import { SandboxLifecycleManager, type RuntimeConfig } from "@clawrun/runtime";
+import { registerWakeHooks, teardownWakeHooks, initializeAdapters } from "@clawrun/channel";
+import type { Agent } from "@clawrun/agent";
 
 export function setupLifecycleHooks(): void {
   SandboxLifecycleManager.setHooks({
@@ -12,4 +14,11 @@ export function setupLifecycleHooks(): void {
       return registerWakeHooks(baseUrl);
     },
   });
+}
+
+export function initializeWakeHookAdapters(agent: Agent, config: RuntimeConfig): void {
+  const agentDir = join(process.cwd(), dirname(config.agent.config));
+  const setup = agent.readSetup(agentDir);
+  const webhookSecrets = config.secrets?.webhookSecrets ?? {};
+  initializeAdapters(setup?.channels ?? {}, webhookSecrets);
 }

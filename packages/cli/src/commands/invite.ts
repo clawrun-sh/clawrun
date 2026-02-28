@@ -1,5 +1,6 @@
 import { command, option, optional, string } from "cmd-ts";
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import qrcode from "qrcode-terminal";
 import { readConfig } from "../instance/index.js";
 import { signInviteToken } from "@clawrun/auth";
@@ -57,17 +58,15 @@ export const invite = command({
   async handler({ instance: instanceName, ttl: rawTTL }) {
     const config = readConfig(instanceName);
     if (!config) {
-      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      clack.log.error(`Could not read config for "${instanceName}".`);
       process.exit(1);
     }
 
     const { deployedUrl } = config.instance;
     const { jwtSecret } = config.secrets;
     if (!deployedUrl || !jwtSecret) {
-      console.error(
-        chalk.red(
-          `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
-        ),
+      clack.log.error(
+        `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
       process.exit(1);
     }
@@ -76,12 +75,8 @@ export const invite = command({
     const jwt = await signInviteToken(jwtSecret, span);
     const url = `${deployedUrl}/auth/accept?token=${jwt}`;
 
-    console.log();
-    console.log(chalk.bold(`Invite link for ${chalk.cyan(instanceName)}`));
-    console.log(chalk.dim(`Expires in ${label}`));
-    console.log();
-    console.log(chalk.underline(url));
-    console.log();
+    clack.log.success(`Invite link for ${chalk.cyan(instanceName)}`);
+    clack.log.info(`Expires in ${label}\n\n${chalk.underline(url)}`);
 
     // Render QR code to terminal
     qrcode.generate(url, { small: true }, (code: string) => {

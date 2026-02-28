@@ -25,7 +25,7 @@
     "dist"
   ],
   "dependencies": {
-    "@clack/prompts": "^0.10.0",
+    "@clack/prompts": "^1.0.1",
     "@clawrun/agent": "workspace:*",
     "@clawrun/auth": "workspace:*",
     "@clawrun/channel": "workspace:*",
@@ -43,7 +43,6 @@
     "qrcode-terminal": "^0.12.0",
     "sandbox": "2.4.0",
     "zeroclaw": "workspace:*",
-    "zeroclaw-napi": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

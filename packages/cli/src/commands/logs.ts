@@ -1,5 +1,6 @@
 import { command, flag, option, optional, number, string } from "cmd-ts";
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import { readConfig, instanceDeployDir } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import { instance } from "../args/instance.js";
@@ -45,14 +46,12 @@ export const logs = command({
   async handler({ instance: instanceName, follow, limit, json, query, since, level }) {
     const config = readConfig(instanceName);
     if (!config) {
-      console.error(chalk.red(`Could not read config for "${instanceName}".`));
+      clack.log.error(`Could not read config for "${instanceName}".`);
       process.exit(1);
     }
 
     if (!config.instance.deployedUrl) {
-      console.error(
-        chalk.red(`Instance "${instanceName}" is not deployed. Run "clawrun deploy" first.`),
-      );
+      clack.log.error(`Instance "${instanceName}" is not deployed. Run "clawrun deploy" first.`);
       process.exit(1);
     }
 
@@ -69,9 +68,7 @@ export const logs = command({
         level,
       });
     } catch (err) {
-      console.error(
-        chalk.red(`Failed to stream logs: ${err instanceof Error ? err.message : String(err)}`),
-      );
+      clack.log.error(`Failed to stream logs: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
   },

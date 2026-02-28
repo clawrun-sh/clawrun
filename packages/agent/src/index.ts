@@ -9,5 +9,12 @@ export type {
   MonitorConfig,
   ProvisionOpts,
   Agent,
+  ProviderInfo,
+  ProviderSetup,
+  ChannelSetupField,
+  ChannelInfo,
+  CuratedModel,
+  AgentSetupData,
 } from "./types.js";
+export { agentSetupDataSchema, channelInfoSchema, providerSetupSchema } from "./schemas.js";
 export { createAgent } from "./registry.js";

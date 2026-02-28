@@ -1,4 +1,4 @@
-import { setupLifecycleHooks } from "@clawrun/server/setup";
+import { setupLifecycleHooks, initializeWakeHookAdapters } from "@clawrun/server/setup";
 import { registerAgent, getRuntimeConfig } from "@clawrun/runtime";
 import { createAgent } from "@clawrun/agent";
 
@@ -13,8 +13,12 @@ export function register() {
     }
   }
 
-  const { agent } = getRuntimeConfig();
-  const instance = createAgent(agent.name);
-  registerAgent(agent.name, instance);
+  const config = getRuntimeConfig();
+  const instance = createAgent(config.agent.name);
+  registerAgent(config.agent.name, instance);
+
+  // Read agent channel config and initialize wake hook adapters
+  initializeWakeHookAdapters(instance, config);
+
   setupLifecycleHooks();
 }

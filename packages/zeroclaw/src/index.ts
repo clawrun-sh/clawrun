@@ -6,4 +6,6 @@ export { parseOutput, parseCronListOutput } from "./output-parser.js";
 export { buildAgentCommand, buildDaemonCommand, buildCronListCommand } from "./command-builder.js";
 export { generateDaemonToml } from "./config-generator.js";
 export { readParsedConfig } from "./config-reader.js";
+export { validateConfig, safeValidateConfig, configDefaults } from "./schema.js";
+export type { ZeroClawConfig } from "./schema.js";
 export { HOUSEKEEPING_FILES, DAEMON_PROCESS_PATTERN } from "./constants.js";
