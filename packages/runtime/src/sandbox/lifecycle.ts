@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
 import type { Agent, CronInfo } from "@clawrun/agent";
+import { DAEMON_PORT } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 import { getStateStore } from "../storage/state.js";
@@ -631,7 +632,7 @@ export class SandboxLifecycleManager {
             sandbox = await this.provider.create({
               snapshotId: latest.id,
               timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
-              ports: [3000, SIDECAR_HEALTH_PORT],
+              ports: [DAEMON_PORT, SIDECAR_HEALTH_PORT],
               resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
             });
             snapshotId = latest.id;
@@ -649,7 +650,7 @@ export class SandboxLifecycleManager {
       if (!sandbox) {
         sandbox = await this.provider.create({
           timeout: getActiveDurationMs() * NATIVE_TTL_MULTIPLIER,
-          ports: [3000, SIDECAR_HEALTH_PORT],
+          ports: [DAEMON_PORT, SIDECAR_HEALTH_PORT],
           resources: { vcpus: getRuntimeConfig().sandbox.resources.vcpus },
         });
       }
@@ -739,7 +740,7 @@ export class SandboxLifecycleManager {
         cmd: daemonCmd.cmd,
         args: daemonCmd.args,
         env: daemonCmd.env,
-        port: 3000,
+        port: DAEMON_PORT,
         readyTimeout: DAEMON_READY_TIMEOUT_MS,
       },
       heartbeat: {

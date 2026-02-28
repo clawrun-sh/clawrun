@@ -1,5 +1,6 @@
 import * as TOML from "@iarna/toml";
 import type { Config as ZeroClawConfig } from "./generated/zeroclaw-config.js";
+import { DAEMON_PORT, DAEMON_HOST } from "./constants.js";
 
 /**
  * Convert a parsed ZeroClaw config object to TOML format for writing into
@@ -12,8 +13,8 @@ export function generateDaemonToml(config: ZeroClawConfig): string {
   // Gateway: sandbox-specific (port/host/binding) — not user-managed
   cfg.gateway = {
     ...(cfg.gateway ?? {}),
-    port: 3000,
-    host: "0.0.0.0",
+    port: DAEMON_PORT,
+    host: DAEMON_HOST,
     require_pairing: false,
     allow_public_bind: true,
   };

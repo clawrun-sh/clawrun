@@ -21,5 +21,5 @@ export { getAgent, registerAgent } from "./agents/registry.js";
 // Config
 export { getRuntimeConfig } from "./config.js";
 export type { RuntimeConfig } from "./config.js";
-export { cloudClawConfigSchema } from "./schema.js";
+export { cloudClawConfigSchema, SANDBOX_DEFAULTS } from "./schema.js";
 export type { ClawRunConfig } from "./schema.js";

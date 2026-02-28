@@ -9,6 +9,7 @@ import {
   readParsedConfig,
   configDefaults,
   HOUSEKEEPING_FILES,
+  DAEMON_PORT,
 } from "zeroclaw";
 import type { ZeroClawConfig } from "zeroclaw";
 import * as TOML from "@iarna/toml";
@@ -216,7 +217,7 @@ export class ZeroclawAgent implements Agent {
       signal?: AbortSignal;
     },
   ): Promise<AgentResponse> {
-    const daemonUrl = sandbox.domain!(3000);
+    const daemonUrl = sandbox.domain!(DAEMON_PORT);
     const wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws/chat";
 
     // Accumulate tool calls from intermediate WS messages.
@@ -1387,6 +1388,9 @@ export class ZeroclawAgent implements Agent {
       // Schema defaults as foundation — every section gets all required fields.
       // Null values are harmlessly dropped by TOML.stringify.
       ...configDefaults,
+      // default_temperature has no schema default but is required.
+      // 0.7 matches ZeroClaw's documented default.
+      default_temperature: 0.7,
       // User's existing config overrides whole sections.
       ...existing,
 
@@ -1437,7 +1441,7 @@ export class ZeroclawAgent implements Agent {
     // cli is required (no #[serde(default)]) when the section exists.
     if (Object.keys(data.channels).length > 0) {
       const cc: Record<string, unknown> = {
-        ...(existing.channels_config ?? {}),
+        ...((config.channels_config as Record<string, unknown>) ?? {}),
       };
       if (cc.cli === undefined) cc.cli = true;
       for (const [channelId, fields] of Object.entries(data.channels)) {

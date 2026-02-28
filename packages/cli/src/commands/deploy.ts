@@ -15,6 +15,8 @@ import type {
   StateStoreEntry,
 } from "../platform/index.js";
 import type { ClawRunConfig } from "@clawrun/runtime";
+import { SANDBOX_DEFAULTS } from "@clawrun/runtime";
+import { configDefaults } from "zeroclaw";
 import {
   createInstance,
   instanceExists,
@@ -70,6 +72,20 @@ const CHANNEL_DOMAINS: Record<string, string[]> = {
 };
 
 const INFRA_DOMAINS = ["*.vercel.app", "*.vercel.sh"];
+
+/**
+ * Deploy-time defaults for agent setup.
+ * Backends derived from ZeroClaw schema defaults.
+ * Explicit overrides: browser enabled + wildcard domains (schema defaults to disabled + empty).
+ */
+const DEPLOY_AGENT_DEFAULTS = {
+  memory: { backend: configDefaults.memory?.backend ?? "sqlite" },
+  browser: {
+    enabled: true, // override: schema defaults to false
+    backend: configDefaults.browser?.backend ?? "agent_browser",
+    allowedDomains: ["*"] as string[], // override: schema defaults to []
+  },
+};
 
 interface DerivedDomains {
   /** All domains flat, for the allowlist. */
@@ -189,9 +205,6 @@ function seedWorkspaceFiles(presetId: string, agentDir: string): void {
   }
 }
 
-// Default active duration from the Zod schema (600s = 10 min)
-const DEFAULT_ACTIVE_DURATION_S = 600;
-
 async function detectTier(platform: PlatformProvider): Promise<{
   tier: PlatformTier;
   limits: PlatformLimits;
@@ -236,9 +249,8 @@ async function handleNewInstance(
   await platform.checkPrerequisites();
 
   const { tier, limits } = await detectTier(platform);
-  const defaultActiveDuration = DEFAULT_ACTIVE_DURATION_S;
   const tierLabel = tier === "hobby" ? `${platform.name} free plan` : `${platform.name} paid plan`;
-  const activeDurationMins = Math.round(DEFAULT_ACTIVE_DURATION_S / 60);
+  const activeDurationMins = Math.round(SANDBOX_DEFAULTS.activeDuration / 60);
 
   clack.note(
     `Instance:   ${chalk.bold(name)}\n` +
@@ -271,8 +283,7 @@ async function handleNewInstance(
   agent.writeSetupConfig(agentConfigDir, {
     provider: providerResult,
     channels: channelSetup.channels,
-    memory: { backend: "sqlite" },
-    browser: { enabled: true, backend: "agent_browser", allowedDomains: ["*"] },
+    ...DEPLOY_AGENT_DEFAULTS,
   });
 
   // Seed workspace template files into agent dir (only missing files)
@@ -289,7 +300,6 @@ async function handleNewInstance(
   }
 
   // ClawRun-specific settings
-  const activeDuration = defaultActiveDuration;
   const cronSecret = generateSecret();
   const jwtSecret = generateSecret();
   const webhookSecrets: Record<string, string> = {};
@@ -366,7 +376,6 @@ async function handleNewInstance(
   clack.note("Building and deploying to " + platform.name, "Deploy");
 
   const config = buildConfig(name, preset.id, preset.agent, {
-    activeDuration,
     cronSecret,
     jwtSecret,
     webhookSecrets,
@@ -485,8 +494,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       agent.writeSetupConfig(agentConfigDir, {
         provider: result,
         channels: existingSetup?.channels ?? {},
-        memory: { backend: "sqlite" },
-        browser: { enabled: true, backend: "agent_browser", allowedDomains: ["*"] },
+        ...DEPLOY_AGENT_DEFAULTS,
       });
     }
 
@@ -504,8 +512,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
           model: "anthropic/claude-sonnet-4-6",
         },
         channels: channelResult.channels,
-        memory: { backend: "sqlite" },
-        browser: { enabled: true, backend: "agent_browser", allowedDomains: ["*"] },
+        ...DEPLOY_AGENT_DEFAULTS,
       });
     }
 
@@ -573,8 +580,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       agentObj.writeSetupConfig(agentCfgDir, {
         provider: currentSetup.provider as { provider: string; apiKey: string; model: string },
         channels: currentSetup.channels ?? {},
-        memory: { backend: "sqlite" },
-        browser: { enabled: true, backend: "agent_browser", allowedDomains: ["*"] },
+        ...DEPLOY_AGENT_DEFAULTS,
       });
     }
   }

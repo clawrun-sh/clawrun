@@ -18,3 +18,4 @@ export type {
 } from "./types.js";
 export { agentSetupDataSchema, channelInfoSchema, providerSetupSchema } from "./schemas.js";
 export { createAgent } from "./registry.js";
+export { DAEMON_PORT } from "zeroclaw";

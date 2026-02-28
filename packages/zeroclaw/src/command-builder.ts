@@ -1,3 +1,5 @@
+import { DAEMON_PORT, DAEMON_HOST } from "./constants.js";
+
 interface SandboxCommand {
   cmd: string;
   args: string[];
@@ -23,7 +25,13 @@ export function buildDaemonCommand(
 ): SandboxCommand {
   return {
     cmd: binaryPath,
-    args: ["daemon", "--port", String(options?.port ?? 3000), "--host", options?.host ?? "0.0.0.0"],
+    args: [
+      "daemon",
+      "--port",
+      String(options?.port ?? DAEMON_PORT),
+      "--host",
+      options?.host ?? DAEMON_HOST,
+    ],
     env,
   };
 }

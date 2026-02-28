@@ -7,6 +7,14 @@ const stateSchema = z.object({
   kvUrl: z.string().optional(),
 });
 
+/** Default values for the sandbox config, used by the Zod schema and importable by other packages. */
+export const SANDBOX_DEFAULTS = {
+  activeDuration: 600,
+  cronKeepAliveWindow: 900,
+  cronWakeLeadTime: 60,
+  vcpus: 2,
+} as const;
+
 export const cloudClawConfigSchema = z.object({
   $schema: z.string().optional(),
   instance: z.object({
@@ -22,15 +30,15 @@ export const cloudClawConfigSchema = z.object({
     bundlePaths: z.array(z.string()).default([]),
   }),
   sandbox: z.object({
-    activeDuration: z.number().default(600),
-    cronKeepAliveWindow: z.number().default(900),
-    cronWakeLeadTime: z.number().default(60),
+    activeDuration: z.number().default(SANDBOX_DEFAULTS.activeDuration),
+    cronKeepAliveWindow: z.number().default(SANDBOX_DEFAULTS.cronKeepAliveWindow),
+    cronWakeLeadTime: z.number().default(SANDBOX_DEFAULTS.cronWakeLeadTime),
     resources: z
       .object({
         // Vercel Sandbox API enforces vcpus >= 2.
-        vcpus: z.number().int().min(2).max(8).default(2),
+        vcpus: z.number().int().min(2).max(8).default(SANDBOX_DEFAULTS.vcpus),
       })
-      .default({ vcpus: 2 }),
+      .default({ vcpus: SANDBOX_DEFAULTS.vcpus }),
     networkPolicy: z
       .union([
         z.literal("allow-all"),

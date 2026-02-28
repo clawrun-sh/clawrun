@@ -6,4 +6,7 @@ export const HOUSEKEEPING_FILES = [
   "jobs.db-journal",
 ];
 
+export const DAEMON_PORT = 3000;
+export const DAEMON_HOST = "0.0.0.0";
+
 export const DAEMON_PROCESS_PATTERN = "zeroclaw daemon";
