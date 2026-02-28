@@ -1,7 +1,7 @@
 import { createUIMessageStreamResponse, createUIMessageStream } from "ai";
 import type { TextUIPart } from "ai";
 import { getProvider } from "@clawrun/provider";
-import { getAgent, getRuntimeConfig, SandboxLifecycleManager } from "@clawrun/runtime";
+import { getAgent, getRuntimeConfig, resolveRoot, SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
 import { requireSessionOrBearerAuth } from "../auth/session.js";
 
@@ -68,9 +68,7 @@ export async function POST(req: Request) {
           const provider = getProvider(config.instance.provider);
           const sandbox = await provider.get(result.sandboxId);
 
-          const homeResult = await sandbox.runCommand("sh", ["-c", "echo ~"]);
-          const home = (await homeResult.stdout()).trim();
-          const root = `${home}/${config.instance.sandboxRoot}`;
+          const root = await resolveRoot(sandbox);
 
           const agent = getAgent();
           const resp = await agent.sendMessage(sandbox, root, message, {

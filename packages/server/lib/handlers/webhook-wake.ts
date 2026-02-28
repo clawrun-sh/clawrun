@@ -1,5 +1,6 @@
 import { getAdapter } from "@clawrun/channel";
-import { SandboxLifecycleManager } from "@clawrun/runtime";
+import { getProvider } from "@clawrun/provider";
+import { getAgent, getRuntimeConfig, resolveRoot, SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:webhook");
@@ -15,10 +16,11 @@ const log = createLogger("handler:webhook");
  *   5. Parse wake signal — null means not a wakeable event
  *   6. For always-on channels: check sandbox state, skip if already running
  *   7. Send courtesy message (best-effort)
- *   8. Wake sandbox — webhook deletion happens inside startNewLocked() after
- *      sidecar is confirmed running (teardownWakeHooks). Returning 503 causes
- *      the messenger to retry, which the creation lock handles idempotently.
- *   9. Return adapter-specific status (503 for Telegram, 200 for most others)
+ *   8. Wake sandbox with skipTeardownWakeHooks — webhook stays active until
+ *      we forward the triggering message to the agent
+ *   9. Forward the triggering message to the agent, send response via adapter,
+ *      then tear down the webhook
+ *  10. Return 200 (message handled) or adapter-specific status (fallback)
  */
 export async function handleWakeWebhook(req: Request, channelId: string): Promise<Response> {
   // 1. Look up adapter
@@ -68,9 +70,7 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
   // 7. For always-on channels, check if sandbox is already running.
   // Programmable-webhook channels (Telegram) don't need this check — the
   // webhook only exists when the sandbox is stopped. Webhook deletion happens
-  // later inside startNewLocked() → teardownWakeHooks(), after the sidecar is
-  // confirmed running. Until then, retries from the messenger (triggered by
-  // the 503 response) are handled idempotently by the creation lock.
+  // later after the message is forwarded to the agent.
   if (!adapter.programmableWebhook) {
     try {
       const manager = new SandboxLifecycleManager();
@@ -85,17 +85,56 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
 
   // 8. Send courtesy message (best-effort)
   if (signal.chatId) {
-    await adapter.sendCourtesyMessage(signal.chatId, "Waking up, one moment...");
+    await adapter.sendMessage(signal.chatId, "Waking up, one moment...");
   }
 
-  // 9. Wake sandbox
+  // 9. Wake sandbox — delay webhook teardown so we can forward the message first
+  const manager = new SandboxLifecycleManager();
+  let result: Awaited<ReturnType<typeof manager.wake>>;
   try {
-    const manager = new SandboxLifecycleManager();
-    await manager.wake();
+    result = await manager.wake({ skipTeardownWakeHooks: true });
   } catch (err) {
     log.error(`Webhook-triggered wake failed (${channelId}):`, err);
+    // Best-effort teardown even on failure
+    try {
+      await manager.teardownWakeHooks();
+    } catch {}
+    return new Response(null, { status: adapter.wakeResponseStatus });
   }
 
-  // 10. Return adapter-specific status
-  return new Response(null, { status: adapter.wakeResponseStatus });
+  // 10. Forward the triggering message to the agent, then tear down hooks
+  if (
+    signal.messageText &&
+    signal.chatId &&
+    result.status === "running" &&
+    result.sandboxId
+  ) {
+    try {
+      const config = getRuntimeConfig();
+      const provider = getProvider(config.instance.provider);
+      const sandbox = await provider.get(result.sandboxId);
+
+      const root = await resolveRoot(sandbox);
+
+      const agent = getAgent();
+      const resp = await agent.sendMessage(sandbox, root, signal.messageText, {
+        signal: AbortSignal.timeout(120_000),
+      });
+
+      if (resp.success && resp.message) {
+        await adapter.sendMessage(signal.chatId, resp.message);
+      }
+    } catch (err) {
+      log.error(`Failed to forward wake message to agent (${channelId}):`, err);
+    }
+  }
+
+  // Always tear down hooks after forwarding (or on fallback)
+  try {
+    await manager.teardownWakeHooks();
+  } catch (err) {
+    log.error(`Failed to tear down wake hooks (${channelId}):`, err);
+  }
+
+  return new Response(null, { status: 200 });
 }

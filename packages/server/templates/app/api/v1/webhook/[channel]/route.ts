@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+export const maxDuration = 150;
 import { handleWakeWebhook } from "@clawrun/server/api/webhook-wake";
 
 export async function POST(req: Request, { params }: { params: Promise<{ channel: string }> }) {

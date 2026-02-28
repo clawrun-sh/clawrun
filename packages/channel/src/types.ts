@@ -36,6 +36,8 @@ export interface WakeSignal {
   channelId: string;
   /** Chat/channel/conversation ID for sending courtesy messages. */
   chatId?: string;
+  /** Text content of the triggering message, if available. */
+  messageText?: string;
   /** Original webhook payload for debugging/logging. */
   rawPayload: unknown;
 }
@@ -86,6 +88,6 @@ export interface WakeHookAdapter {
   /** Extract wake signal from webhook payload. Null = not a wakeable event. */
   parseWakeSignal(body: unknown): WakeSignal | null;
 
-  /** Send "waking up" courtesy message to user. Best-effort, never throws. */
-  sendCourtesyMessage(chatId: string, message: string): Promise<void>;
+  /** Send a text message to a chat. Best-effort, never throws. */
+  sendMessage(chatId: string, message: string): Promise<void>;
 }

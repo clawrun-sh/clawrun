@@ -13,6 +13,7 @@ import type { ExtendReason } from "./extend-reasons.js";
 import { GracePeriodReason, FileActivityReason, CronScheduleReason } from "./extend-reasons.js";
 import { createLogger } from "@clawrun/logger";
 import type { SidecarConfig } from "../sidecar/types.js";
+import { resolveRoot } from "./resolve-root.js";
 
 const log = createLogger("sandbox");
 
@@ -249,7 +250,7 @@ export class SandboxLifecycleManager {
    * Tear down channel wake hooks when sandbox starts.
    * Throws if hooks are not initialized.
    */
-  private async teardownWakeHooks(): Promise<void> {
+  async teardownWakeHooks(): Promise<void> {
     if (!SandboxLifecycleManager.hooks.onSandboxStarted) {
       throw new Error(
         "Cannot tear down wake hooks: lifecycle hooks not initialized." +
@@ -330,7 +331,7 @@ export class SandboxLifecycleManager {
    * sandbox is stopped. Unlike heartbeat(), this does NOT make keep-alive
    * or sleep decisions — it only ensures a sandbox exists.
    */
-  async wake(): Promise<SandboxResult> {
+  async wake(opts?: { skipTeardownWakeHooks?: boolean }): Promise<SandboxResult> {
     const sandboxes = await this.listSandboxes();
     const active = sandboxes.filter((s) => this.isActive(s));
 
@@ -340,7 +341,7 @@ export class SandboxLifecycleManager {
     }
 
     log.info("Wake: no active sandbox, starting one");
-    return this.startNew();
+    return this.startNew(opts);
   }
 
   /**
@@ -593,7 +594,7 @@ export class SandboxLifecycleManager {
     return { running: false };
   }
 
-  private async startNew(): Promise<SandboxResult> {
+  private async startNew(opts?: { skipTeardownWakeHooks?: boolean }): Promise<SandboxResult> {
     const nonce = await tryAcquireCreationLock();
     if (!nonce) {
       // Another caller is creating — wait briefly and re-check
@@ -608,13 +609,13 @@ export class SandboxLifecycleManager {
     }
 
     try {
-      return await this.startNewLocked();
+      return await this.startNewLocked(opts);
     } finally {
       await releaseCreationLock(nonce);
     }
   }
 
-  private async startNewLocked(): Promise<SandboxResult> {
+  private async startNewLocked(opts?: { skipTeardownWakeHooks?: boolean }): Promise<SandboxResult> {
     try {
       let sandbox: ManagedSandbox | null = null;
       let snapshotId: string | undefined;
@@ -655,11 +656,7 @@ export class SandboxLifecycleManager {
         });
       }
 
-      // Resolve workspace root from sandbox HOME
-      const { sandboxRoot } = getRuntimeConfig().instance;
-      const homeResult = await sandbox.runCommand("sh", ["-c", "echo ~"]);
-      const home = (await homeResult.stdout()).trim();
-      const root = `${home}/${sandboxRoot}`;
+      const root = await resolveRoot(sandbox);
 
       // Write clawrun.json into the sandbox workspace
       const clawrunJson = readBundledCloudclawJson();
@@ -701,7 +698,9 @@ export class SandboxLifecycleManager {
 
       // Start sidecar (supervises daemon + heartbeat + health server)
       await this.startSidecar(sandbox, root);
-      await this.teardownWakeHooks();
+      if (!opts?.skipTeardownWakeHooks) {
+        await this.teardownWakeHooks();
+      }
 
       return { status: "running", sandboxId: sandbox.id };
     } catch (err) {

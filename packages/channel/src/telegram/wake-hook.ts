@@ -59,15 +59,17 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
 
     const chat = message.chat as Record<string, unknown> | undefined;
     const chatId = chat?.id as number | undefined;
+    const text = message.text as string | undefined;
 
     return {
       channelId: this.channelId,
       chatId: chatId != null ? String(chatId) : undefined,
+      messageText: text || undefined,
       rawPayload: body,
     };
   }
 
-  async sendCourtesyMessage(chatId: string, message: string): Promise<void> {
+  async sendMessage(chatId: string, message: string): Promise<void> {
     try {
       await fetch(`${TELEGRAM_API}${this.token}/sendMessage`, {
         method: "POST",

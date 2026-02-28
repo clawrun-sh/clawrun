@@ -5,6 +5,7 @@ import { getProvider } from "@clawrun/provider";
 import type { Agent, AgentResponse } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
+import { resolveRoot } from "./resolve-root.js";
 
 const SANDBOX_TIMEOUT_MS = 60_000;
 const COMMAND_TIMEOUT_MS = 45_000;
@@ -42,11 +43,7 @@ export async function runAgent(
       ...(snapshotId ? { snapshotId } : {}),
     });
 
-    // Resolve workspace root from sandbox HOME
-    const { sandboxRoot } = getRuntimeConfig().instance;
-    const homeResult = await sandbox.runCommand("sh", ["-c", "echo ~"]);
-    const home = (await homeResult.stdout()).trim();
-    const root = `${home}/${sandboxRoot}`;
+    const root = await resolveRoot(sandbox);
 
     // Provision agent (binary, config, secret key, .profile)
     const localAgentDir = join(process.cwd(), "agent");

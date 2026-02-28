@@ -8,6 +8,7 @@ export type {
   SandboxStatus,
 } from "./sandbox/lifecycle.js";
 export { runAgent } from "./sandbox/runner.js";
+export { resolveRoot } from "./sandbox/resolve-root.js";
 
 // Storage
 export { getStateStore, getLockStore } from "./storage/state.js";
