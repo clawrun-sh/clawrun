@@ -24,6 +24,7 @@
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.scripts.json && tsc",
     "dev": "tsc --watch",
+    "test": "vitest run",
     "lint": "eslint src",
     "format:check": "prettier --check src"
   },
