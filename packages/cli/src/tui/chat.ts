@@ -16,7 +16,7 @@ import {
   imageFallback,
 } from "@mariozechner/pi-tui";
 import { signInviteToken } from "@clawrun/auth";
-import { sendChatMessage, type ToolCallInfo } from "../chat-client.js";
+import { sendChatMessage } from "../chat-client.js";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,9 @@ export async function startChatTUI(
 
   // Render ❯ prompt inside the editor's left padding on the first content line
   const editorRender = editor.render.bind(editor);
-  (editor as any).render = (width: number): string[] => {
+  (editor as unknown as { render: (width: number) => string[] }).render = (
+    width: number,
+  ): string[] => {
     const lines = editorRender(width);
     // lines[0] = top border, lines[1] = first content line
     if (lines.length > 1) {

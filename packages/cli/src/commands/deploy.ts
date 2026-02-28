@@ -21,7 +21,6 @@ import {
   createInstance,
   instanceExists,
   getInstance,
-  instanceDir,
   instanceAgentDir,
   instanceDeployDir,
   saveDeployedUrl,
@@ -392,7 +391,7 @@ async function handleNewInstance(
     ...stateResult.vars,
   };
 
-  const dir = await createInstance(name, config, allEnvVars);
+  await createInstance(name, config, allEnvVars);
   const deployDir = instanceDeployDir(name);
 
   // Write the project link into .deploy/
@@ -442,7 +441,6 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
     process.exit(1);
   }
 
-  const dir = instanceDir(name);
   const deployDir = instanceDeployDir(name);
 
   clack.intro(chalk.bold.cyan(`Redeploying: ${name}`));

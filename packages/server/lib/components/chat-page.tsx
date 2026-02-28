@@ -32,10 +32,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@clawrun/ui/components/ai-elements/prompt-input";
-import {
-  Suggestion,
-  Suggestions,
-} from "@clawrun/ui/components/ai-elements/suggestion";
+import { Suggestion, Suggestions } from "@clawrun/ui/components/ai-elements/suggestion";
 import { SpeechInput } from "@clawrun/ui/components/ai-elements/speech-input";
 import { ThemeToggle } from "@clawrun/ui/components/theme-toggle";
 import { Button } from "@clawrun/ui/components/ui/button";
@@ -44,12 +41,9 @@ import { CheckIcon, ClipboardIcon, MessageCircleIcon, Trash2Icon } from "lucide-
 import { useCallback, useEffect, useState } from "react";
 import { useChatHistory } from "../hooks/use-chat-history";
 
-const DATA_URI_IMAGE_RE =
-  /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
+const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
-type ContentPart =
-  | { type: "text"; content: string }
-  | { type: "image"; alt: string; src: string };
+type ContentPart = { type: "text"; content: string } | { type: "image"; alt: string; src: string };
 
 function splitContentParts(text: string): ContentPart[] {
   const parts: ContentPart[] = [];
@@ -73,11 +67,7 @@ const transport = new DefaultChatTransport({
   credentials: "same-origin",
 });
 
-const suggestions = [
-  "What can you do?",
-  "Tell me about yourself",
-  "What tools do you have?",
-];
+const suggestions = ["What can you do?", "Tell me about yourself", "What tools do you have?"];
 
 interface ChatPageProps {
   instanceName?: string;
@@ -128,12 +118,9 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
     setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
   }, []);
 
-  const handleTextChange = useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setText(event.target.value);
-    },
-    [],
-  );
+  const handleTextChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(event.target.value);
+  }, []);
 
   const handleCopy = useCallback((messageId: string, content: string) => {
     navigator.clipboard.writeText(content);
@@ -153,10 +140,15 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
       {/* Header — pinned top */}
       <header className="flex shrink-0 items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <a href="https://clawrun.sh" target="_blank" rel="noopener noreferrer" className="font-semibold text-sm">ClawRun</a>
-          {version && (
-            <span className="text-muted-foreground text-xs">v{version}</span>
-          )}
+          <a
+            href="https://clawrun.sh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-sm"
+          >
+            ClawRun
+          </a>
+          {version && <span className="text-muted-foreground text-xs">v{version}</span>}
           {instanceName && (
             <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
               {instanceName}
@@ -188,48 +180,40 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
           {messages.map((m) => (
             <Message key={m.id} from={m.role}>
               <MessageContent>
-                {m.role === "assistant" ? (
-                  m.parts.map((part, i) => {
-                    if (part.type === "text") {
-                      const segments = splitContentParts(part.text);
-                      return segments.map((seg, j) =>
-                        seg.type === "text" ? (
-                          <MessageResponse key={`${i}-${j}`}>
-                            {seg.content}
-                          </MessageResponse>
-                        ) : (
-                          <img
-                            key={`${i}-${j}`}
-                            src={seg.src}
-                            alt={seg.alt}
-                            className="my-2 max-w-full rounded-md"
-                          />
-                        ),
-                      );
-                    }
-                    if (part.type === "dynamic-tool") {
-                      return (
-                        <Tool key={i} defaultOpen={false}>
-                          <ToolHeader
-                            toolName={part.toolName}
-                            state={part.state}
-                          />
-                          <ToolContent>
-                            <ToolInput input={part.input} />
-                            <ToolOutput output={part.output} />
-                          </ToolContent>
-                        </Tool>
-                      );
-                    }
-                    return null;
-                  })
-                ) : (
-                  m.parts.map((part, i) => {
-                    if (part.type === "text")
-                      return <span key={i}>{part.text}</span>;
-                    return null;
-                  })
-                )}
+                {m.role === "assistant"
+                  ? m.parts.map((part, i) => {
+                      if (part.type === "text") {
+                        const segments = splitContentParts(part.text);
+                        return segments.map((seg, j) =>
+                          seg.type === "text" ? (
+                            <MessageResponse key={`${i}-${j}`}>{seg.content}</MessageResponse>
+                          ) : (
+                            <img
+                              key={`${i}-${j}`}
+                              src={seg.src}
+                              alt={seg.alt}
+                              className="my-2 max-w-full rounded-md"
+                            />
+                          ),
+                        );
+                      }
+                      if (part.type === "dynamic-tool") {
+                        return (
+                          <Tool key={i} defaultOpen={false}>
+                            <ToolHeader toolName={part.toolName} state={part.state} />
+                            <ToolContent>
+                              <ToolInput input={part.input} />
+                              <ToolOutput output={part.output} />
+                            </ToolContent>
+                          </Tool>
+                        );
+                      }
+                      return null;
+                    })
+                  : m.parts.map((part, i) => {
+                      if (part.type === "text") return <span key={i}>{part.text}</span>;
+                      return null;
+                    })}
               </MessageContent>
               {m.role === "assistant" && (
                 <MessageActions>
@@ -258,7 +242,9 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
           {status === "submitted" && (
             <Message from="assistant">
               <MessageContent>
-                <Shimmer className="text-sm" duration={1.5}>Thinking...</Shimmer>
+                <Shimmer className="text-sm" duration={1.5}>
+                  Thinking...
+                </Shimmer>
               </MessageContent>
             </Message>
           )}
@@ -277,11 +263,7 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
         {messages.length === 0 && (
           <Suggestions className="px-4">
             {suggestions.map((s) => (
-              <Suggestion
-                key={s}
-                onClick={handleSuggestionClick}
-                suggestion={s}
-              />
+              <Suggestion key={s} onClick={handleSuggestionClick} suggestion={s} />
             ))}
           </Suggestions>
         )}

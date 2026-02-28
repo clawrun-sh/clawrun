@@ -13,7 +13,9 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "lint": "eslint src --ignore-pattern src/components/ai-elements --ignore-pattern src/components/ui",
+    "format:check": "prettier --check src"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

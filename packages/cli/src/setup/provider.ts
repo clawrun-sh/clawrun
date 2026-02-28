@@ -1,6 +1,5 @@
 import * as clack from "@clack/prompts";
-import chalk from "chalk";
-import type { Agent, ProviderSetup, CuratedModel } from "@clawrun/agent";
+import type { Agent, ProviderSetup } from "@clawrun/agent";
 import {
   openAiModelsResponse,
   ollamaModelsResponse,

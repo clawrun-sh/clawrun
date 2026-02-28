@@ -1,5 +1,4 @@
 import { command, flag, option, optional, number, string } from "cmd-ts";
-import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { readConfig, instanceDeployDir } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";

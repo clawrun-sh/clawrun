@@ -11,9 +11,7 @@ export async function verifySessionCookie(
   cookieHeader: string,
   secret: string,
 ): Promise<TokenPayload | null> {
-  const match = cookieHeader.match(
-    new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`),
-  );
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
   if (!match) return null;
   const payload = await verifyToken(match[1], secret);
   if (!payload || payload.scope !== "chat") return null;
@@ -27,9 +25,7 @@ export async function verifySessionCookie(
  *
  * Returns null on success, or a Response to send back on failure.
  */
-export async function requireSessionOrBearerAuth(
-  req: Request,
-): Promise<Response | null> {
+export async function requireSessionOrBearerAuth(req: Request): Promise<Response | null> {
   const secret = process.env.CLAWRUN_JWT_SECRET;
   if (!secret) {
     return new Response("Server misconfigured", { status: 500 });

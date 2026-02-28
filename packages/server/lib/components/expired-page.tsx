@@ -18,9 +18,7 @@ export default function ExpiredPage() {
           padding: "32px",
         }}
       >
-        <h1 style={{ fontSize: "24px", fontWeight: 600, marginBottom: "12px" }}>
-          Link expired
-        </h1>
+        <h1 style={{ fontSize: "24px", fontWeight: 600, marginBottom: "12px" }}>Link expired</h1>
         <p style={{ color: "#a3a3a3", fontSize: "15px", lineHeight: 1.6 }}>
           This invite link has expired or is invalid.
           <br />

@@ -15,13 +15,7 @@ function readClawRunConfig(): { instanceName: string; version: string } {
   }
 
   // Read @clawrun/server version from node_modules (deployed instance)
-  const serverPkgPath = join(
-    process.cwd(),
-    "node_modules",
-    "@clawrun",
-    "server",
-    "package.json",
-  );
+  const serverPkgPath = join(process.cwd(), "node_modules", "@clawrun", "server", "package.json");
   if (existsSync(serverPkgPath)) {
     try {
       const pkg = JSON.parse(readFileSync(serverPkgPath, "utf-8"));

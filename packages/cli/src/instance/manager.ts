@@ -192,7 +192,6 @@ export async function createInstance(
  * into .deploy/ so Vercel can bundle them.
  */
 export function copyMirroredFiles(name: string): void {
-  const dir = instanceDir(name);
   const agentDir = instanceAgentDir(name);
   const deployDir = instanceDeployDir(name);
 

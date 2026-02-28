@@ -29,12 +29,15 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   const resolvedAgentPaths = agentBundlePaths.map((p) => `./${p}`);
 
   // Config files that must be bundled with every function.
-  const configPaths = ["./clawrun.json", "./agent/config.toml", "./agent/.secret_key", "./agent/workspace/*.md"];
+  const configPaths = [
+    "./clawrun.json",
+    "./agent/config.toml",
+    "./agent/.secret_key",
+    "./agent/workspace/*.md",
+  ];
 
   // Sidecar scripts injected into sandbox (daemon supervisor + heartbeat + health).
-  const sidecarPaths = [
-    "./node_modules/@clawrun/runtime/dist/scripts/sidecar/*",
-  ];
+  const sidecarPaths = ["./node_modules/@clawrun/runtime/dist/scripts/sidecar/*"];
 
   const allPaths = [...resolvedAgentPaths, ...configPaths, ...sidecarPaths];
 

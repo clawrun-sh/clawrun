@@ -114,10 +114,7 @@ export async function POST(req: Request) {
             });
           }
         } catch (err) {
-          log.error(
-            "Chat error:",
-            err instanceof Error ? err.message : "Unknown error",
-          );
+          log.error("Chat error:", err instanceof Error ? err.message : "Unknown error");
           writer.write({
             type: "error",
             errorText: "Something went wrong — please try again",
