@@ -449,8 +449,8 @@ export class VercelPlatformProvider implements PlatformProvider {
         },
       );
 
-      const url = stdout.trim().split("\n").pop()?.trim() ?? "";
-      return url;
+      const deploymentUrl = stdout.trim().split("\n").pop()?.trim() ?? "";
+      return (await this.resolveProductionAlias(deploymentUrl)) ?? deploymentUrl;
     } catch (error) {
       clack.log.error(`Deployment failed.${error instanceof Error ? ` ${error.message}` : ""}`);
       process.exit(1);
@@ -473,6 +473,17 @@ export class VercelPlatformProvider implements PlatformProvider {
   }
 
   // ---- Private helpers --------------------------------------------------
+
+  private async resolveProductionAlias(deploymentUrl: string): Promise<string | null> {
+    try {
+      const { stdout } = await execa("vercel", ["inspect", deploymentUrl, "--format", "json"]);
+      const data = JSON.parse(stdout) as { aliases?: string[] };
+      const alias = data.aliases?.[0];
+      return alias ? `https://${alias}` : null;
+    } catch {
+      return null;
+    }
+  }
 
   private async getCurrentTeam(): Promise<{ id: string; slug: string } | null> {
     try {

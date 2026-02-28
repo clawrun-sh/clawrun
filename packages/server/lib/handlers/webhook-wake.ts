@@ -13,10 +13,11 @@ const log = createLogger("handler:webhook");
  *   3. Verify request authenticity
  *   4. Handle platform challenges (PING, url_verification) — always respond
  *   5. Parse wake signal — null means not a wakeable event
- *   6. For programmable-webhook channels: delete webhook to stop further deliveries
- *      For always-on channels: check sandbox state, skip if already running
+ *   6. For always-on channels: check sandbox state, skip if already running
  *   7. Send courtesy message (best-effort)
- *   8. Wake sandbox
+ *   8. Wake sandbox — webhook deletion happens inside startNewLocked() after
+ *      sidecar is confirmed running (teardownWakeHooks). Returning 503 causes
+ *      the messenger to retry, which the creation lock handles idempotently.
  *   9. Return adapter-specific status (503 for Telegram, 200 for most others)
  */
 export async function handleWakeWebhook(req: Request, channelId: string): Promise<Response> {
@@ -64,14 +65,13 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
     return new Response(null, { status: 200 });
   }
 
-  // 7. Channel-specific wake logic
-  if (adapter.programmableWebhook) {
-    // Category A: Delete webhook to stop further deliveries.
-    // Idempotent — safe if multiple in-flight requests call this concurrently.
-    await adapter.deleteWebhook();
-  } else {
-    // Category B (always-on): Check if sandbox is running.
-    // If running, the daemon handles messages natively — no wake needed.
+  // 7. For always-on channels, check if sandbox is already running.
+  // Programmable-webhook channels (Telegram) don't need this check — the
+  // webhook only exists when the sandbox is stopped. Webhook deletion happens
+  // later inside startNewLocked() → teardownWakeHooks(), after the sidecar is
+  // confirmed running. Until then, retries from the messenger (triggered by
+  // the 503 response) are handled idempotently by the creation lock.
+  if (!adapter.programmableWebhook) {
     try {
       const manager = new SandboxLifecycleManager();
       const status = await manager.getStatus();
