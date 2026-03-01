@@ -11,30 +11,24 @@ function getLog() {
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5_000;
 
-function run(cmd: string, args: string[]): Promise<void> {
+function run(cmd: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: "inherit" });
+    const child = spawn(cmd, args, { stdio: "ignore" });
     child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${cmd} ${args.join(" ")} exited with code ${code}`));
-    });
+    child.on("exit", (code) => resolve(code ?? 1));
   });
 }
 
 async function isInstalled(tool: ToolConfig): Promise<boolean> {
-  try {
-    await run(tool.check.cmd, tool.check.args);
-    return true;
-  } catch {
-    return false;
-  }
+  return (await run(tool.check.cmd, tool.check.args)) === 0;
 }
 
-async function installTool(tool: ToolConfig): Promise<void> {
-  for (const step of tool.install) {
-    getLog().info(`running: ${step.cmd} ${step.args.join(" ")}`);
-    await run(step.cmd, step.args);
+async function installStep(step: { cmd: string; args: string[] }): Promise<void> {
+  const label = `${step.cmd} ${step.args.join(" ")}`;
+  getLog().info(`running: ${label}`);
+  const exitCode = await run(step.cmd, step.args);
+  if (exitCode !== 0) {
+    throw new Error(`${label} exited with code ${exitCode}`);
   }
 }
 
@@ -56,7 +50,9 @@ export async function installTools(tools: ToolConfig[]): Promise<void> {
     let lastErr: unknown;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        await installTool(tool);
+        for (const step of tool.install) {
+          await installStep(step);
+        }
         getLog().info(`${tool.id}: installed`);
         lastErr = null;
         break;
@@ -72,7 +68,7 @@ export async function installTools(tools: ToolConfig[]): Promise<void> {
     }
 
     if (lastErr) {
-      getLog().error(`${tool.id}: all attempts failed, continuing without it`);
+      getLog().error(`${tool.id}: all ${MAX_ATTEMPTS} attempts failed, continuing without it`);
     }
   }
 }

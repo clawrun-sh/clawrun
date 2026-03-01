@@ -1,44 +1,40 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { listInstances } from "../instance/index.js";
+import { listInstances, readConfig } from "../instance/index.js";
+import { createSandboxClient } from "../sandbox/index.js";
+import type { SandboxEntry } from "../sandbox/types.js";
 
-interface SandboxStatus {
-  running: boolean;
-  sandboxId?: string;
-  status?: string;
+function timeAgo(ms: number): string {
+  const seconds = Math.floor((Date.now() - ms) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
-async function fetchSandboxStatus(deployedUrl: string): Promise<SandboxStatus | null> {
-  try {
-    const res = await fetch(`${deployedUrl}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
-    const data = (await res.json()) as Record<string, unknown>;
-    return (data.sandbox as SandboxStatus) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function formatSandboxStatus(status: SandboxStatus | null, width: number): string {
-  let label: string;
+function formatStatus(status: string, width: number): string {
   let colorFn: (s: string) => string;
-  if (!status) {
-    label = "unreachable";
-    colorFn = chalk.dim;
-  } else if (status.running) {
-    label = "running";
-    colorFn = chalk.green;
-  } else if (status.status === "stopped") {
-    label = "stopped";
-    colorFn = chalk.yellow;
-  } else if (status.status === "failed") {
-    label = "failed";
-    colorFn = chalk.red;
-  } else {
-    label = status.status ?? "stopped";
-    colorFn = chalk.dim;
+  switch (status) {
+    case "running":
+      colorFn = chalk.green;
+      break;
+    case "stopped":
+    case "stopping":
+    case "snapshotting":
+      colorFn = chalk.yellow;
+      break;
+    case "failed":
+    case "aborted":
+      colorFn = chalk.red;
+      break;
+    default:
+      colorFn = chalk.dim;
   }
-  return colorFn(label.padEnd(width));
+  return colorFn(status.padEnd(width));
 }
 
 export const list = command({
@@ -54,40 +50,54 @@ export const list = command({
       return;
     }
 
-    // Fetch sandbox status for all deployed instances in parallel
+    // Fetch sandbox info from SDK for each instance in parallel
     const spinner = clack.spinner();
     spinner.start("Fetching sandbox status...");
-    const statuses = await Promise.all(
-      instances.map((inst) =>
-        inst.deployedUrl ? fetchSandboxStatus(inst.deployedUrl) : Promise.resolve(null),
-      ),
+    const sandboxes = await Promise.all(
+      instances.map(async (inst): Promise<SandboxEntry | null> => {
+        try {
+          const config = readConfig(inst.name);
+          if (!config) return null;
+          const client = createSandboxClient(inst.name, config);
+          const list = await client.list();
+          // Return the first running sandbox, or the most recent one
+          return (
+            list.find((s) => s.status === "running") ??
+            list.sort((a, b) => b.createdAt - a.createdAt)[0] ??
+            null
+          );
+        } catch {
+          return null;
+        }
+      }),
     );
     spinner.stop("Done.");
 
     console.log(chalk.bold(`\n  Instances (${instances.length}):\n`));
 
-    // Table header
     const nameW = 28;
-    const presetW = 18;
+    const statusW = 14;
+    const createdW = 14;
     const agentW = 12;
-    const sandboxW = 14;
-    const versionW = 20;
 
     console.log(
       chalk.dim(
-        `  ${"NAME".padEnd(nameW)}${"PRESET".padEnd(presetW)}${"AGENT".padEnd(agentW)}${"SANDBOX".padEnd(sandboxW)}${"APP VERSION".padEnd(versionW)}URL`,
+        `  ${"NAME".padEnd(nameW)}${"SANDBOX".padEnd(statusW)}${"CREATED".padEnd(createdW)}${"AGENT".padEnd(agentW)}URL`,
       ),
     );
-    console.log(chalk.dim(`  ${"─".repeat(nameW + presetW + agentW + sandboxW + versionW + 30)}`));
+    console.log(chalk.dim(`  ${"─".repeat(nameW + statusW + createdW + agentW + 30)}`));
 
     for (let i = 0; i < instances.length; i++) {
       const inst = instances[i];
+      const sbx = sandboxes[i];
       const url = inst.deployedUrl ?? chalk.dim("not deployed");
-      const sandbox = inst.deployedUrl
-        ? formatSandboxStatus(statuses[i], sandboxW)
-        : chalk.dim("—".padEnd(sandboxW));
+      const status = sbx ? formatStatus(sbx.status, statusW) : chalk.dim("—".padEnd(statusW));
+      const created = sbx
+        ? chalk.dim(timeAgo(sbx.createdAt).padEnd(createdW))
+        : chalk.dim("—".padEnd(createdW));
+
       console.log(
-        `  ${chalk.cyan(inst.name.padEnd(nameW))}${inst.preset.padEnd(presetW)}${inst.agent.padEnd(agentW)}${sandbox}${inst.appVersion.padEnd(versionW)}${url}`,
+        `  ${chalk.cyan(inst.name.padEnd(nameW))}${status}${created}${inst.agent.padEnd(agentW)}${url}`,
       );
     }
 

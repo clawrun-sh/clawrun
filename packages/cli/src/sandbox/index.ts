@@ -1,6 +1,5 @@
 import type { ClawRunConfig } from "../instance/config.js";
 import { instanceDeployDir } from "../instance/index.js";
-import { getPlatformProvider } from "../platform/index.js";
 import type { SandboxClient } from "./types.js";
 import { VercelSandboxClient } from "./vercel.js";
 
@@ -10,15 +9,7 @@ const clientFactories: Record<string, (instance: string, config: ClawRunConfig) 
   {
     vercel: (instance) => {
       const dir = instanceDeployDir(instance);
-      const platform = getPlatformProvider("vercel");
-      const handle = platform.readProjectLink(dir);
-      if (!handle) {
-        throw new Error(
-          `No project link found for instance "${instance}". ` +
-            `Re-run "clawrun deploy ${instance}" to fix this.`,
-        );
-      }
-      return new VercelSandboxClient({ projectId: handle.projectId, orgId: handle.orgId });
+      return new VercelSandboxClient(dir);
     },
   };
 

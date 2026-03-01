@@ -15,7 +15,7 @@ const log = createLogger("channel");
 export async function registerWakeHooks(baseUrl: string): Promise<void> {
   const adapters = getAllAdapters();
   if (adapters.length === 0) {
-    log.warn("registerWakeHooks: no configured channel adapters found — wake hooks not registered");
+    log.debug("registerWakeHooks: no configured channel adapters, skipping");
     return;
   }
 
@@ -50,7 +50,7 @@ export async function registerWakeHooks(baseUrl: string): Promise<void> {
 export async function teardownWakeHooks(): Promise<void> {
   const adapters = getAllAdapters();
   if (adapters.length === 0) {
-    log.warn("teardownWakeHooks: no configured channel adapters found");
+    log.debug("teardownWakeHooks: no configured channel adapters, skipping");
     return;
   }
 

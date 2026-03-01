@@ -9,7 +9,12 @@ import type { SandboxHandle } from "../types.js";
 export class AgentBrowserTool implements Tool {
   readonly id = "agent-browser";
   readonly name = "Agent Browser";
-  readonly installDomains = ["registry.npmjs.org", "playwright.azureedge.net"];
+  readonly installDomains = [
+    "registry.npmjs.org",
+    "cdn.playwright.dev",
+    "storage.googleapis.com",
+    "cdn.amazonlinux.com",
+  ];
   readonly checkCommand = { cmd: "which", args: ["agent-browser"] };
   readonly installCommands = [
     { cmd: "npm", args: ["install", "-g", "agent-browser"] },

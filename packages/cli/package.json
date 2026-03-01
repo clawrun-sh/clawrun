@@ -34,6 +34,8 @@
     "@clawrun/server": "workspace:*",
     "@iarna/toml": "^2.2.5",
     "@mariozechner/pi-tui": "^0.55.1",
+    "@vercel/sandbox": "^1.7.0",
+    "sandbox": "^2.5.3",
     "chalk": "^5.4.0",
     "cli-highlight": "^2.1.11",
     "cmd-ts": "^0.15.0",
@@ -41,7 +43,6 @@
     "execa": "^9.5.0",
     "human-id": "^4.1.1",
     "qrcode-terminal": "^0.12.0",
-    "sandbox": "2.4.0",
     "zeroclaw": "workspace:*",
     "zod": "^4.3.6"
   },

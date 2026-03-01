@@ -41,7 +41,7 @@ async function heartbeatTick(
       getLog().info(await res.text());
     } else {
       state.lastHeartbeatSuccess = false;
-      getLog().error(`HTTP ${res.status}:`, await res.text());
+      getLog().error(`HTTP ${res.status}: ${await res.text()}`);
     }
     state.lastHeartbeatTick = Date.now();
   } catch (err: unknown) {
@@ -61,7 +61,7 @@ export function startHeartbeat(config: SidecarConfig, state: SidecarState): { st
 
   const safeTick = () => {
     heartbeatTick(config, state, secret).catch((err) => {
-      getLog().error("tick failed:", err);
+      getLog().error("tick failed: %o", err);
     });
   };
 

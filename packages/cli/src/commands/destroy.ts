@@ -10,6 +10,7 @@ import {
   instanceAgentDir,
 } from "../instance/index.js";
 import { getPlatformProvider } from "../platform/index.js";
+import { createSandboxClient } from "../sandbox/index.js";
 import { createAgent } from "@clawrun/agent";
 import { initializeAdapters, teardownWakeHooks } from "@clawrun/channel";
 import { instance } from "../args/instance.js";
@@ -86,8 +87,32 @@ export const destroy = command({
     const handle = platform.readProjectLink(instanceDeployDir(name));
 
     if (!handle) {
-      clack.log.warn("No project link found — skipping platform project deletion.");
+      clack.log.warn("No project link found — skipping platform cleanup.");
     } else {
+      // Stop running sandboxes and delete snapshots before removing the project
+      try {
+        const client = createSandboxClient(name, config);
+
+        const sandboxes = await client.list();
+        const running = sandboxes.filter((s) => s.status === "running" || s.status === "pending");
+        if (running.length > 0) {
+          const s = clack.spinner();
+          s.start(`Stopping ${running.length} sandbox(es)...`);
+          await client.stop(...running.map((s) => s.id));
+          s.stop(`Stopped ${running.length} sandbox(es).`);
+        }
+
+        const snapshots = await client.listSnapshots();
+        if (snapshots.length > 0) {
+          const s = clack.spinner();
+          s.start(`Deleting ${snapshots.length} snapshot(s)...`);
+          await client.deleteSnapshots(...snapshots);
+          s.stop(`Deleted ${snapshots.length} snapshot(s).`);
+        }
+      } catch {
+        clack.log.warn("Could not clean up sandboxes/snapshots (best-effort, continuing).");
+      }
+
       const s = clack.spinner();
       s.start(`Removing project (${handle.projectId})...`);
       try {

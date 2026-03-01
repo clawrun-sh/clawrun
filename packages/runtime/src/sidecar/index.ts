@@ -25,7 +25,7 @@ function main(): void {
   const log = createLogger("sidecar");
 
   process.on("unhandledRejection", (err) => {
-    log.error("unhandled rejection:", err);
+    log.error(`unhandled rejection: ${err instanceof Error ? err.message : String(err)}`);
   });
 
   const state: SidecarState = {

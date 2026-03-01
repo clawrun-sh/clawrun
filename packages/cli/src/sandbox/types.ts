@@ -1,7 +1,10 @@
-/** Minimal sandbox info returned by list. */
+/** Sandbox info returned by list. */
 export interface SandboxEntry {
   id: string;
   status: string;
+  createdAt: number;
+  memory: number;
+  vcpus: number;
 }
 
 /** Result of running a command in a sandbox. */
@@ -18,6 +21,15 @@ export interface ExecResult {
 export interface SandboxClient {
   /** List sandboxes (running ones by default). */
   list(): Promise<SandboxEntry[]>;
+
+  /** Stop one or more running sandboxes. */
+  stop(...sandboxIds: string[]): Promise<void>;
+
+  /** List snapshot IDs for this project. */
+  listSnapshots(): Promise<string[]>;
+
+  /** Delete one or more snapshots. */
+  deleteSnapshots(...snapshotIds: string[]): Promise<void>;
 
   /** Execute a command inside a running sandbox. */
   exec(

@@ -214,11 +214,10 @@ async function promptToolDomains(
     const missing = tool.installDomains.filter((d) => !isAllowed(d));
     if (missing.length === 0) continue;
 
+    clack.note(missing.join("\n"), `${tool.name} — required domains`);
+
     const addThem = await clack.confirm({
-      message:
-        `The ${tool.name} tool needs these domains for installation:\n` +
-        missing.map((d) => chalk.dim(`  ${d}`)).join("\n") +
-        `\nAdd them to your allow-list?`,
+      message: `Add these to your allow-list?`,
       initialValue: true,
     });
 
@@ -572,6 +571,15 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         channels: channelResult.channels,
         ...DEPLOY_AGENT_DEFAULTS,
       });
+
+      // Generate webhook secrets for newly added channels that don't have one yet
+      const currentSecrets = existingConfig.secrets?.webhookSecrets ?? {};
+      for (const channelId of Object.keys(channelResult.channels)) {
+        if (hasWakeHook(channelId) && !currentSecrets[channelId]) {
+          currentSecrets[channelId] = generateSecret();
+        }
+      }
+      existingConfig.secrets = { ...existingConfig.secrets, webhookSecrets: currentSecrets };
     }
 
     // ── Infrastructure ───────────────────────────────────────────
@@ -590,7 +598,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       ],
     });
 
-    if (!clack.isCancel(policyAction) && policyAction !== "keep") {
+    if (!clack.isCancel(policyAction)) {
       if (policyAction === "restricted") {
         const currentChannels = agent.readSetup(agentConfigDir)?.channels;
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
@@ -601,9 +609,41 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
           agentConfigDir,
           existingConfig.sandbox.networkPolicy,
         );
-      } else {
-        // Explicit allow-all to clear any previous restricted policy
+      } else if (policyAction === "allow-all") {
         existingConfig.sandbox.networkPolicy = "allow-all";
+      } else if (
+        policyAction === "keep" &&
+        typeof currentPolicy === "object" &&
+        "allow" in currentPolicy
+      ) {
+        // "Keep current" with a restricted policy — ensure newly added
+        // channels and tools have their domains in the allow-list.
+        const currentChannels = agent.readSetup(agentConfigDir)?.channels;
+        const channelNames = currentChannels ? Object.keys(currentChannels) : [];
+        const derived = deriveAllowedDomains(undefined, channelNames);
+        const currentAllow = currentPolicy.allow ?? [];
+        const missing = derived.all.filter(
+          (d) => !currentAllow.some((p) => domainMatchesWildcard(d, p)),
+        );
+        if (missing.length > 0) {
+          clack.note(missing.join("\n"), "Missing domains for configured channels");
+          const addThem = await clack.confirm({
+            message: "Add these to your allow-list?",
+            initialValue: true,
+          });
+          if (!clack.isCancel(addThem) && addThem) {
+            existingConfig.sandbox.networkPolicy = {
+              ...currentPolicy,
+              allow: [...new Set([...currentAllow, ...missing])],
+            };
+          }
+        }
+        // Also check tool domains
+        existingConfig.sandbox.networkPolicy = await promptToolDomains(
+          agent,
+          agentConfigDir,
+          existingConfig.sandbox.networkPolicy,
+        );
       }
     }
   }
