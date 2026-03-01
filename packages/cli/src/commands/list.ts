@@ -46,7 +46,7 @@ export const list = command({
     const instances = listInstances();
 
     if (instances.length === 0) {
-      clack.log.info("No instances found.\n  Create one with: clawrun deploy starter");
+      clack.log.info("No instances found.\n  Create one with: clawrun deploy");
       return;
     }
 
