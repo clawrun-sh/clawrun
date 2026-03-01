@@ -1,8 +1,19 @@
 import type { SandboxHandle } from "./types.js";
 
+export interface ToolInstallStep {
+  cmd: string;
+  args: string[];
+}
+
 export interface Tool {
   readonly id: string;
   readonly name: string;
+  /** Hostnames the tool needs to reach during installation (npm, CDNs, etc.). */
+  readonly installDomains: string[];
+  /** Command to check if the tool is already installed (exit 0 = installed). */
+  readonly checkCommand: { cmd: string; args: string[] };
+  /** Sequential install steps. */
+  readonly installCommands: ToolInstallStep[];
   isInstalled(sandbox: SandboxHandle): Promise<boolean>;
   install(sandbox: SandboxHandle): Promise<void>;
 }

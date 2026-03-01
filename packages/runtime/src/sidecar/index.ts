@@ -1,14 +1,12 @@
 import { readFileSync } from "node:fs";
 import type { SidecarConfig, SidecarState } from "./types.js";
+import { initLogger, createLogger } from "./log.js";
 import { startHealthServer } from "./health.js";
 import { superviseDaemon } from "./supervisor.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { installTools } from "./tools.js";
 
 function main(): void {
-  process.on("unhandledRejection", (err) => {
-    console.error("[sidecar] unhandled rejection:", err);
-  });
-
   const configPath = process.argv[2];
   if (!configPath) {
     console.error("[sidecar] Usage: node index.js <config.json>");
@@ -22,6 +20,14 @@ function main(): void {
 
   const config: SidecarConfig = JSON.parse(readFileSync(configPath, "utf-8"));
 
+  // Initialize logger before anything else
+  initLogger(config.root);
+  const log = createLogger("sidecar");
+
+  process.on("unhandledRejection", (err) => {
+    log.error("unhandled rejection:", err);
+  });
+
   const state: SidecarState = {
     daemonPid: null,
     daemonStatus: "stopped",
@@ -33,8 +39,8 @@ function main(): void {
     createdAt: Date.now(),
   };
 
-  console.log(
-    `[sidecar] starting: daemon=${config.daemon.cmd}, ` +
+  log.info(
+    `starting: daemon=${config.daemon.cmd}, ` +
       `heartbeat=${config.heartbeat.url}, ` +
       `health=:${config.health.port}`,
   );
@@ -48,9 +54,14 @@ function main(): void {
   // 3. Heartbeat loop
   const heartbeat = startHeartbeat(config, state);
 
+  // 4. Install tools in background (non-blocking)
+  if (config.tools && config.tools.length > 0) {
+    installTools(config.tools);
+  }
+
   // Graceful shutdown — stop restarting daemon, drain heartbeat, exit
   process.on("SIGTERM", async () => {
-    console.log("[sidecar] SIGTERM received, shutting down");
+    log.info("SIGTERM received, shutting down");
     heartbeat.stop();
     await supervisor.shutdown();
     process.exit(0);

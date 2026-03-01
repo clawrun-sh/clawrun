@@ -9,30 +9,27 @@ import type { SandboxHandle } from "../types.js";
 export class AgentBrowserTool implements Tool {
   readonly id = "agent-browser";
   readonly name = "Agent Browser";
+  readonly installDomains = ["registry.npmjs.org", "playwright.azureedge.net"];
+  readonly checkCommand = { cmd: "which", args: ["agent-browser"] };
+  readonly installCommands = [
+    { cmd: "npm", args: ["install", "-g", "agent-browser"] },
+    { cmd: "sh", args: ["-c", "agent-browser install --with-deps"] },
+  ];
 
   async isInstalled(sandbox: SandboxHandle): Promise<boolean> {
-    // Quick check: is the CLI on PATH?
-    const which = await sandbox.runCommand("which", ["agent-browser"]);
+    const which = await sandbox.runCommand(this.checkCommand.cmd, this.checkCommand.args);
     if (which.exitCode !== 0) return false;
-
-    // Functional check: can it report its version?
     const version = await sandbox.runCommand("agent-browser", ["--version"]);
     return version.exitCode === 0;
   }
 
   async install(sandbox: SandboxHandle): Promise<void> {
-    // Install the CLI globally
-    const npm = await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);
-    if (npm.exitCode !== 0) {
-      const stderr = await npm.stderr();
-      throw new Error(`Failed to install agent-browser: ${stderr}`);
-    }
-
-    // Install Chromium + system deps
-    const deps = await sandbox.runCommand("sh", ["-c", "agent-browser install --with-deps"]);
-    if (deps.exitCode !== 0) {
-      const stderr = await deps.stderr();
-      throw new Error(`Failed to install browser dependencies: ${stderr}`);
+    for (const step of this.installCommands) {
+      const result = await sandbox.runCommand(step.cmd, step.args);
+      if (result.exitCode !== 0) {
+        const stderr = await result.stderr();
+        throw new Error(`Failed: ${step.cmd} ${step.args.join(" ")}: ${stderr}`);
+      }
     }
   }
 }

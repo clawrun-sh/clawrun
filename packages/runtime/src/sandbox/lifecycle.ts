@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
@@ -623,8 +623,6 @@ export class SandboxLifecycleManager {
       const networkPolicy = getRuntimeConfig().sandbox.networkPolicy;
 
       // 1. Try latest snapshot from provider.
-      // Always create with allow-all — installTools needs unrestricted
-      // internet (npm, CDN). Network policy is applied after installTools.
       try {
         const snapshots = await this.provider.listSnapshots();
         const latest = snapshots.sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -676,21 +674,7 @@ export class SandboxLifecycleManager {
         fromSnapshot: !!snapshotId,
       });
 
-      // Install external tools (browsers, etc.).
-      // Runs on both fresh and snapshot-restored sandboxes so config changes
-      // (e.g. enabling browser) take effect even on stale snapshots.
-      // installTools is idempotent — already-installed tools are a no-op.
-      if (this.agent.installTools) {
-        await this.agent.installTools(sandbox, root, {
-          localAgentDir,
-          secretKey,
-          fromSnapshot: !!snapshotId,
-        });
-      }
-
-      // Lock down network after tool installation.
-      // Both fresh and snapshot-restored sandboxes start with allow-all
-      // so installTools can reach npm/CDN, then we apply the real policy.
+      // Apply network policy before starting services.
       if (networkPolicy !== "allow-all") {
         log.info(`Applying network policy to sandbox ${sandbox.id}`);
         await sandbox.updateNetworkPolicy(networkPolicy);
@@ -734,6 +718,15 @@ export class SandboxLifecycleManager {
     });
     const monitorConfig = this.agent.getMonitorConfig(root);
 
+    // Build tool install configs from agent's enabled tools
+    const localAgentDir = join(process.cwd(), "agent");
+    const enabledTools = this.agent.getEnabledTools(localAgentDir);
+    const toolConfigs = enabledTools.map((t) => ({
+      id: t.id,
+      check: t.checkCommand,
+      install: t.installCommands,
+    }));
+
     const sidecarConfig: SidecarConfig = {
       daemon: {
         cmd: daemonCmd.cmd,
@@ -754,53 +747,48 @@ export class SandboxLifecycleManager {
       health: {
         port: SIDECAR_HEALTH_PORT,
       },
+      tools: toolConfigs.length > 0 ? toolConfigs : undefined,
       root,
     };
 
-    // Read all compiled sidecar scripts from dist/scripts/sidecar/.
+    // Read the bundled sidecar script from dist/scripts/sidecar/index.js.
     // Try cwd first (dev monorepo), then node_modules (deployed instance).
-    const sidecarDirCandidates = [
-      join(process.cwd(), "dist", "scripts", "sidecar"),
-      join(process.cwd(), "node_modules", "@clawrun", "runtime", "dist", "scripts", "sidecar"),
+    const sidecarBundleCandidates = [
+      join(process.cwd(), "dist", "scripts", "sidecar", "index.js"),
+      join(
+        process.cwd(),
+        "node_modules",
+        "@clawrun",
+        "runtime",
+        "dist",
+        "scripts",
+        "sidecar",
+        "index.js",
+      ),
     ];
-    const sidecarDir = sidecarDirCandidates.find((p) => existsSync(p));
-    if (!sidecarDir) {
-      throw new Error(`Sidecar scripts not found. Searched: ${sidecarDirCandidates.join(", ")}`);
+    const sidecarBundle = sidecarBundleCandidates.find((p) => existsSync(p));
+    if (!sidecarBundle) {
+      throw new Error(`Sidecar bundle not found. Searched: ${sidecarBundleCandidates.join(", ")}`);
     }
 
-    // Read all .js files from the sidecar directory (kept as .js, not renamed)
-    const sidecarFiles: Array<{ path: string; content: Buffer }> = [];
     const sandboxSidecarDir = `${root}/scripts/sidecar`;
-    for (const file of readdirSync(sidecarDir)) {
-      if (!file.endsWith(".js")) continue;
-      const content = readFileSync(join(sidecarDir, file), "utf-8");
-      sidecarFiles.push({
-        path: `${sandboxSidecarDir}/${file}`,
-        content: Buffer.from(content),
-      });
-    }
-
-    // package.json with "type": "module" so Node treats .js as ESM
-    sidecarFiles.push({
-      path: `${sandboxSidecarDir}/package.json`,
-      content: Buffer.from('{"type":"module"}'),
-    });
-
     const configPath = `${root}/scripts/sidecar-config.json`;
-    const logPath = `${root}/scripts/sidecar.log`;
     const entryPath = `${sandboxSidecarDir}/index.js`;
+
+    const bundleContent = readFileSync(sidecarBundle);
 
     await sandbox.runCommand("mkdir", ["-p", sandboxSidecarDir]);
     await sandbox.writeFiles([
-      ...sidecarFiles,
+      { path: entryPath, content: bundleContent },
       { path: configPath, content: Buffer.from(JSON.stringify(sidecarConfig)) },
     ]);
 
     // Launch as detached. Secret passed via env option (not in cmdline, so
     // it won't appear in ps/top/htop inside the sandbox).
+    // Logger writes directly to ${root}/logs/sidecar.log inside the sandbox.
     await sandbox.runCommand({
-      cmd: "sh",
-      args: ["-c", `node ${entryPath} ${configPath} >> ${logPath} 2>&1`],
+      cmd: "node",
+      args: [entryPath, configPath],
       env: { CLAWRUN_HB_SECRET: secret },
       detached: true,
     });
@@ -843,6 +831,7 @@ export class SandboxLifecycleManager {
     }
 
     // Health check failed — read log for diagnostics
+    const logPath = `${root}/logs/sidecar.log`;
     const logBuf = await sandbox.readFile(logPath);
     const logOutput = logBuf ? logBuf.toString("utf-8").trim() : "(no log output)";
     throw new Error(

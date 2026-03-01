@@ -1,5 +1,12 @@
 import { createServer } from "node:http";
 import type { SidecarState, SidecarConfig } from "./types.js";
+import { createLogger } from "./log.js";
+
+let log: ReturnType<typeof createLogger>;
+function getLog() {
+  if (!log) log = createLogger("health");
+  return log;
+}
 
 export function startHealthServer(config: SidecarConfig, state: SidecarState): void {
   const server = createServer((req, res) => {
@@ -26,6 +33,6 @@ export function startHealthServer(config: SidecarConfig, state: SidecarState): v
   });
 
   server.listen(config.health.port, "0.0.0.0", () => {
-    console.log(`[sidecar] health server listening on port ${config.health.port}`);
+    getLog().info(`health server listening on port ${config.health.port}`);
   });
 }

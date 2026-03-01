@@ -34,12 +34,21 @@ import {
 } from "../instance/index.js";
 import { hasWakeHook } from "@clawrun/channel";
 import { createAgent } from "@clawrun/agent";
+import type { Agent } from "@clawrun/agent";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
 import { createApiClient } from "../api.js";
 import { promptProvider, promptChannels } from "../setup/index.js";
 import type { ChannelSetupResult } from "../setup/index.js";
+
+/** Test whether `domain` matches a wildcard `pattern` (e.g. *.example.com, cdn.*.net). */
+function domainMatchesWildcard(domain: string, pattern: string): boolean {
+  if (pattern === domain) return true;
+  // Convert wildcard pattern to regex: escape dots, replace * with [^.]+ (single label)
+  const re = new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$");
+  return re.test(domain);
+}
 
 function generateInstanceName(): string {
   return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
@@ -181,6 +190,56 @@ async function promptNetworkPolicy(derived: DerivedDomains): Promise<NetworkPoli
 }
 
 /**
+ * After a restricted policy is chosen, check if enabled tools need domains
+ * that aren't in the allow-list. Prompt the user to add them.
+ */
+async function promptToolDomains(
+  agent: Agent,
+  agentDir: string,
+  policy: NetworkPolicy,
+): Promise<NetworkPolicy> {
+  if (policy === "allow-all" || policy === "deny-all") return policy;
+  if (!("allow" in policy)) return policy;
+
+  const tools = agent.getToolDomains(agentDir);
+  if (tools.length === 0) return policy;
+
+  const currentAllow = policy.allow ?? [];
+
+  function isAllowed(domain: string): boolean {
+    return currentAllow.some((pattern) => domainMatchesWildcard(domain, pattern));
+  }
+
+  for (const tool of tools) {
+    const missing = tool.installDomains.filter((d) => !isAllowed(d));
+    if (missing.length === 0) continue;
+
+    const addThem = await clack.confirm({
+      message:
+        `The ${tool.name} tool needs these domains for installation:\n` +
+        missing.map((d) => chalk.dim(`  ${d}`)).join("\n") +
+        `\nAdd them to your allow-list?`,
+      initialValue: true,
+    });
+
+    if (clack.isCancel(addThem)) {
+      clack.cancel("Setup cancelled.");
+      process.exit(0);
+    }
+
+    if (addThem) {
+      currentAllow.push(...missing);
+    } else {
+      clack.log.warn(
+        `${tool.name} will not be available — it cannot be installed without network access to: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  return { ...policy, allow: [...new Set(currentAllow)] };
+}
+
+/**
  * Seed workspace template .md files into the instance agent dir.
  * Base templates are merged with preset-specific overrides.
  * Only copies files that don't already exist (preserves user customizations).
@@ -296,6 +355,7 @@ async function handleNewInstance(
   if (!options.yes) {
     const derived = deriveAllowedDomains(providerResult.provider, channelSetup.channelNames);
     networkPolicy = await promptNetworkPolicy(derived);
+    networkPolicy = await promptToolDomains(agent, agentConfigDir, networkPolicy);
   }
 
   // ClawRun-specific settings
@@ -536,6 +596,11 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
         const derived = deriveAllowedDomains(undefined, channelNames);
         existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);
+        existingConfig.sandbox.networkPolicy = await promptToolDomains(
+          agent,
+          agentConfigDir,
+          existingConfig.sandbox.networkPolicy,
+        );
       } else {
         // Explicit allow-all to clear any previous restricted policy
         existingConfig.sandbox.networkPolicy = "allow-all";

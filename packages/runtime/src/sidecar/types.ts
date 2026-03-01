@@ -1,3 +1,11 @@
+export interface ToolConfig {
+  id: string;
+  /** Command to check if already installed (exit 0 = installed). */
+  check: { cmd: string; args: string[] };
+  /** Install steps, run sequentially. */
+  install: Array<{ cmd: string; args: string[] }>;
+}
+
 export interface SidecarConfig {
   daemon: {
     cmd: string;
@@ -18,6 +26,7 @@ export interface SidecarConfig {
   health: {
     port: number;
   };
+  tools?: ToolConfig[];
   root: string;
 }
 

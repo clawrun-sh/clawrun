@@ -5,6 +5,7 @@ import type {
   CuratedModel,
   AgentSetupData,
 } from "./schemas.js";
+import type { Tool } from "./tools.js";
 
 export type {
   ProviderInfo,
@@ -85,11 +86,10 @@ export interface Agent {
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
   /**
-   * Install external tools the agent needs (browsers, CLIs, etc.).
-   * Called after provision(), before the daemon starts.
-   * Runs on both fresh and snapshot-restored sandboxes — must be idempotent.
+   * Return tools enabled in the agent config.
+   * Used to build sidecar tool install config (runs inside the sandbox).
    */
-  installTools?(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
+  getEnabledTools(agentDir: string): Tool[];
 
   sendMessage(
     sandbox: SandboxHandle,
@@ -143,4 +143,7 @@ export interface Agent {
     provider?: Partial<ProviderSetup>;
     channels?: Record<string, Record<string, string>>;
   } | null;
+
+  /** Return tools enabled in the agent config (for install-time domain checks). */
+  getToolDomains(agentDir: string): Tool[];
 }

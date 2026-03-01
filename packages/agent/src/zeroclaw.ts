@@ -32,9 +32,7 @@ import type {
 } from "./types.js";
 import { agentSetupDataSchema } from "./schemas.js";
 import type { Tool } from "./tools.js";
-import { runTools } from "./tools.js";
 import { AgentBrowserTool } from "./tools/agent-browser.js";
-import { createLogger } from "@clawrun/logger";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -159,36 +157,19 @@ export class ZeroclawAgent implements Agent {
     });
   }
 
-  async installTools(sandbox: SandboxHandle, root: string, _opts: ProvisionOpts): Promise<void> {
-    const log = createLogger("zeroclaw:tools");
-    const agentDir = `${root}/agent`;
+  getEnabledTools(agentDir: string): Tool[] {
+    try {
+      const configPath = join(agentDir, "config.toml");
+      if (!existsSync(configPath)) return [];
 
-    // Read config to decide which tools are needed
-    const configBuf = await sandbox.readFile(`${agentDir}/config.toml`);
-    if (!configBuf) return;
+      const raw = readFileSync(configPath, "utf-8");
+      const config = TOML.parse(raw) as unknown as ZeroClawConfig;
 
-    const config = TOML.parse(configBuf.toString("utf-8")) as unknown as ZeroClawConfig;
-
-    const tools: Tool[] = [];
-    if (config.browser?.enabled) {
-      tools.push(new AgentBrowserTool());
-    }
-
-    if (tools.length === 0) return;
-
-    const results = await runTools(sandbox, tools);
-    for (const r of results) {
-      if (r.action === "failed") {
-        log.error(`Tool ${r.toolId} failed (${r.durationMs}ms): ${r.error}`);
-      } else {
-        log.info(`Tool ${r.toolId} ${r.action} (${r.durationMs}ms)`);
-      }
-    }
-
-    // Re-throw if any tool failed
-    const failed = results.find((r) => r.action === "failed");
-    if (failed) {
-      throw new Error(`Tool installation failed: ${failed.toolId} — ${failed.error}`);
+      const tools: Tool[] = [];
+      if (config.browser?.enabled) tools.push(new AgentBrowserTool());
+      return tools;
+    } catch {
+      return [];
     }
   }
 
@@ -1514,6 +1495,10 @@ export class ZeroclawAgent implements Agent {
     }
 
     writeFileSync(configPath, TOML.stringify(config as TOML.JsonMap));
+  }
+
+  getToolDomains(agentDir: string): Tool[] {
+    return this.getEnabledTools(agentDir);
   }
 
   readSetup(agentDir: string): {
