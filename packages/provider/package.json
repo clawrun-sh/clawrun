@@ -27,9 +27,6 @@
     "lint": "eslint src",
     "format:check": "prettier --check src"
   },
-  "dependencies": {
-    "@vercel/sandbox": "^1.7.0"
-  },
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",
     "@types/node": "^22.0.0",

@@ -11,6 +11,7 @@ export interface ChannelSetupResult {
 export async function promptChannels(
   agent: Agent,
   existing?: Record<string, Record<string, string>>,
+  instanceName?: string,
 ): Promise<ChannelSetupResult> {
   const supportedChannels = agent.getSupportedChannels();
   const channels: Record<string, Record<string, string>> = {};
@@ -24,7 +25,13 @@ export async function promptChannels(
 
   // Main loop — channel menu with live status
   while (true) {
-    const options = supportedChannels.map((ch) => {
+    const configuredCount = supportedChannels.filter(
+      (ch) => status.get(ch.id) === "configured",
+    ).length;
+
+    const options: Array<{ value: string; label: string; hint?: string; disabled?: boolean }> = [];
+
+    for (const ch of supportedChannels) {
       const s = status.get(ch.id) ?? "pending";
       const indicator =
         s === "configured"
@@ -38,16 +45,30 @@ export async function promptChannels(
           : s === "failed"
             ? "failed \u2014 select to retry"
             : undefined;
-      return { value: ch.id, label: `${indicator} ${ch.name}`, hint };
+      options.push({ value: ch.id, label: `${indicator} ${ch.name}`, hint });
+    }
+
+    // Disabled separator
+    options.push({
+      value: "__sep__",
+      label: chalk.dim("\u2500".repeat(16)),
+      disabled: true,
     });
+
+    // Done — dynamic hint showing progress
+    const doneHint =
+      configuredCount > 0
+        ? `finish channel setup \u00b7 ${configuredCount} configured`
+        : "finish channel setup";
     options.push({
       value: "__done__",
-      label: `${chalk.green("\u2713")} Done`,
-      hint: "finish channel setup",
+      label: `${chalk.green("\u2713")} ${chalk.bold("Done")}`,
+      hint: doneHint,
     });
 
     const choice = await clack.select({
-      message: "Messaging channels",
+      message: "Select a channel to configure",
+      initialValue: "__done__",
       options,
     });
 
@@ -83,8 +104,17 @@ export async function promptChannels(
   const configured = supportedChannels
     .filter((ch) => status.get(ch.id) === "configured")
     .map((ch) => chalk.green(ch.name));
+
   if (configured.length > 0) {
-    clack.log.info(`Active channels: ${configured.join(", ")}`);
+    clack.note(configured.join("\n"), "Active channels");
+  } else {
+    const redeployHint = instanceName
+      ? `Run ${chalk.cyan(`clawrun deploy ${instanceName}`)} to add channels later.`
+      : `Re-run deploy to add channels later.`;
+    clack.note(
+      "The TUI and web chat interface will still be available.\n" + redeployHint,
+      "No channels configured",
+    );
   }
 
   return { channels, channelNames: Object.keys(channels) };

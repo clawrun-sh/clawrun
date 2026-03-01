@@ -20,5 +20,4 @@ export type { Tool, ToolResult } from "./tools.js";
 export { runTools } from "./tools.js";
 export { AgentBrowserTool } from "./tools/index.js";
 export { agentSetupDataSchema, channelInfoSchema, providerSetupSchema } from "./schemas.js";
-export { createAgent } from "./registry.js";
-export { DAEMON_PORT } from "zeroclaw";
+export { createAgent, registerAgentFactory } from "./registry.js";

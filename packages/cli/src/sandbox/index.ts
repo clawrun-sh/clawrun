@@ -1,7 +1,9 @@
 import type { ClawRunConfig } from "../instance/config.js";
 import { instanceDeployDir } from "../instance/index.js";
+import { getPlatformProvider } from "../platform/index.js";
+import { getProvider } from "@clawrun/provider";
 import type { SandboxClient } from "./types.js";
-import { VercelSandboxClient } from "./vercel.js";
+import { ProviderSandboxClient } from "./client.js";
 
 export type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
 
@@ -9,7 +11,9 @@ const clientFactories: Record<string, (instance: string, config: ClawRunConfig) 
   {
     vercel: (instance) => {
       const dir = instanceDeployDir(instance);
-      return new VercelSandboxClient(dir);
+      const provider = getProvider("vercel", { projectDir: dir });
+      const platform = getPlatformProvider("vercel");
+      return new ProviderSandboxClient(provider, dir, platform);
     },
   };
 

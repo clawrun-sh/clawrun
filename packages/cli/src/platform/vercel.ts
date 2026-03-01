@@ -429,6 +429,28 @@ export class VercelPlatformProvider implements PlatformProvider {
     }
   }
 
+  // ---- Sandbox ----------------------------------------------------------
+
+  getInfraDomains(): string[] {
+    return ["*.vercel.app", "*.vercel.sh"];
+  }
+
+  getUrlEnvVars(): string[] {
+    return ["VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL"];
+  }
+
+  getServerExternalPackages(): string[] {
+    return ["@vercel/sandbox"];
+  }
+
+  getConnectArgs(dir: string, sandboxId: string): string[] {
+    const data = JSON.parse(readFileSync(join(dir, ".vercel", "project.json"), "utf-8")) as {
+      projectId: string;
+      orgId: string;
+    };
+    return [sandboxId, "--project", data.projectId, "--scope", data.orgId];
+  }
+
   // ---- Deploy -----------------------------------------------------------
 
   async deploy(dir: string, envVars: Record<string, string>): Promise<string> {

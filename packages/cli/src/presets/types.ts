@@ -4,5 +4,4 @@ export interface Preset {
   agent: string;
   provider: string;
   description: string;
-  bundlePaths?: string[];
 }

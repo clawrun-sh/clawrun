@@ -35,8 +35,8 @@ function readWebhookSecretsFromEnv(): Record<string, string> {
   return secrets;
 }
 
-/** Vercel Sandbox allocates 2 048 MB RAM per vCPU. */
-const SANDBOX_MB_PER_VCPU = 2048;
+/** Default MB of RAM per vCPU when memory is not explicitly configured. */
+const DEFAULT_MB_PER_VCPU = 2048;
 
 let cached: RuntimeConfig | null = null;
 
@@ -62,7 +62,8 @@ export function getRuntimeConfig(): RuntimeConfig {
       cronWakeLeadTime: parsed.sandbox.cronWakeLeadTime,
       resources: {
         vcpus: parsed.sandbox.resources.vcpus,
-        memory: parsed.sandbox.resources.vcpus * SANDBOX_MB_PER_VCPU,
+        memory:
+          parsed.sandbox.resources.memory ?? parsed.sandbox.resources.vcpus * DEFAULT_MB_PER_VCPU,
       },
       networkPolicy: parsed.sandbox.networkPolicy,
     },

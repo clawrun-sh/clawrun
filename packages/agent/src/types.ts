@@ -83,6 +83,9 @@ export interface Agent {
   /** Key in agent's parsed config that holds per-channel configuration. */
   readonly channelsConfigKey: string;
 
+  /** Port the agent daemon listens on inside the sandbox. */
+  readonly daemonPort: number;
+
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
   /**
@@ -146,4 +149,19 @@ export interface Agent {
 
   /** Return tools enabled in the agent config (for install-time domain checks). */
   getToolDomains(agentDir: string): Tool[];
+
+  /** Files managed locally that should not be overwritten by pull. */
+  getLocalOwnedFiles(): string[];
+
+  /** Glob patterns (relative to agent dir) to bundle into the deployed app and mirror to .deploy/. */
+  getBundleFiles(): string[];
+
+  /** npm dependencies the deployed instance needs for this agent. */
+  getInstallDependencies(): Record<string, string>;
+
+  /** Subdirectory (relative to agent config dir) for seeded workspace files. Null to skip seeding. */
+  getSeedDirectory(): string | null;
+
+  /** Glob patterns (relative to deploy dir) for binary files to bundle. */
+  getBinaryBundlePaths(): string[];
 }

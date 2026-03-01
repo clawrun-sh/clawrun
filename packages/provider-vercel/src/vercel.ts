@@ -9,7 +9,8 @@ import type {
   CommandResult,
   SnapshotRef,
   NetworkPolicy,
-} from "./types.js";
+  ProviderOptions,
+} from "@clawrun/provider";
 
 class VercelManagedSandbox implements ManagedSandbox {
   constructor(private sandbox: Sandbox) {}
@@ -72,6 +73,23 @@ class VercelManagedSandbox implements ManagedSandbox {
 }
 
 export class VercelSandboxProvider implements SandboxProvider {
+  private projectDir?: string;
+
+  constructor(options?: ProviderOptions) {
+    this.projectDir = options?.projectDir;
+  }
+
+  private async withScope<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.projectDir) return fn();
+    const origCwd = process.cwd();
+    process.chdir(this.projectDir);
+    try {
+      return await fn();
+    } finally {
+      process.chdir(origCwd);
+    }
+  }
+
   async create(opts: CreateSandboxOptions): Promise<ManagedSandbox> {
     const createOpts: Record<string, unknown> = { timeout: opts.timeout };
     if (opts.ports) createOpts.ports = opts.ports;
@@ -80,22 +98,22 @@ export class VercelSandboxProvider implements SandboxProvider {
     if (opts.snapshotId) {
       createOpts.source = { type: "snapshot", snapshotId: opts.snapshotId };
     }
-    const sandbox = await Sandbox.create(createOpts);
+    const sandbox = await this.withScope(() => Sandbox.create(createOpts));
     return new VercelManagedSandbox(sandbox);
   }
 
   async get(id: string): Promise<ManagedSandbox> {
-    const sandbox = await Sandbox.get({ sandboxId: id });
+    const sandbox = await this.withScope(() => Sandbox.get({ sandboxId: id }));
     return new VercelManagedSandbox(sandbox);
   }
 
   async list(): Promise<SandboxInfo[]> {
-    const result = await Sandbox.list();
+    const result = await this.withScope(() => Sandbox.list());
     return result.json.sandboxes;
   }
 
   async listSnapshots(): Promise<SnapshotInfo[]> {
-    const result = await Snapshot.list();
+    const result = await this.withScope(() => Snapshot.list());
     return result.json.snapshots.map((s: Record<string, unknown>) => ({
       id: (s.snapshotId ?? s.id) as string,
       createdAt: (s.createdAt as number) ?? Date.now(),
@@ -105,7 +123,7 @@ export class VercelSandboxProvider implements SandboxProvider {
 
   async deleteSnapshot(id: string): Promise<void> {
     try {
-      const snapshot = await Snapshot.get({ snapshotId: id });
+      const snapshot = await this.withScope(() => Snapshot.get({ snapshotId: id }));
       await snapshot.delete();
     } catch (err) {
       // Snapshot already expired or deleted — treat as success

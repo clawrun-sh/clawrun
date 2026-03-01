@@ -23,11 +23,13 @@ export const cloudClawConfigSchema = z.object({
     provider: z.string(),
     deployedUrl: z.string().optional(),
     sandboxRoot: z.string().default(".clawrun"),
+    platformUrlEnvVars: z.array(z.string()).default([]),
   }),
   agent: z.object({
     name: z.string(),
     config: z.string().default("agent/config.toml"),
     bundlePaths: z.array(z.string()).default([]),
+    configPaths: z.array(z.string()).default([]),
   }),
   sandbox: z.object({
     activeDuration: z.number().default(SANDBOX_DEFAULTS.activeDuration),
@@ -35,8 +37,10 @@ export const cloudClawConfigSchema = z.object({
     cronWakeLeadTime: z.number().default(SANDBOX_DEFAULTS.cronWakeLeadTime),
     resources: z
       .object({
-        // Vercel Sandbox API enforces vcpus >= 2.
+        // Minimum vCPU count (current providers require >= 2).
         vcpus: z.number().int().min(2).max(8).default(SANDBOX_DEFAULTS.vcpus),
+        /** MB of RAM. Defaults to vcpus * 2048 at runtime if not set. */
+        memory: z.number().int().optional(),
       })
       .default({ vcpus: SANDBOX_DEFAULTS.vcpus }),
     networkPolicy: z
@@ -55,6 +59,7 @@ export const cloudClawConfigSchema = z.object({
       ])
       .default("allow-all"),
   }),
+  serverExternalPackages: z.array(z.string()).default([]),
   secrets: z
     .object({
       cronSecret: z.string(),

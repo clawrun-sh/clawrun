@@ -6,10 +6,8 @@ import * as clack from "@clack/prompts";
 import { createSandboxClient } from "../sandbox/index.js";
 import { getRunningId } from "../sandbox/resolve.js";
 import { readConfig, instanceAgentDir } from "../instance/index.js";
+import { createAgent } from "@clawrun/agent";
 import { instance } from "../args/instance.js";
-
-/** Files that flow local → sandbox. Never pulled back. */
-const LOCAL_OWNED_FILES = new Set(["config.toml", ".secret_key"]);
 
 export const pull = command({
   name: "pull",
@@ -62,11 +60,14 @@ export const pull = command({
       return;
     }
 
+    const agent = createAgent(config.agent.name);
+    const localOwned = new Set(agent.getLocalOwnedFiles());
+
     const remoteFiles = findResult.stdout
       .trim()
       .split("\n")
       .map((abs) => abs.slice(remoteAgentDir.length + 1)) // relative path
-      .filter((rel) => !LOCAL_OWNED_FILES.has(rel));
+      .filter((rel) => !localOwned.has(rel));
 
     if (remoteFiles.length === 0) {
       clack.log.warn("No pullable files found (only config files present).");

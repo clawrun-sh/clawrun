@@ -8,9 +8,10 @@ export type {
   CreateSandboxOptions,
   SandboxProvider,
   NetworkPolicy,
+  ProviderOptions,
 } from "./types.js";
 
 export type { SnapshotRetentionPolicy } from "./retention.js";
 export { CountBasedRetention } from "./retention.js";
 
-export { getProvider } from "./registry.js";
+export { getProvider, registerProviderFactory } from "./registry.js";

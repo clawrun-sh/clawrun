@@ -44,12 +44,6 @@ export const channelInfoSchema = z.object({
 export const agentSetupDataSchema = z.object({
   provider: providerSetupSchema,
   channels: z.record(z.string(), z.record(z.string(), z.string())),
-  memory: z.object({ backend: z.string().min(1) }),
-  browser: z.object({
-    enabled: z.boolean(),
-    backend: z.string().min(1),
-    allowedDomains: z.array(z.string()),
-  }),
 });
 
 // --- Derived types ---

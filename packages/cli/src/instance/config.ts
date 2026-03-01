@@ -36,6 +36,9 @@ export function buildConfig(
     sandboxSecret: string;
     provider?: string;
     bundlePaths?: string[];
+    configPaths?: string[];
+    serverExternalPackages?: string[];
+    platformUrlEnvVars?: string[];
   },
 ): ClawRunConfigWithSecrets {
   return cloudClawConfigSchema.parse({
@@ -44,11 +47,13 @@ export function buildConfig(
       name,
       preset,
       provider: options.provider,
+      platformUrlEnvVars: options.platformUrlEnvVars,
     },
     agent: {
       name: agentName,
       config: options.agentConfigPath,
       bundlePaths: options.bundlePaths,
+      configPaths: options.configPaths,
     },
     sandbox: {
       activeDuration: options.activeDuration,
@@ -57,6 +62,7 @@ export function buildConfig(
       resources: options.resources,
       networkPolicy: options.networkPolicy,
     },
+    serverExternalPackages: options.serverExternalPackages,
     secrets: {
       cronSecret: options.cronSecret,
       jwtSecret: options.jwtSecret,
@@ -116,6 +122,7 @@ export function sanitizeConfig(config: ClawRunConfig): Omit<ClawRunConfig, "secr
     instance: config.instance,
     agent: config.agent,
     sandbox: config.sandbox,
+    serverExternalPackages: config.serverExternalPackages,
   };
 }
 

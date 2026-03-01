@@ -1,3 +1,10 @@
+// --- Provider options ---
+
+export interface ProviderOptions {
+  /** Directory containing platform-specific project configuration for auth and scoping. */
+  projectDir?: string;
+}
+
 // --- Network policy ---
 
 export type NetworkPolicy =
@@ -62,6 +69,8 @@ export interface SandboxInfo {
   startedAt?: number;
   stoppedAt?: number;
   timeout: number;
+  memory: number;
+  vcpus: number;
   sourceSnapshotId?: string;
 }
 

@@ -85,6 +85,18 @@ export interface PlatformProvider {
   /** Disable deployment protection (platform-specific). No-op if not applicable. */
   disableDeploymentProtection(dir: string): Promise<void>;
 
+  // --- Sandbox ---
+  /** Wildcard domains for sandbox lifecycle (heartbeat, sidecar traffic). */
+  getInfraDomains(): string[];
+
+  /** Env vars that may contain the deployment URL at runtime. Checked in order. */
+  getUrlEnvVars(): string[];
+
+  /** SDK packages the provider needs externalized by Next.js at runtime. */
+  getServerExternalPackages(): string[];
+  /** Build CLI args for connecting to a sandbox shell. */
+  getConnectArgs(dir: string, sandboxId: string): string[];
+
   // --- Deploy ---
   deploy(dir: string, envVars: Record<string, string>): Promise<string>;
 

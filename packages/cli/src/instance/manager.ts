@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { execa } from "execa";
+import { createAgent } from "@clawrun/agent";
 import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
 import { applyTemplates } from "./templates.js";
 import type { ClawRunConfig } from "./config.js";
@@ -37,14 +37,15 @@ function getMonorepoRoot(): string {
   return resolve(__dirname, "..", "..", "..", "..");
 }
 
-async function packLocalDeps(instancePath: string): Promise<Record<string, string>> {
+async function packLocalDeps(
+  instancePath: string,
+  config: ClawRunConfig,
+): Promise<Record<string, string>> {
   const root = getMonorepoRoot();
   const deps: Record<string, string> = {};
 
-  // pnpm pack must be run from the workspace root so it can resolve workspace:* deps
-  // Pack in dependency order: zeroclaw and provider first since @clawrun/server depends on both
+  // Core packages (always needed)
   const packages = [
-    { name: "zeroclaw", dir: join(root, "packages", "zeroclaw") },
     { name: "@clawrun/agent", dir: join(root, "packages", "agent") },
     { name: "@clawrun/auth", dir: join(root, "packages", "auth") },
     { name: "@clawrun/provider", dir: join(root, "packages", "provider") },
@@ -54,6 +55,28 @@ async function packLocalDeps(instancePath: string): Promise<Record<string, strin
     { name: "@clawrun/ui", dir: join(root, "packages", "ui") },
     { name: "@clawrun/server", dir: join(root, "packages", "server") },
   ];
+
+  // Agent-specific packages
+  const agentName = config.agent.name;
+  const agentPkgDir = join(root, "packages", `agent-${agentName}`);
+  if (existsSync(agentPkgDir)) {
+    packages.push({ name: `@clawrun/agent-${agentName}`, dir: agentPkgDir });
+  }
+  // Agent's own SDK deps (e.g., "zeroclaw" SDK package)
+  const agent = createAgent(agentName);
+  for (const depName of Object.keys(agent.getInstallDependencies())) {
+    const depDir = join(root, "packages", depName);
+    if (existsSync(depDir)) {
+      packages.push({ name: depName, dir: depDir });
+    }
+  }
+
+  // Provider-specific packages
+  const providerName = config.instance.provider;
+  const providerPkgDir = join(root, "packages", `provider-${providerName}`);
+  if (existsSync(providerPkgDir)) {
+    packages.push({ name: `@clawrun/provider-${providerName}`, dir: providerPkgDir });
+  }
 
   for (const pkg of packages) {
     clack.log.info(chalk.dim(`Packing ${pkg.name}...`));
@@ -111,6 +134,7 @@ export async function createInstance(
   name: string,
   config: ClawRunConfig,
   envVars: Record<string, string>,
+  opts?: { presetDeps?: Record<string, string> },
 ): Promise<string> {
   const dir = instanceDir(name);
   const agentDir = instanceAgentDir(name);
@@ -146,18 +170,20 @@ export async function createInstance(
   let deps: Record<string, string>;
   if (devMode) {
     clack.log.step("Packing local packages...");
-    deps = await packLocalDeps(deployDir);
+    deps = await packLocalDeps(deployDir, config);
   } else {
     deps = {
       "@clawrun/agent": "0.1.0",
+      [`@clawrun/agent-${config.agent.name}`]: "0.1.0",
       "@clawrun/auth": "0.1.0",
       "@clawrun/provider": "0.1.0",
+      [`@clawrun/provider-${config.instance.provider}`]: "0.1.0",
       "@clawrun/channel": "0.1.0",
       "@clawrun/logger": "0.1.0",
       "@clawrun/runtime": "0.1.0",
       "@clawrun/ui": "0.1.0",
       "@clawrun/server": "0.1.0",
-      zeroclaw: "0.1.0",
+      ...(opts?.presetDeps ?? {}),
     };
   }
 
@@ -187,6 +213,40 @@ export async function createInstance(
 }
 
 /**
+ * Resolve simple glob patterns (e.g. "workspace/*.md") against a base directory.
+ * Supports bare filenames and single-level wildcards like "dir/*.ext".
+ */
+function resolveGlobPattern(baseDir: string, pattern: string): string[] {
+  const files: string[] = [];
+
+  if (!pattern.includes("*")) {
+    // Plain file
+    const fullPath = join(baseDir, pattern);
+    if (existsSync(fullPath)) files.push(pattern);
+    return files;
+  }
+
+  // Simple single-level wildcard: "dir/*.ext"
+  const lastSlash = pattern.lastIndexOf("/");
+  const dir = lastSlash >= 0 ? pattern.slice(0, lastSlash) : ".";
+  const filePattern = lastSlash >= 0 ? pattern.slice(lastSlash + 1) : pattern;
+
+  const searchDir = dir === "." ? baseDir : join(baseDir, dir);
+  if (!existsSync(searchDir)) return files;
+
+  // Convert wildcard to regex
+  const re = new RegExp("^" + filePattern.replace(/\./g, "\\.").replace(/\*/g, "[^/]*") + "$");
+
+  for (const f of readdirSync(searchDir)) {
+    if (re.test(f)) {
+      files.push(dir === "." ? f : `${dir}/${f}`);
+    }
+  }
+
+  return files;
+}
+
+/**
  * Copy files that are mirrored between local instance root and .deploy/.
  * These files live at the instance root (source of truth) and are copied
  * into .deploy/ so Vercel can bundle them.
@@ -202,30 +262,22 @@ export function copyMirroredFiles(name: string): void {
     writeFileSync(join(deployDir, "clawrun.json"), JSON.stringify(safe, null, 2) + "\n");
   }
 
-  // agent/config.toml
+  // Copy agent files declared by the agent's getBundleFiles()
+  if (!config) {
+    throw new Error(`No clawrun.json found for instance "${name}"`);
+  }
+  const agent = createAgent(config.agent.name);
+  const bundlePatterns = agent.getBundleFiles();
   const agentDeployDir = join(deployDir, "agent");
   mkdirSync(agentDeployDir, { recursive: true });
 
-  const configTomlSrc = join(agentDir, "config.toml");
-  if (existsSync(configTomlSrc)) {
-    writeFileSync(join(agentDeployDir, "config.toml"), readFileSync(configTomlSrc));
-  }
-
-  // agent/.secret_key
-  const secretKeySrc = join(agentDir, ".secret_key");
-  if (existsSync(secretKeySrc)) {
-    writeFileSync(join(agentDeployDir, ".secret_key"), readFileSync(secretKeySrc));
-  }
-
-  // agent/workspace/*.md — workspace template files
-  const workspaceSrc = join(agentDir, "workspace");
-  if (existsSync(workspaceSrc)) {
-    const workspaceDeployDir = join(agentDeployDir, "workspace");
-    mkdirSync(workspaceDeployDir, { recursive: true });
-    for (const f of readdirSync(workspaceSrc)) {
-      if (f.endsWith(".md")) {
-        writeFileSync(join(workspaceDeployDir, f), readFileSync(join(workspaceSrc, f)));
-      }
+  for (const pattern of bundlePatterns) {
+    const resolved = resolveGlobPattern(agentDir, pattern);
+    for (const relPath of resolved) {
+      const src = join(agentDir, relPath);
+      const dest = join(agentDeployDir, relPath);
+      mkdirSync(dirname(dest), { recursive: true });
+      writeFileSync(dest, readFileSync(src));
     }
   }
 }
@@ -320,8 +372,12 @@ export async function upgradeInstance(name: string): Promise<void> {
 
   // In dev mode, repack local packages to pick up changes
   if (isDevMode()) {
+    const config = readConfig(name);
+    if (!config) {
+      throw new Error(`No clawrun.json found for instance "${name}"`);
+    }
     clack.log.step("Repacking local packages...");
-    const deps = await packLocalDeps(deployDir);
+    const deps = await packLocalDeps(deployDir, config);
 
     // Update package.json with new tarball paths and current peer deps
     const pkgPath = join(deployDir, "package.json");

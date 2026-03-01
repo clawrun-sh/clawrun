@@ -16,7 +16,6 @@ import type {
 } from "../platform/index.js";
 import type { ClawRunConfig } from "@clawrun/runtime";
 import { SANDBOX_DEFAULTS } from "@clawrun/runtime";
-import { configDefaults } from "zeroclaw";
 import {
   createInstance,
   instanceExists,
@@ -79,22 +78,6 @@ const CHANNEL_DOMAINS: Record<string, string[]> = {
   nostr: ["relay.damus.io", "nos.lol", "relay.primal.net", "relay.snort.social"],
 };
 
-const INFRA_DOMAINS = ["*.vercel.app", "*.vercel.sh"];
-
-/**
- * Deploy-time defaults for agent setup.
- * Backends derived from ZeroClaw schema defaults.
- * Explicit overrides: browser enabled + wildcard domains (schema defaults to disabled + empty).
- */
-const DEPLOY_AGENT_DEFAULTS = {
-  memory: { backend: configDefaults.memory?.backend ?? "sqlite" },
-  browser: {
-    enabled: true, // override: schema defaults to false
-    backend: configDefaults.browser?.backend ?? "agent_browser",
-    allowedDomains: ["*"] as string[], // override: schema defaults to []
-  },
-};
-
 interface DerivedDomains {
   /** All domains flat, for the allowlist. */
   all: string[];
@@ -102,9 +85,13 @@ interface DerivedDomains {
   groups: Array<{ reason: string; domains: string[] }>;
 }
 
-function deriveAllowedDomains(provider?: string, channelNames?: string[]): DerivedDomains {
+function deriveAllowedDomains(
+  platform: PlatformProvider,
+  provider?: string,
+  channelNames?: string[],
+): DerivedDomains {
   const groups: DerivedDomains["groups"] = [
-    { reason: "Sandbox lifecycle (heartbeat, sidecar)", domains: [...INFRA_DOMAINS] },
+    { reason: "Sandbox lifecycle (heartbeat, sidecar)", domains: [...platform.getInfraDomains()] },
   ];
   if (provider) {
     const domains = PROVIDER_DOMAINS[provider.toLowerCase()];
@@ -243,15 +230,17 @@ async function promptToolDomains(
  * Base templates are merged with preset-specific overrides.
  * Only copies files that don't already exist (preserves user customizations).
  */
-function seedWorkspaceFiles(presetId: string, agentDir: string): void {
-  // ZeroClaw reads workspace files from {configDir}/workspace/, not configDir itself
-  const workspaceDir = join(agentDir, "workspace");
-  mkdirSync(workspaceDir, { recursive: true });
+function seedWorkspaceFiles(presetId: string, agentDir: string, agent: Agent): void {
+  const seedDir = agent.getSeedDirectory();
+  if (seedDir === null) return;
+
+  const targetDir = join(agentDir, seedDir);
+  mkdirSync(targetDir, { recursive: true });
 
   const files = getWorkspaceFiles(presetId);
   let seeded = 0;
   for (const [filename, srcPath] of files) {
-    const destPath = join(workspaceDir, filename);
+    const destPath = join(targetDir, filename);
     if (!existsSync(destPath)) {
       copyFileSync(srcPath, destPath);
       seeded++;
@@ -333,18 +322,17 @@ async function handleNewInstance(
   // Channel setup
   let channelSetup: ChannelSetupResult = { channels: {}, channelNames: [] };
   if (!options.yes) {
-    channelSetup = await promptChannels(agent);
+    channelSetup = await promptChannels(agent, undefined, name);
   }
 
-  // Write agent config (provider + channels + memory + browser)
+  // Write agent config (provider + channels)
   agent.writeSetupConfig(agentConfigDir, {
     provider: providerResult,
     channels: channelSetup.channels,
-    ...DEPLOY_AGENT_DEFAULTS,
   });
 
   // Seed workspace template files into agent dir (only missing files)
-  seedWorkspaceFiles(preset.id, agentConfigDir);
+  seedWorkspaceFiles(preset.id, agentConfigDir, agent);
 
   // ── Infrastructure ───────────────────────────────────────────
   clack.note("Network policy and state store", "Infrastructure");
@@ -352,7 +340,11 @@ async function handleNewInstance(
   // Network policy prompt
   let networkPolicy: NetworkPolicy = "allow-all";
   if (!options.yes) {
-    const derived = deriveAllowedDomains(providerResult.provider, channelSetup.channelNames);
+    const derived = deriveAllowedDomains(
+      platform,
+      providerResult.provider,
+      channelSetup.channelNames,
+    );
     networkPolicy = await promptNetworkPolicy(derived);
     networkPolicy = await promptToolDomains(agent, agentConfigDir, networkPolicy);
   }
@@ -439,8 +431,11 @@ async function handleNewInstance(
     webhookSecrets,
     sandboxSecret,
     provider: platform.id,
-    bundlePaths: preset.bundlePaths,
+    bundlePaths: agent.getBinaryBundlePaths(),
+    configPaths: agent.getBundleFiles(),
     networkPolicy,
+    serverExternalPackages: platform.getServerExternalPackages(),
+    platformUrlEnvVars: platform.getUrlEnvVars(),
   });
 
   // Derive env vars: ClawRun secrets (channel tokens live in bundled config.toml)
@@ -450,7 +445,9 @@ async function handleNewInstance(
     ...stateResult.vars,
   };
 
-  await createInstance(name, config, allEnvVars);
+  await createInstance(name, config, allEnvVars, {
+    presetDeps: agent.getInstallDependencies(),
+  });
   const deployDir = instanceDeployDir(name);
 
   // Write the project link into .deploy/
@@ -551,11 +548,10 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       agent.writeSetupConfig(agentConfigDir, {
         provider: result,
         channels: existingSetup?.channels ?? {},
-        ...DEPLOY_AGENT_DEFAULTS,
       });
     }
 
-    const channelResult = await promptChannels(agent, existingSetup?.channels);
+    const channelResult = await promptChannels(agent, existingSetup?.channels, name);
     if (Object.keys(channelResult.channels).length > 0) {
       const currentSetup = agent.readSetup(agentConfigDir);
       agent.writeSetupConfig(agentConfigDir, {
@@ -569,7 +565,6 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
           model: "anthropic/claude-sonnet-4-6",
         },
         channels: channelResult.channels,
-        ...DEPLOY_AGENT_DEFAULTS,
       });
 
       // Generate webhook secrets for newly added channels that don't have one yet
@@ -602,7 +597,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       if (policyAction === "restricted") {
         const currentChannels = agent.readSetup(agentConfigDir)?.channels;
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
-        const derived = deriveAllowedDomains(undefined, channelNames);
+        const derived = deriveAllowedDomains(platform, undefined, channelNames);
         existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);
         existingConfig.sandbox.networkPolicy = await promptToolDomains(
           agent,
@@ -620,7 +615,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         // channels and tools have their domains in the allow-list.
         const currentChannels = agent.readSetup(agentConfigDir)?.channels;
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
-        const derived = deriveAllowedDomains(undefined, channelNames);
+        const derived = deriveAllowedDomains(platform, undefined, channelNames);
         const currentAllow = currentPolicy.allow ?? [];
         const missing = derived.all.filter(
           (d) => !currentAllow.some((p) => domainMatchesWildcard(d, p)),
@@ -653,7 +648,8 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
 
   // Seed any missing workspace template files (upgrade path)
   if (existingConfig.instance.preset) {
-    seedWorkspaceFiles(existingConfig.instance.preset, instanceAgentDir(name));
+    const agentForSeed = createAgent(existingConfig.agent.name);
+    seedWorkspaceFiles(existingConfig.instance.preset, instanceAgentDir(name), agentForSeed);
   }
 
   // ── Deploy ───────────────────────────────────────────────────
@@ -683,7 +679,6 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       agentObj.writeSetupConfig(agentCfgDir, {
         provider: currentSetup.provider as { provider: string; apiKey: string; model: string },
         channels: currentSetup.channels ?? {},
-        ...DEPLOY_AGENT_DEFAULTS,
       });
     }
   }
