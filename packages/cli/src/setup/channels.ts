@@ -171,6 +171,10 @@ async function configureChannel(
     const validation = await validateChannel(channelId, fields);
     if (validation!.ok) {
       s.stop(chalk.green(validation!.message));
+      // Merge auto-derived fields (e.g. Discord application_id from bot token)
+      if (validation!.enrichedFields) {
+        Object.assign(fields, validation!.enrichedFields);
+      }
     } else {
       s.stop(chalk.red(validation!.message));
       return { success: false, fields, error: validation!.message };

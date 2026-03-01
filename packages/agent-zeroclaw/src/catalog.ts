@@ -460,6 +460,13 @@ export const CHANNELS: ChannelInfo[] = [
     setupFields: [
       { name: "bot_token", label: "Bot token (xoxb-...)", type: "password", required: true },
       {
+        name: "signing_secret",
+        label: "Signing secret (from App Credentials)",
+        type: "password",
+        required: false,
+        description: "Required for webhook wake — verifies incoming Events API requests",
+      },
+      {
         name: "app_token",
         label: "App-level token (xapp-...)",
         type: "password",
@@ -569,6 +576,14 @@ export const CHANNELS: ChannelInfo[] = [
         label: "Phone number ID (from WhatsApp app settings)",
         type: "text",
         required: true,
+      },
+      {
+        name: "app_secret",
+        label: "App secret (for webhook signature verification)",
+        type: "password",
+        required: false,
+        description:
+          "Required for webhook wake — found in Meta App Dashboard → App Settings → Basic",
       },
       {
         name: "verify_token",

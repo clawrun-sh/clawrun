@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import type { WakeHookAdapter, WakeSignal, AuthResult } from "../types.js";
+import { safeEqual } from "../safe-equal.js";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("channel:telegram");
@@ -83,12 +83,4 @@ export class TelegramWakeHookAdapter implements WakeHookAdapter {
       // Best-effort — courtesy message failure is not critical
     }
   }
-}
-
-/** Timing-safe string comparison. */
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
 }

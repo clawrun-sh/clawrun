@@ -4,6 +4,8 @@
 export interface ChannelValidationResult {
   ok: boolean;
   message: string;
+  /** Fields auto-derived during validation (e.g. Discord application_id from bot token). */
+  enrichedFields?: Record<string, string>;
 }
 
 /**
@@ -40,6 +42,8 @@ export interface WakeSignal {
   messageText?: string;
   /** Original webhook payload for debugging/logging. */
   rawPayload: unknown;
+  /** If true, the adapter already sent a courtesy acknowledgment (e.g. Discord interaction response). */
+  acknowledged?: boolean;
 }
 
 /**
@@ -87,6 +91,13 @@ export interface WakeHookAdapter {
 
   /** Extract wake signal from webhook payload. Null = not a wakeable event. */
   parseWakeSignal(body: unknown): WakeSignal | null;
+
+  /**
+   * Handle GET-based webhook URL verification (e.g. WhatsApp hub.challenge).
+   * Returns a Response if this is a verification request, null otherwise.
+   * Only implemented by channels that verify via GET (most use POST challenges).
+   */
+  handleVerifyGet?(req: Request): Response | null;
 
   /** Send a text message to a chat. Best-effort, never throws. */
   sendMessage(chatId: string, message: string): Promise<void>;

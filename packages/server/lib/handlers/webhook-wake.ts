@@ -6,6 +6,27 @@ import { createLogger } from "@clawrun/logger";
 const log = createLogger("handler:webhook");
 
 /**
+ * Handle GET requests for webhook URL verification (e.g. WhatsApp hub.challenge).
+ *
+ * Some platforms verify webhook URLs by sending a GET request with a challenge
+ * parameter that must be echoed back. This handler delegates to the adapter's
+ * handleVerifyGet() method if present.
+ */
+export async function handleWakeWebhookGet(req: Request, channelId: string): Promise<Response> {
+  const adapter = getAdapter(channelId);
+  if (!adapter) {
+    return new Response("Unknown channel", { status: 404 });
+  }
+
+  if (adapter.handleVerifyGet) {
+    const response = adapter.handleVerifyGet(req);
+    if (response) return response;
+  }
+
+  return new Response("Method Not Allowed", { status: 405 });
+}
+
+/**
  * Generic wake webhook handler for any channel.
  *
  * Flow:
@@ -83,8 +104,8 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
     }
   }
 
-  // 8. Send courtesy message (best-effort)
-  if (signal.chatId) {
+  // 8. Send courtesy message (best-effort) — skip if adapter already acknowledged
+  if (signal.chatId && !signal.acknowledged) {
     await adapter.sendMessage(signal.chatId, "Waking up, one moment...");
   }
 

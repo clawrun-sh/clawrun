@@ -1,5 +1,10 @@
 import type { WakeHookAdapter } from "./types.js";
 import { TelegramWakeHookAdapter } from "./telegram/wake-hook.js";
+import { SlackWakeHookAdapter } from "./slack/wake-hook.js";
+import { WhatsAppWakeHookAdapter } from "./whatsapp/wake-hook.js";
+import { DiscordWakeHookAdapter } from "./discord/wake-hook.js";
+import { LarkWakeHookAdapter } from "./lark/wake-hook.js";
+import { QQWakeHookAdapter } from "./qq/wake-hook.js";
 
 type WakeHookFactory = (
   credentials: Record<string, string>,
@@ -9,6 +14,36 @@ type WakeHookFactory = (
 // Factory registry — declares which channels CAN have wake hooks
 const factories = new Map<string, WakeHookFactory>();
 factories.set("telegram", (creds, secret) => new TelegramWakeHookAdapter(creds.bot_token, secret));
+factories.set("slack", (creds) => new SlackWakeHookAdapter(creds.bot_token, creds.signing_secret));
+factories.set(
+  "whatsapp",
+  (creds) =>
+    new WhatsAppWakeHookAdapter(
+      creds.access_token,
+      creds.phone_number_id,
+      creds.app_secret,
+      creds.verify_token,
+    ),
+);
+factories.set(
+  "discord",
+  (creds) => new DiscordWakeHookAdapter(creds.bot_token, creds.application_id, creds.public_key),
+);
+factories.set(
+  "lark",
+  (creds) =>
+    new LarkWakeHookAdapter(
+      creds.app_id,
+      creds.app_secret,
+      creds.verification_token,
+      creds.use_feishu === "true",
+    ),
+);
+factories.set(
+  "qq",
+  (creds) =>
+    new QQWakeHookAdapter(creds.app_id, creds.app_secret, creds.environment || "production"),
+);
 
 // Live adapter registry — populated at boot via initializeAdapters()
 const adapters: Map<string, WakeHookAdapter> = new Map();
