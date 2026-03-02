@@ -23,16 +23,21 @@ export function safeValidateConfig(config: unknown) {
 }
 
 /**
- * Default values for every config section, extracted from the JSON Schema's
- * `default` annotations. These are the values ZeroClaw uses when a section
- * is absent from config.toml (via `#[serde(default)]`).
- *
- * Use this to avoid hard-coding defaults that duplicate ZeroClaw's own.
+ * ZeroClaw's own config defaults, extracted from the JSON schema.
+ * Each top-level property with a `default` value is included.
  */
-export const configDefaults: Partial<ZeroClawConfig> = Object.fromEntries(
-  Object.entries(rawSchema.properties)
-    .filter(([, v]) => "default" in v)
-    .map(([k, v]) => [k, (v as { default: unknown }).default]),
-) as Partial<ZeroClawConfig>;
+export const schemaDefaults: Partial<ZeroClawConfig> = (() => {
+  const props = (rawSchema as Record<string, unknown>).properties as
+    | Record<string, { default?: unknown }>
+    | undefined;
+  if (!props) return {};
+  const defaults: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(props)) {
+    if (prop.default !== undefined) {
+      defaults[key] = prop.default;
+    }
+  }
+  return defaults as Partial<ZeroClawConfig>;
+})();
 
 export type { ZeroClawConfig };

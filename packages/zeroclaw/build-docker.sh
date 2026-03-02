@@ -71,20 +71,38 @@ CONTAINER_NAME="zeroclaw-build-extract"
 echo ""
 echo "--- Building x86_64-unknown-linux-musl ---"
 
-docker build \
+BUILD_LOG=$(mktemp)
+if ! docker build \
   --platform linux/amd64 \
   -t "$IMAGE_TAG" \
-  "$CONTEXT_DIR"
+  "$CONTEXT_DIR" > "$BUILD_LOG" 2>&1; then
+  echo "Docker build FAILED. Last 40 lines:"
+  echo "---"
+  tail -40 "$BUILD_LOG"
+  echo "---"
+  echo "Full log: $BUILD_LOG"
+  exit 1
+fi
+
+# Show only warnings from build output
+if grep -iE '(warning|warn\b)' "$BUILD_LOG" | grep -v '^#[0-9]' | head -20 > /dev/null 2>&1; then
+  WARNINGS=$(grep -iE '(warning|warn\b)' "$BUILD_LOG" | grep -v '^#[0-9]' | head -20)
+  if [ -n "$WARNINGS" ]; then
+    echo "  Warnings:"
+    echo "$WARNINGS" | sed 's/^/    /'
+  fi
+fi
+rm -f "$BUILD_LOG"
 
 # Extract binary
-docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
-docker create --name "$CONTAINER_NAME" "$IMAGE_TAG" /bin/true
+docker rm -f "$CONTAINER_NAME" &>/dev/null || true
+docker create --name "$CONTAINER_NAME" "$IMAGE_TAG" /bin/true &>/dev/null
 
 mkdir -p "$DIST_DIR"
 
-docker cp "$CONTAINER_NAME:/app/target/release/zeroclaw" "$DEST_BIN"
+docker cp "$CONTAINER_NAME:/app/target/x86_64-unknown-linux-musl/release-fast/zeroclaw" "$DEST_BIN"
 docker cp "$CONTAINER_NAME:/zeroclaw-config.schema.json" "$SCRIPT_DIR/src/zeroclaw-config.schema.json"
-docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+docker rm -f "$CONTAINER_NAME" &>/dev/null || true
 
 chmod +x "$DEST_BIN"
 

@@ -28,6 +28,7 @@
     "clean": "rm -rf dist",
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "vitest run",
     "lint": "eslint src",
     "format:check": "prettier --check src"
   },
@@ -35,6 +36,7 @@
     "@clawrun/agent": "workspace:*",
     "@clawrun/logger": "workspace:*",
     "@iarna/toml": "^2.2.5",
+    "deepmerge-ts": "^7.1.5",
     "ws": "^8.19.0",
     "zeroclaw": "workspace:*",
     "zod": "^4.3.6"

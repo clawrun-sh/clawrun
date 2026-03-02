@@ -1,5 +1,6 @@
-import { readParsedConfig, configDefaults } from "zeroclaw";
+import { readParsedConfig, schemaDefaults } from "zeroclaw";
 import type { ZeroClawConfig } from "zeroclaw";
+import { deepmergeCustom } from "deepmerge-ts";
 import * as TOML from "@iarna/toml";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -20,98 +21,95 @@ function coerceTomlValue(value: string): string | number | boolean {
 }
 
 /**
- * Autonomy overrides for daemon mode — intentionally differ from ZeroClaw's
- * interactive defaults for unattended sandbox operation.
- *
- * Schema defaults (interactive): level=supervised, 20 actions/hr, $5/day,
- *   13 allowed commands, forbidden_paths=[/etc, /root, ...],
- *   block_high_risk=true, require_approval=true, non_cli_excluded_tools=[21 tools]
- *
- * Daemon overrides: full autonomy, expanded commands, relaxed limits,
- *   no tool exclusions — the sandbox is isolated and the operator is absent.
+ * ClawRun overrides on top of ZeroClaw's schema defaults.
+ * Only fields where we diverge from zeroclaw's defaults.
  */
-const DAEMON_AUTONOMY_OVERRIDES: ZeroClawConfig["autonomy"] = {
-  level: "full",
-  workspace_only: true,
-  allowed_commands: [
-    // Read-only inspection
-    "ls",
-    "cat",
-    "head",
-    "tail",
-    "wc",
-    "grep",
-    "find",
-    "echo",
-    "pwd",
-    "date",
-    "which",
-    "file",
-    // Text processing / stream filters
-    "jq",
-    "sort",
-    "uniq",
-    "cut",
-    "tr",
-    "sed",
-    "awk",
-    "diff",
-    "patch",
-    "tee",
-    "xargs",
-    // Path utilities
-    "basename",
-    "dirname",
-    "realpath",
-    "env",
-    "printenv",
-    // Version control
-    "git",
-    // Package managers
-    "npm",
-    "npx",
-    "pnpm",
-    "yarn",
-    "pip",
-    "pip3",
-    "cargo",
-    // Runtimes
-    "node",
-    "python",
-    "python3",
-    // File operations (no permission changes)
-    "mkdir",
-    "cp",
-    "mv",
-    "rm",
-    "touch",
-    "ln",
-    // Archive
-    "tar",
-    "gzip",
-    "gunzip",
-    "zip",
-    "unzip",
-    // Build
-    "make",
-  ],
-  forbidden_paths: [],
-  max_actions_per_hour: 500,
-  max_cost_per_day_cents: 5000,
-  require_approval_for_medium_risk: false,
-  block_high_risk_commands: false,
-  non_cli_excluded_tools: [],
-};
-
-/** Deploy-time defaults for daemon mode. Existing user config takes precedence. */
-const DEPLOY_DEFAULTS = {
-  memory: { backend: "sqlite" },
+const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
+  default_temperature: 0.7,
+  autonomy: {
+    level: "full",
+    workspace_only: true,
+    allowed_commands: [
+      // Read-only inspection
+      "ls",
+      "cat",
+      "head",
+      "tail",
+      "wc",
+      "grep",
+      "find",
+      "echo",
+      "pwd",
+      "date",
+      "which",
+      "file",
+      // Text processing / stream filters
+      "jq",
+      "sort",
+      "uniq",
+      "cut",
+      "tr",
+      "sed",
+      "awk",
+      "diff",
+      "patch",
+      "tee",
+      "xargs",
+      // Path utilities
+      "basename",
+      "dirname",
+      "realpath",
+      "env",
+      "printenv",
+      // Version control
+      "git",
+      // Package managers
+      "npm",
+      "npx",
+      "pnpm",
+      "yarn",
+      "pip",
+      "pip3",
+      "cargo",
+      // Runtimes
+      "node",
+      "python",
+      "python3",
+      // File operations (no permission changes)
+      "mkdir",
+      "cp",
+      "mv",
+      "rm",
+      "touch",
+      "ln",
+      // Archive
+      "tar",
+      "gzip",
+      "gunzip",
+      "zip",
+      "unzip",
+      // Build
+      "make",
+    ],
+    max_actions_per_hour: 500,
+    max_cost_per_day_cents: 5000,
+    require_approval_for_medium_risk: false,
+    block_high_risk_commands: false,
+  },
+  memory: { backend: "sqlite", auto_save: true },
   browser: {
     enabled: true,
     backend: "agent_browser",
     allowed_domains: ["*"],
   },
-} satisfies Partial<ZeroClawConfig>;
+};
+
+/** Deep merge where config arrays win outright (no union/dedup). */
+const deepmerge = deepmergeCustom({
+  mergeArrays(values) {
+    return values[values.length - 1];
+  },
+});
 
 /**
  * Write agent-specific config (provider, channels, daemon defaults) to config.toml.
@@ -134,45 +132,19 @@ export function writeSetupConfig(
     // No existing config — start fresh
   }
 
-  const config: Partial<ZeroClawConfig> = {
-    ...configDefaults,
-    default_temperature: 0.7,
-    ...existing,
+  // Deep merge: zeroclaw schema defaults → ClawRun overrides → existing user config → wizard values.
+  // Each layer wins over the previous for conflicting keys.
+  const base = deepmerge(schemaDefaults, CLAWRUN_OVERRIDES, existing) as Partial<ZeroClawConfig>;
 
-    // Wizard outputs (always written)
+  // Wizard values + forced overrides — always applied on top.
+  // security.otp.enabled is forced false (OTP is unusable in daemon mode).
+  const config = deepmerge(base, {
     api_key: data.provider.apiKey,
     default_provider: data.provider.provider,
     default_model: data.provider.model,
     ...(data.provider.apiUrl ? { api_url: data.provider.apiUrl } : {}),
-
-    autonomy: {
-      ...(configDefaults.autonomy ?? {}),
-      ...DAEMON_AUTONOMY_OVERRIDES,
-      ...(existing.autonomy ?? {}),
-    },
-
-    security: {
-      ...(configDefaults.security ?? {}),
-      ...(existing.security ?? {}),
-      otp: {
-        ...(configDefaults.security?.otp ?? {}),
-        ...(existing.security?.otp ?? {}),
-        enabled: false,
-      },
-    },
-
-    memory: {
-      ...(configDefaults.memory ?? {}),
-      ...DEPLOY_DEFAULTS.memory,
-      ...(existing.memory ?? {}),
-    },
-
-    browser: {
-      ...(configDefaults.browser ?? {}),
-      ...DEPLOY_DEFAULTS.browser,
-      ...(existing.browser ?? {}),
-    },
-  };
+    security: { otp: { enabled: false } },
+  } as Partial<ZeroClawConfig>) as Partial<ZeroClawConfig>;
 
   // Merge channels into channels_config.
   if (Object.keys(data.channels).length > 0) {

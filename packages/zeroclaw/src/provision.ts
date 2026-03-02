@@ -38,7 +38,9 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
     throw new Error(`Binary not executable after install: ${binPath}`);
   }
 
-  // Read agent config from local dir and generate daemon TOML
+  // Read agent config from local dir and generate daemon TOML with
+  // sandbox-specific overrides. The zeroclaw binary applies its own
+  // defaults via #[serde(default)] for any missing fields.
   const parsed = readParsedConfig(opts.localAgentDir);
   const toml = generateDaemonToml(parsed);
 
