@@ -14,7 +14,6 @@ export { resolveRoot } from "./sandbox/resolve-root.js";
 export { getStateStore, getLockStore } from "./storage/state.js";
 export type { StateStore, LockStore } from "./storage/state-types.js";
 export type { ChatMessage, MessageStore } from "./storage/types.js";
-export { getMessageStore } from "./storage/index.js";
 
 // Agents
 export { getAgent, registerAgent } from "./agents/registry.js";

@@ -94,14 +94,7 @@ export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, stri
 
   // State store
   if (config.state) {
-    vars["KV_REST_API_URL"] = config.state.url;
-    vars["KV_REST_API_TOKEN"] = config.state.token;
-    if (config.state.readOnlyToken) {
-      vars["KV_REST_API_READ_ONLY_TOKEN"] = config.state.readOnlyToken;
-    }
-    if (config.state.kvUrl) {
-      vars["KV_URL"] = config.state.kvUrl;
-    }
+    vars["REDIS_URL"] = config.state.redisUrl;
   }
 
   return vars;

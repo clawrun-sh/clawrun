@@ -1,10 +1,7 @@
 import { z } from "zod";
 
 const stateSchema = z.object({
-  url: z.string(),
-  token: z.string(),
-  readOnlyToken: z.string().optional(),
-  kvUrl: z.string().optional(),
+  redisUrl: z.string(),
 });
 
 /** Default values for the sandbox config, used by the Zod schema and importable by other packages. */

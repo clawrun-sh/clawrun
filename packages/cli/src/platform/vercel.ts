@@ -571,8 +571,8 @@ export class VercelPlatformProvider implements PlatformProvider {
         // ignore
       }
 
-      if (!vars["KV_REST_API_URL"] || !vars["KV_REST_API_TOKEN"]) {
-        spinner.stop("State store setup incomplete: missing KV_REST_API_URL or KV_REST_API_TOKEN.");
+      if (!vars["KV_URL"]) {
+        spinner.stop("State store setup incomplete: missing KV_URL.");
         return { success: false, vars: {} };
       }
 

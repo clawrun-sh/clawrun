@@ -324,45 +324,19 @@ describe("cloudClawConfigSchema — state", () => {
     expect(parsed.state).toBeUndefined();
   });
 
-  it("accepts state with required url and token", () => {
+  it("accepts state with redisUrl", () => {
     const input = {
       ...minInput,
-      state: { url: "https://redis.example.com", token: "tok" },
+      state: { redisUrl: "rediss://default:tok@redis.example.com:6379" },
     };
     const parsed = cloudClawConfigSchema.parse(input);
-    expect(parsed.state?.url).toBe("https://redis.example.com");
+    expect(parsed.state?.redisUrl).toBe("rediss://default:tok@redis.example.com:6379");
   });
 
-  it("accepts state with optional readOnlyToken", () => {
+  it("rejects state missing redisUrl", () => {
     const input = {
       ...minInput,
-      state: {
-        url: "https://redis.example.com",
-        token: "tok",
-        readOnlyToken: "ro",
-      },
-    };
-    const parsed = cloudClawConfigSchema.parse(input);
-    expect(parsed.state?.readOnlyToken).toBe("ro");
-  });
-
-  it("accepts state with optional kvUrl", () => {
-    const input = {
-      ...minInput,
-      state: {
-        url: "https://redis.example.com",
-        token: "tok",
-        kvUrl: "https://kv.example.com",
-      },
-    };
-    const parsed = cloudClawConfigSchema.parse(input);
-    expect(parsed.state?.kvUrl).toBe("https://kv.example.com");
-  });
-
-  it("rejects state missing token", () => {
-    const input = {
-      ...minInput,
-      state: { url: "https://redis.example.com" },
+      state: {},
     };
     expect(() => cloudClawConfigSchema.parse(input)).toThrow();
   });

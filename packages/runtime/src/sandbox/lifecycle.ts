@@ -64,10 +64,6 @@ function getCronWakeLeadS(): number {
   return getRuntimeConfig().sandbox.cronWakeLeadTime;
 }
 
-function getDatabaseUrl(): string | undefined {
-  return process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-}
-
 /** Read the agent .secret_key bundled at agent/.secret_key. */
 function readBundledSecretKey(): string {
   return readFileSync(join(process.cwd(), "agent", ".secret_key"), "utf-8").trim();
@@ -711,10 +707,7 @@ export class SandboxLifecycleManager {
       throw new Error(`Cannot start sidecar — missing: ${missing.join(", ")}`);
     }
 
-    const databaseUrl = getDatabaseUrl();
-    const daemonCmd = this.agent.getDaemonCommand(root, {
-      env: databaseUrl ? { DATABASE_URL: databaseUrl } : undefined,
-    });
+    const daemonCmd = this.agent.getDaemonCommand(root, {});
     const monitorConfig = this.agent.getMonitorConfig(root);
 
     // Build tool install configs from agent's enabled tools

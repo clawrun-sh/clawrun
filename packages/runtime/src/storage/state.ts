@@ -1,17 +1,17 @@
 import type { StateStore, LockStore } from "./state-types.js";
 import { RedisStateStore } from "./state-redis.js";
 import { RedisLockStore } from "./lock-redis.js";
-import { PostgresStateStore } from "./state-postgres.js";
 import type { RedisClient } from "./redis-types.js";
-import { createUpstashClient } from "./redis-upstash.js";
+import { createRedisClient } from "./redis-client.js";
 import { getRuntimeConfig } from "../config.js";
 
 let _redisClient: RedisClient | null = null;
 
 function getRedisClient(): RedisClient | null {
   if (_redisClient) return _redisClient;
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) return null;
-  _redisClient = createUpstashClient();
+  const url = process.env.REDIS_URL ?? process.env.KV_URL;
+  if (!url) return null;
+  _redisClient = createRedisClient(url);
   return _redisClient;
 }
 
@@ -24,7 +24,6 @@ function getKeyPrefix(): string {
 export function getStateStore(): StateStore | null {
   const redis = getRedisClient();
   if (redis) return new RedisStateStore(redis, getKeyPrefix());
-  if (process.env.POSTGRES_URL || process.env.DATABASE_URL) return new PostgresStateStore();
   return null;
 }
 

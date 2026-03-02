@@ -21,10 +21,6 @@ function getSandboxProvider(): SandboxProvider {
   return _provider;
 }
 
-function getDatabaseUrl(): string | undefined {
-  return process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-}
-
 export async function runAgent(
   message: string,
   options?: { agentId?: string },
@@ -34,7 +30,6 @@ export async function runAgent(
 
   try {
     const snapshotId = process.env.CLAWRUN_SANDBOX_SNAPSHOT_ID;
-    const databaseUrl = getDatabaseUrl();
 
     // Create sandbox
     sandbox = await getSandboxProvider().create({
@@ -56,7 +51,6 @@ export async function runAgent(
 
     try {
       return await agent.sendMessage(sandbox, root, message, {
-        env: databaseUrl ? { DATABASE_URL: databaseUrl } : undefined,
         signal: controller.signal,
       });
     } finally {
