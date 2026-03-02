@@ -121,7 +121,10 @@ export function copyServerApp(instancePath: string): void {
   if (existsSync(globalsCssPath)) {
     let css = readFileSync(globalsCssPath, "utf-8");
     // Normalize any monorepo-relative UI path to node_modules path
-    css = css.replace(/@source\s+"\.\.\/\.\.\/ui\/src"/g, '@source "../node_modules/@clawrun/ui/src"');
+    css = css.replace(
+      /@source\s+"\.\.\/\.\.\/ui\/src"/g,
+      '@source "../node_modules/@clawrun/ui/src"',
+    );
     css = css.replace(
       /@source\s+"\.\.\/\.\.\/ui\/node_modules\/streamdown\/dist"/g,
       '@source "../node_modules/streamdown/dist"',
@@ -130,7 +133,10 @@ export function copyServerApp(instancePath: string): void {
   }
 
   // Write deployment tsconfig.json (standalone — no monorepo extends)
-  writeFileSync(join(instancePath, "tsconfig.json"), JSON.stringify(DEPLOY_TSCONFIG, null, 2) + "\n");
+  writeFileSync(
+    join(instancePath, "tsconfig.json"),
+    JSON.stringify(DEPLOY_TSCONFIG, null, 2) + "\n",
+  );
 
   // Write vercel.json
   writeFileSync(join(instancePath, "vercel.json"), JSON.stringify(VERCEL_JSON, null, 2) + "\n");
