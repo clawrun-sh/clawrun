@@ -6,8 +6,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @source "../lib/components";
-@source "../../ui/src";
-@source "../../ui/node_modules/streamdown/dist";
+@source "../node_modules/@clawrun/ui/src";
+@source "../node_modules/streamdown/dist";
 
 @theme inline {
   --color-background: var(--background);

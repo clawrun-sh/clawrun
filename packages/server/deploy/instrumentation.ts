@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { setupLifecycleHooks, initializeWakeHookAdapters } from "@clawrun/server/setup";
+import { setupLifecycleHooks, initializeWakeHookAdapters } from "@/lib/setup";
 import { registerAgent, getRuntimeConfig } from "@clawrun/runtime";
 import { createAgent } from "@clawrun/agent";
 

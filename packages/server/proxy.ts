@@ -1,4 +1,4 @@
-import proxy from "@clawrun/server/proxy";
+import proxy from "@/lib/auth/middleware";
 
 export default proxy;
 

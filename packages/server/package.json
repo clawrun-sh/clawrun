@@ -12,82 +12,20 @@
   },
   "type": "module",
   "scripts": {
-    "clean": "rm -rf dist .next",
+    "clean": "rm -rf .next",
     "dev": "next dev",
-    "build": "tsc -p tsconfig.lib.json && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint lib",
     "format:check": "prettier --check lib"
   },
-  "exports": {
-    "./api/health": {
-      "types": "./dist/handlers/health.d.ts",
-      "default": "./dist/handlers/health.js"
-    },
-    "./api/webhook-wake": {
-      "types": "./dist/handlers/webhook-wake.d.ts",
-      "default": "./dist/handlers/webhook-wake.js"
-    },
-    "./api/heartbeat": {
-      "types": "./dist/handlers/heartbeat.d.ts",
-      "default": "./dist/handlers/heartbeat.js"
-    },
-    "./api/sandbox-heartbeat": {
-      "types": "./dist/handlers/sandbox-heartbeat.d.ts",
-      "default": "./dist/handlers/sandbox-heartbeat.js"
-    },
-    "./api/sandbox-restart": {
-      "types": "./dist/handlers/sandbox-restart.d.ts",
-      "default": "./dist/handlers/sandbox-restart.js"
-    },
-    "./api/sandbox-start": {
-      "types": "./dist/handlers/sandbox-start.d.ts",
-      "default": "./dist/handlers/sandbox-start.js"
-    },
-    "./api/sandbox-stop": {
-      "types": "./dist/handlers/sandbox-stop.d.ts",
-      "default": "./dist/handlers/sandbox-stop.js"
-    },
-    "./api/accept": {
-      "types": "./dist/handlers/accept.d.ts",
-      "default": "./dist/handlers/accept.js"
-    },
-    "./api/chat": {
-      "types": "./dist/handlers/chat.d.ts",
-      "default": "./dist/handlers/chat.js"
-    },
-    "./pages/home": {
-      "types": "./dist/components/home.d.ts",
-      "default": "./dist/components/home.js"
-    },
-    "./pages/layout": {
-      "types": "./dist/components/root-layout.d.ts",
-      "default": "./dist/components/root-layout.js"
-    },
-    "./pages/chat": {
-      "types": "./dist/components/chat-page-server.d.ts",
-      "default": "./dist/components/chat-page-server.js"
-    },
-    "./pages/expired": {
-      "types": "./dist/components/expired-page.d.ts",
-      "default": "./dist/components/expired-page.js"
-    },
-    "./proxy": {
-      "types": "./dist/auth/middleware.d.ts",
-      "default": "./dist/auth/middleware.js"
-    },
-    "./config": {
-      "types": "./dist/config.d.ts",
-      "default": "./dist/config.js"
-    },
-    "./setup": {
-      "types": "./dist/setup.d.ts",
-      "default": "./dist/setup.js"
-    }
-  },
   "files": [
-    "dist",
-    "templates",
+    "app",
+    "lib",
+    "deploy",
+    "proxy.ts",
+    "postcss.config.mjs",
+    "next.config.ts",
     "package.json"
   ],
   "dependencies": {

@@ -3,7 +3,7 @@ import type { TextUIPart } from "ai";
 import { getProvider } from "@clawrun/provider";
 import { getAgent, getRuntimeConfig, resolveRoot, SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
-import { requireSessionOrBearerAuth } from "../auth/session.js";
+import { requireSessionOrBearerAuth } from "../auth/session";
 
 /** Maximum allowed message length (characters). */
 const MAX_MESSAGE_LENGTH = 32_000;

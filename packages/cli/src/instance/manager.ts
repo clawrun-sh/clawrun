@@ -6,7 +6,7 @@ import * as clack from "@clack/prompts";
 import { execa } from "execa";
 import { createAgent } from "@clawrun/agent";
 import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
-import { applyTemplates } from "./templates.js";
+import { copyServerApp } from "./templates.js";
 import type { ClawRunConfig } from "./config.js";
 import { readConfig, writeConfig, sanitizeConfig } from "./config.js";
 
@@ -22,6 +22,7 @@ export interface InstanceMetadata {
 
 interface InstancePackageJson {
   name: string;
+  version?: string;
   private: boolean;
   dependencies: Record<string, string>;
 }
@@ -53,7 +54,6 @@ async function packLocalDeps(
     { name: "@clawrun/runtime", dir: join(root, "packages", "runtime") },
     { name: "@clawrun/logger", dir: join(root, "packages", "logger") },
     { name: "@clawrun/ui", dir: join(root, "packages", "ui") },
-    { name: "@clawrun/server", dir: join(root, "packages", "server") },
   ];
 
   // Agent-specific packages
@@ -99,6 +99,9 @@ const INSTANCE_PEER_DEPS: Record<string, string> = {
   next: "^16.0.0",
   react: "^19.0.0",
   "react-dom": "^19.0.0",
+  ai: "^6.0.0",
+  "@ai-sdk/react": "^3.0.0",
+  "lucide-react": "^0.500.0",
   dexie: "^4.0.0",
   "next-themes": "^0.4.0",
   shadcn: "^3.8.5",
@@ -182,7 +185,6 @@ export async function createInstance(
       "@clawrun/logger": "0.1.0",
       "@clawrun/runtime": "0.1.0",
       "@clawrun/ui": "0.1.0",
-      "@clawrun/server": "0.1.0",
       ...(opts?.presetDeps ?? {}),
     };
   }
@@ -204,9 +206,9 @@ export async function createInstance(
     stdio: "inherit",
   });
 
-  // Apply templates from installed @clawrun/server into .deploy/
-  clack.log.step("Applying templates...");
-  applyTemplates(deployDir);
+  // Copy server app source into .deploy/
+  clack.log.step("Copying server app...");
+  copyServerApp(deployDir);
 
   clack.log.success(`Instance "${name}" created.`);
   return dir;
@@ -301,12 +303,12 @@ export function listInstances(): InstanceMetadata[] {
     const config = readConfig(entry.name);
     if (!config) continue;
 
-    // Read app version from .deploy/package.json if it exists
+    // Read app version from .deploy/package.json
     const deployPkgPath = join(dir, entry.name, ".deploy", "package.json");
     let appVersion = "unknown";
     if (existsSync(deployPkgPath)) {
       const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-      appVersion = pkg.dependencies?.["@clawrun/server"] ?? "unknown";
+      appVersion = pkg.version ?? "unknown";
     }
 
     instances.push({
@@ -327,12 +329,12 @@ export function getInstance(name: string): InstanceMetadata | null {
   const config = readConfig(name);
   if (!config) return null;
 
-  // Read app version from .deploy/package.json if it exists
+  // Read app version from .deploy/package.json
   const deployPkgPath = join(dir, ".deploy", "package.json");
   let appVersion = "unknown";
   if (existsSync(deployPkgPath)) {
     const pkg = JSON.parse(readFileSync(deployPkgPath, "utf-8")) as InstancePackageJson;
-    appVersion = pkg.dependencies?.["@clawrun/server"] ?? "unknown";
+    appVersion = pkg.version ?? "unknown";
   }
 
   return {
@@ -418,9 +420,9 @@ export async function upgradeInstance(name: string): Promise<void> {
     stdio: "inherit",
   });
 
-  // Reapply templates from the updated @clawrun/server
-  clack.log.step("Reapplying templates...");
-  applyTemplates(deployDir);
+  // Copy updated server app source
+  clack.log.step("Copying server app...");
+  copyServerApp(deployDir);
 
   clack.log.success(`Instance "${name}" upgraded.`);
 }

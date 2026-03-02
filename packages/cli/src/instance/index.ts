@@ -17,7 +17,7 @@ export {
   isDevMode,
 } from "./manager.js";
 export type { InstanceMetadata } from "./manager.js";
-export { applyTemplates } from "./templates.js";
+export { copyServerApp } from "./templates.js";
 export {
   cloudClawConfigSchema,
   buildConfig,

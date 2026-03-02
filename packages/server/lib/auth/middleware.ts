@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@clawrun/auth";
-import { verifySessionCookie } from "./session.js";
+import { verifySessionCookie } from "./session";
 
 /**
  * Middleware that protects the /chat page.
