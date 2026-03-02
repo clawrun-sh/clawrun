@@ -271,6 +271,7 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
           <PromptInput onSubmit={handleSubmit}>
             <PromptInputBody>
               <PromptInputTextarea
+                autoFocus
                 onChange={handleTextChange}
                 placeholder="Type a message..."
                 value={text}
