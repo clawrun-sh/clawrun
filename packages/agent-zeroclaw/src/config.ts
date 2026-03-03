@@ -101,6 +101,7 @@ const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
     enabled: true,
     backend: "agent_browser",
     allowed_domains: ["*"],
+    browser_open: "disable",
   },
 };
 

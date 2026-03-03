@@ -1,5 +1,10 @@
 # AGENTS.md — Operating Instructions
 
+## First Run
+
+If `BOOTSTRAP.md` exists, follow its instructions first.
+It's your onboarding guide. Delete it when you're done.
+
 ## Every Session (required)
 
 Before doing anything else:
@@ -7,7 +12,7 @@ Before doing anything else:
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Use `memory_recall` for recent context
-4. Use `memory_store` to persist durable info (not files)
+4. Use `memory_store` to persist durable context across sessions
 
 Don't ask permission. Just do it.
 

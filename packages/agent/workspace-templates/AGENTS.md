@@ -1,5 +1,10 @@
 # AGENTS.md — Operating Instructions
 
+## First Run
+
+If `BOOTSTRAP.md` exists, follow its instructions first.
+It's your onboarding guide. Delete it when you're done.
+
 ## Every Session (required)
 
 Before doing anything else:
