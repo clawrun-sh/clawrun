@@ -10,17 +10,33 @@ export async function getRunningId(client: SandboxClient): Promise<string | null
   return running?.id ?? null;
 }
 
-/** Trigger heartbeat to start a sandbox, then poll until one is running. */
+/** Start a sandbox (wake from snapshot if needed), then poll until one is running. */
 async function ensureRunning(
   client: SandboxClient,
   deployedUrl: string,
   jwtSecret: string,
+  spinner: ReturnType<typeof clack.spinner>,
 ): Promise<string> {
-  const spinner = clack.spinner();
-  spinner.start("Starting sandbox...");
+  spinner.message("Starting sandbox...");
 
   const api = createApiClient(deployedUrl, jwtSecret);
-  await api.post("/api/v1/sandbox/restart");
+
+  let res: Response;
+  try {
+    res = await api.post("/api/v1/sandbox/start", {
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    spinner.stop(chalk.red(`Failed to reach deployment: ${msg}`));
+    process.exit(1);
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    spinner.stop(chalk.red(`Start failed (HTTP ${res.status}): ${body}`));
+    process.exit(1);
+  }
 
   const POLL_INTERVAL_MS = 3_000;
   const POLL_TIMEOUT_MS = 90_000;
@@ -28,10 +44,11 @@ async function ensureRunning(
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const id = await getRunningId(client);
-    if (id) {
-      spinner.stop(chalk.green("Sandbox started."));
-      return id;
+    try {
+      const id = await getRunningId(client);
+      if (id) return id;
+    } catch {
+      // Provider API may be temporarily unavailable — keep polling
     }
   }
 
@@ -40,14 +57,21 @@ async function ensureRunning(
 }
 
 /**
- * Get the running sandbox ID — start one via heartbeat if none found.
+ * Get the running sandbox ID — start one via restart if none found.
+ * Caller owns the spinner lifecycle.
  */
 export async function resolveRunningId(
   client: SandboxClient,
   deployedUrl: string,
   jwtSecret: string,
+  spinner?: ReturnType<typeof clack.spinner>,
 ): Promise<string> {
   const id = await getRunningId(client);
   if (id) return id;
-  return ensureRunning(client, deployedUrl, jwtSecret);
+
+  // Create a spinner if the caller didn't provide one
+  const s = spinner ?? clack.spinner();
+  if (!spinner) s.start("Starting sandbox...");
+
+  return ensureRunning(client, deployedUrl, jwtSecret, s);
 }

@@ -1,11 +1,17 @@
 import { command, positional, option, optional, string } from "cmd-ts";
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { humanId } from "human-id";
 import * as clack from "@clack/prompts";
-import { getPreset, listPresets, getWorkspaceFiles } from "../presets/index.js";
+import {
+  getPreset,
+  listPresets,
+  getWorkspaceFiles,
+  loadPresetFromDir,
+  registerPreset,
+} from "../presets/index.js";
 import { getPlatformProvider } from "../platform/index.js";
 import type {
   PlatformProvider,
@@ -230,14 +236,19 @@ async function promptToolDomains(
  * Base templates are merged with preset-specific overrides.
  * Only copies files that don't already exist (preserves user customizations).
  */
-function seedWorkspaceFiles(presetId: string, agentDir: string, agent: Agent): void {
+function seedWorkspaceFiles(
+  presetId: string,
+  agentDir: string,
+  agent: Agent,
+  customDir?: string,
+): void {
   const seedDir = agent.getSeedDirectory();
   if (seedDir === null) return;
 
   const targetDir = join(agentDir, seedDir);
   mkdirSync(targetDir, { recursive: true });
 
-  const files = getWorkspaceFiles(presetId);
+  const files = getWorkspaceFiles(presetId, customDir);
   let seeded = 0;
   for (const [filename, srcPath] of files) {
     const destPath = join(targetDir, filename);
@@ -263,7 +274,7 @@ async function detectTier(platform: PlatformProvider): Promise<{
 async function handleNewInstance(
   instanceName: string | undefined,
   presetId: string | undefined,
-  options: { yes?: boolean },
+  options: { yes?: boolean; customWorkspaceDir?: string },
 ): Promise<void> {
   // Resolve preset
   if (!presetId) {
@@ -298,13 +309,26 @@ async function handleNewInstance(
   const tierLabel = tier === "hobby" ? `${platform.name} free plan` : `${platform.name} paid plan`;
   const activeDurationMins = Math.round(SANDBOX_DEFAULTS.activeDuration / 60);
 
-  clack.note(
+  let noteBody =
     `Instance:   ${chalk.bold(name)}\n` +
-      `Preset:     ${preset.name}\n` +
-      `Platform:   ${tierLabel}\n` +
-      `Duration:   ${activeDurationMins} min per session`,
-    "New Instance",
-  );
+    `Preset:     ${preset.name}\n` +
+    `Platform:   ${tierLabel}\n` +
+    `Duration:   ${activeDurationMins} min per session`;
+
+  if (options.customWorkspaceDir) {
+    // Show only files from the custom dir that actually override base/preset defaults.
+    // Check dirname() === customDir to avoid false positives when
+    // the custom dir is an ancestor of the base or preset dirs.
+    const resolved = getWorkspaceFiles(preset.id, options.customWorkspaceDir);
+    const customFiles = [...resolved.entries()]
+      .filter(([, srcPath]) => dirname(srcPath) === options.customWorkspaceDir)
+      .map(([filename]) => filename);
+    if (customFiles.length > 0) {
+      noteBody += `\nWorkspace:  ${options.customWorkspaceDir}\n            ${customFiles.join(", ")}`;
+    }
+  }
+
+  clack.note(noteBody, "New Instance");
 
   // ── Agent Configuration ──────────────────────────────────────
   clack.note("LLM provider, model, and messaging channels", "Agent Configuration");
@@ -332,7 +356,7 @@ async function handleNewInstance(
   });
 
   // Seed workspace template files into agent dir (only missing files)
-  seedWorkspaceFiles(preset.id, agentConfigDir, agent);
+  seedWorkspaceFiles(preset.id, agentConfigDir, agent, options.customWorkspaceDir);
 
   // ── Infrastructure ───────────────────────────────────────────
   clack.note("Network policy and state store", "Infrastructure");
@@ -753,43 +777,47 @@ export const deploy = command({
   name: "deploy",
   description: "Create or upgrade and deploy an instance",
   args: {
-    nameOrPreset: positional({
+    preset: positional({
       type: optional(string),
-      displayName: "name",
-      description: "Instance name or preset",
+      displayName: "preset",
+      description: "Preset name or folder path with workspace .md files",
+    }),
+    name: option({
+      long: "name",
+      short: "n",
+      type: optional(string),
+      description: "Instance name",
     }),
     yes,
-    preset: option({
-      long: "preset",
-      short: "p",
-      type: optional(string),
-      description: "Preset to use",
-    }),
   },
-  async handler({ nameOrPreset, yes, preset }) {
+  async handler({ preset: presetArg, name, yes }) {
     printBanner();
 
-    // Determine if the argument is a preset name or an instance name.
-    const presetNames = listPresets().map((p) => p.id);
-    let instanceName: string | undefined;
-    let presetId: string | undefined = preset;
+    // Redeploy existing instance
+    if (name && instanceExists(name)) {
+      return handleExistingInstance(name, { yes });
+    }
 
-    if (nameOrPreset) {
-      if (instanceExists(nameOrPreset)) {
-        instanceName = nameOrPreset;
-      } else if (presetNames.includes(nameOrPreset)) {
-        presetId = nameOrPreset;
+    // Resolve preset arg — folder path or built-in name
+    let presetId: string | undefined;
+    let customWorkspaceDir: string | undefined;
+
+    if (presetArg) {
+      const resolved = resolve(presetArg);
+      if (existsSync(resolved) && statSync(resolved).isDirectory()) {
+        // Folder path — check for preset.json inside
+        const folderPreset = loadPresetFromDir(resolved);
+        if (folderPreset) {
+          presetId = folderPreset.id;
+          // Register it so getPreset() works downstream
+          registerPreset(folderPreset);
+        }
+        customWorkspaceDir = resolved;
       } else {
-        instanceName = nameOrPreset;
+        presetId = presetArg;
       }
     }
 
-    // PATH B: Existing instance — upgrade + redeploy
-    if (instanceName && instanceExists(instanceName)) {
-      return handleExistingInstance(instanceName, { yes });
-    }
-
-    // PATH A: New instance
-    return handleNewInstance(instanceName, presetId, { yes });
+    return handleNewInstance(name, presetId, { yes, customWorkspaceDir });
   },
 });

@@ -19,7 +19,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint src",
-    "format:check": "prettier --check src"
+    "format:check": "prettier --check src",
+    "test": "vitest run"
   },
   "files": [
     "dist"

@@ -59,11 +59,11 @@ export const list = command({
           const config = readConfig(inst.name);
           if (!config) return null;
           const client = createSandboxClient(inst.name, config);
-          const list = await client.list();
+          const sbxList = await client.list();
           // Return the first running sandbox, or the most recent one
           return (
-            list.find((s) => s.status === "running") ??
-            list.sort((a, b) => b.createdAt - a.createdAt)[0] ??
+            sbxList.find((s) => s.status === "running") ??
+            sbxList.sort((a, b) => b.createdAt - a.createdAt)[0] ??
             null
           );
         } catch {

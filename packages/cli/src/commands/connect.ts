@@ -21,8 +21,8 @@ export const connect = command({
     }
 
     const { deployedUrl } = config.instance;
-    const { cronSecret } = config.secrets;
-    if (!deployedUrl || !cronSecret) {
+    const { jwtSecret } = config.secrets;
+    if (!deployedUrl || !jwtSecret) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
@@ -33,7 +33,7 @@ export const connect = command({
 
     const s = clack.spinner();
     s.start(`Connecting to ${instanceName}...`);
-    const sandboxId = await resolveRunningId(client, deployedUrl, cronSecret);
+    const sandboxId = await resolveRunningId(client, deployedUrl, jwtSecret, s);
     s.stop(`Connected to sandbox ${chalk.dim(sandboxId)}`);
 
     await client.connect(sandboxId);

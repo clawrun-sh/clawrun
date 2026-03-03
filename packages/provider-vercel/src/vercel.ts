@@ -1,4 +1,8 @@
 import { Sandbox, Snapshot } from "@vercel/sandbox";
+// SDK's own auth utility — reads the Vercel CLI token without us reimplementing it.
+import { getAuth } from "@vercel/sandbox/dist/auth/file.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type {
   SandboxProvider,
   ManagedSandbox,
@@ -72,15 +76,59 @@ class VercelManagedSandbox implements ManagedSandbox {
   }
 }
 
+/**
+ * Full credentials the Vercel SDK requires — all three fields or none.
+ * Passing 1–2 of 3 causes the SDK to throw.
+ */
+interface SdkCredentials {
+  token: string;
+  projectId: string;
+  teamId: string;
+}
+
+/**
+ * Resolve full SDK credentials for a Vercel-linked project directory.
+ *
+ * Reads projectId + orgId from `.vercel/project.json` (project config),
+ * and uses the SDK's own `getAuth()` for the token — no manual token
+ * parsing or credential reimplementation.
+ */
+function resolveCredentials(projectDir: string): SdkCredentials | undefined {
+  try {
+    const data = JSON.parse(readFileSync(join(projectDir, ".vercel", "project.json"), "utf-8")) as {
+      projectId?: string;
+      orgId?: string;
+    };
+
+    if (!data.projectId || !data.orgId) return undefined;
+
+    // Delegate token resolution to the SDK's own getAuth()
+    const auth = getAuth();
+    if (!auth?.token) return undefined;
+
+    return { token: auth.token, projectId: data.projectId, teamId: data.orgId };
+  } catch {
+    return undefined;
+  }
+}
+
 export class VercelSandboxProvider implements SandboxProvider {
+  private credentials?: SdkCredentials;
   private projectDir?: string;
 
   constructor(options?: ProviderOptions) {
     this.projectDir = options?.projectDir;
+    if (options?.projectDir) {
+      this.credentials = resolveCredentials(options.projectDir);
+    }
   }
 
+  /**
+   * Fallback: chdir to the project directory for SDK calls when explicit
+   * credentials could not be resolved (e.g. missing auth.json).
+   */
   private async withScope<T>(fn: () => Promise<T>): Promise<T> {
-    if (!this.projectDir) return fn();
+    if (this.credentials || !this.projectDir) return fn();
     const origCwd = process.cwd();
     process.chdir(this.projectDir);
     try {
@@ -91,7 +139,10 @@ export class VercelSandboxProvider implements SandboxProvider {
   }
 
   async create(opts: CreateSandboxOptions): Promise<ManagedSandbox> {
-    const createOpts: Record<string, unknown> = { timeout: opts.timeout };
+    const createOpts: Record<string, unknown> = {
+      timeout: opts.timeout,
+      ...this.credentials,
+    };
     if (opts.ports) createOpts.ports = opts.ports;
     if (opts.resources) createOpts.resources = opts.resources;
     if (opts.networkPolicy) createOpts.networkPolicy = opts.networkPolicy;
@@ -103,17 +154,17 @@ export class VercelSandboxProvider implements SandboxProvider {
   }
 
   async get(id: string): Promise<ManagedSandbox> {
-    const sandbox = await this.withScope(() => Sandbox.get({ sandboxId: id }));
+    const sandbox = await this.withScope(() => Sandbox.get({ sandboxId: id, ...this.credentials }));
     return new VercelManagedSandbox(sandbox);
   }
 
   async list(): Promise<SandboxInfo[]> {
-    const result = await this.withScope(() => Sandbox.list());
+    const result = await this.withScope(() => Sandbox.list(this.credentials));
     return result.json.sandboxes;
   }
 
   async listSnapshots(): Promise<SnapshotInfo[]> {
-    const result = await this.withScope(() => Snapshot.list());
+    const result = await this.withScope(() => Snapshot.list(this.credentials));
     return result.json.snapshots.map((s: Record<string, unknown>) => ({
       id: (s.snapshotId ?? s.id) as string,
       createdAt: (s.createdAt as number) ?? Date.now(),
@@ -123,7 +174,9 @@ export class VercelSandboxProvider implements SandboxProvider {
 
   async deleteSnapshot(id: string): Promise<void> {
     try {
-      const snapshot = await this.withScope(() => Snapshot.get({ snapshotId: id }));
+      const snapshot = await this.withScope(() =>
+        Snapshot.get({ snapshotId: id, ...this.credentials }),
+      );
       await snapshot.delete();
     } catch (err) {
       // Snapshot already expired or deleted — treat as success

@@ -1,4 +1,5 @@
 {
+  "$schema": "https://clawrun.sh/preset/schema.json",
   "id": "starter",
   "name": "Starter",
   "agent": "zeroclaw",

@@ -1,5 +1,0 @@
-# Identity
-
-- **Name:**
-- **Emoji:**
-- **Vibe:**
