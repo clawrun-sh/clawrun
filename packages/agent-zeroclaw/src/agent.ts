@@ -30,12 +30,12 @@ import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("agent:zeroclaw");
 
+import { sendMessageViaCli } from "./messaging.js";
 import {
-  sendMessageViaCli,
-  sendMessageViaDaemon,
-  streamMessageViaDaemon,
-  fetchHistoryViaDaemon,
-} from "./messaging.js";
+  sendMessage as sendMessageViaDaemon,
+  streamMessage as streamMessageViaDaemon,
+  fetchHistory as fetchHistoryViaDaemon,
+} from "./ws-client.js";
 import { writeSetupConfig, readSetup } from "./config.js";
 import {
   PROVIDERS,

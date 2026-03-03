@@ -396,7 +396,7 @@ export class StreamingTagParser {
  * stream events. Used for the done/message fallback when no chunks were
  * streamed.
  */
-function emitParsedResponse(writer: UIMessageStreamWriter, text: string): void {
+export function emitParsedResponse(writer: UIMessageStreamWriter, text: string): void {
   const parser = new StreamingTagParser(writer);
   parser.feed(text);
   parser.flush();

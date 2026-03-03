@@ -43,13 +43,16 @@ vi.mock("./messaging.js", () => ({
     message: "cli response",
     toolCalls: [],
   })),
-  sendMessageViaDaemon: vi.fn(async () => ({
+}));
+
+vi.mock("./ws-client.js", () => ({
+  sendMessage: vi.fn(async () => ({
     success: true,
     message: "daemon response",
     toolCalls: [],
   })),
-  streamMessageViaDaemon: vi.fn(async () => {}),
-  fetchHistoryViaDaemon: vi.fn(async () => [
+  streamMessage: vi.fn(async () => {}),
+  fetchHistory: vi.fn(async () => [
     { role: "user", content: "hi" },
     { role: "assistant", content: "hello" },
   ]),
@@ -77,12 +80,12 @@ vi.mock("@iarna/toml", () => ({
   parse: vi.fn(() => ({ browser: { enabled: true } })),
 }));
 
+import { sendMessageViaCli } from "./messaging.js";
 import {
-  sendMessageViaDaemon,
-  sendMessageViaCli,
-  streamMessageViaDaemon,
-  fetchHistoryViaDaemon,
-} from "./messaging.js";
+  sendMessage as sendMessageViaDaemon,
+  streamMessage as streamMessageViaDaemon,
+  fetchHistory as fetchHistoryViaDaemon,
+} from "./ws-client.js";
 import { parseCronListOutput } from "zeroclaw";
 import { existsSync, readFileSync } from "node:fs";
 import * as TOML from "@iarna/toml";
