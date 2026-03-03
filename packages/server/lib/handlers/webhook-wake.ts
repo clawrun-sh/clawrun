@@ -138,8 +138,13 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
       const root = await resolveRoot(sandbox);
 
       const agent = getAgent();
+      const sessionId = signal.chatId
+        ? `${signal.channelId}-${signal.chatId}`
+        : signal.channelId;
+
       const resp = await agent.sendMessage(sandbox, root, signal.messageText, {
         signal: AbortSignal.timeout(120_000),
+        sessionId,
       });
 
       if (resp.success && resp.message) {

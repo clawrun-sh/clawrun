@@ -26,8 +26,16 @@ import type {
 } from "@clawrun/agent";
 import type { Tool } from "@clawrun/agent";
 import { AgentBrowserTool } from "@clawrun/agent";
+import { createLogger } from "@clawrun/logger";
 
-import { sendMessageViaCli, sendMessageViaDaemon } from "./messaging.js";
+const log = createLogger("agent:zeroclaw");
+
+import {
+  sendMessageViaCli,
+  sendMessageViaDaemon,
+  streamMessageViaDaemon,
+  fetchHistoryViaDaemon,
+} from "./messaging.js";
 import { writeSetupConfig, readSetup } from "./config.js";
 import {
   PROVIDERS,
@@ -83,24 +91,74 @@ export class ZeroclawAgent implements Agent {
     opts?: {
       env?: Record<string, string>;
       signal?: AbortSignal;
+      sessionId?: string;
     },
   ): Promise<AgentResponse> {
     // Try daemon WebSocket first (if domain() is available)
     if (typeof sandbox.domain === "function") {
       try {
+        log.info(`sendMessage via daemon WS, sessionId=${opts?.sessionId ?? "(none)"}`);
         return await sendMessageViaDaemon(sandbox, root, message, opts);
       } catch (err) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           const msg = err instanceof Error ? err.message : String(err);
-          console.warn("Daemon WS failed, falling back to CLI:", msg);
+          log.warn(`Daemon WS failed, falling back to CLI: ${msg}`);
         } else {
           throw err;
         }
       }
     }
 
-    // Fallback: CLI one-shot
+    // Fallback: CLI one-shot (no session support)
+    log.info(
+      `sendMessage via CLI one-shot (no session support), sessionId=${opts?.sessionId ?? "(none)"}`,
+    );
     return sendMessageViaCli(sandbox, root, message, this.env(root), opts);
+  }
+
+  async streamMessage(
+    sandbox: SandboxHandle,
+    root: string,
+    message: string,
+    writer: { write(part: unknown): void },
+    opts?: { signal?: AbortSignal; sessionId?: string },
+  ): Promise<void> {
+    if (typeof sandbox.domain !== "function") {
+      // No daemon available — fall back to batch sendMessage and write result
+      const resp = await this.sendMessage(sandbox, root, message, opts);
+      const textId = crypto.randomUUID();
+      if (resp.success) {
+        writer.write({ type: "text-start", id: textId });
+        writer.write({ type: "text-delta", id: textId, delta: resp.message });
+        writer.write({ type: "text-end", id: textId });
+      } else {
+        writer.write({ type: "error", errorText: resp.error ?? resp.message });
+      }
+      return;
+    }
+
+    await streamMessageViaDaemon(
+      sandbox,
+      root,
+      message,
+      // Cast to UIMessageStreamWriter — structurally compatible
+      writer as import("ai").UIMessageStreamWriter,
+      opts,
+    );
+  }
+
+  async fetchHistory(
+    sandbox: SandboxHandle,
+    root: string,
+    sessionId: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<Array<{ role: string; content: string }>> {
+    if (typeof sandbox.domain !== "function") return [];
+    try {
+      return await fetchHistoryViaDaemon(sandbox, root, sessionId, opts);
+    } catch {
+      return [];
+    }
   }
 
   getDaemonCommand(

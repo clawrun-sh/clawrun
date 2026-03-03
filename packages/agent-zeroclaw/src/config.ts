@@ -97,6 +97,14 @@ const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
     block_high_risk_commands: false,
   },
   memory: { backend: "sqlite", auto_save: true },
+  agent: {
+    session: {
+      backend: "sqlite",
+      strategy: "per-sender",
+      ttl_seconds: 86400,
+      max_messages: 100,
+    },
+  },
   browser: {
     enabled: true,
     backend: "agent_browser",

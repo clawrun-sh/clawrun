@@ -15,8 +15,9 @@ import {
   getImageDimensions,
   imageFallback,
 } from "@mariozechner/pi-tui";
+import { randomUUID } from "node:crypto";
 import { signInviteToken } from "@clawrun/auth";
-import { sendChatMessage } from "../chat-client.js";
+import { sendChatMessage, type ChatStreamEvent } from "../chat-client.js";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,7 @@ export async function startChatTUI(
 ): Promise<void> {
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal);
+  const sessionId = randomUUID().replaceAll("-", "_");
 
   // --- header ---------------------------------------------------------------
   const header = new TruncatedText(colors.accent(instanceName) + colors.dim(` · ${sandboxId}`));
@@ -241,21 +243,102 @@ export async function startChatTUI(
     loader.start();
     tui.requestRender();
 
-    let responseText: string;
+    // Streaming state — we build the response container incrementally
+    let streaming = false;
+    let streamText = "";
+    let reasoningText = "";
+    let streamMsg: InstanceType<typeof Container> | undefined;
+    let streamMd: InstanceType<typeof Markdown> | undefined;
+    const toolLines: string[] = [];
+
+    function ensureStreaming() {
+      if (!streaming) {
+        streaming = true;
+        loader.stop();
+        loader.dispose();
+        statusContainer.clear();
+
+        streamMsg = new Container();
+        streamMsg.addChild(new Spacer(1));
+        streamMd = new Markdown("", 1, 0, markdownTheme);
+        streamMsg.addChild(streamMd);
+        chatContainer.addChild(streamMsg);
+      }
+    }
+
+    function updateStreamContent() {
+      const parts: string[] = [];
+      if (reasoningText) {
+        parts.push(colors.dim("> " + reasoningText.replace(/\n/g, "\n> ")));
+      }
+      if (toolLines.length > 0) {
+        parts.push(toolLines.join("\n"));
+      }
+      if (streamText) {
+        parts.push(streamText);
+      }
+      streamMd!.setText(parts.join("\n\n"));
+      tui.requestRender();
+    }
+
+    const onEvent = (event: ChatStreamEvent) => {
+      switch (event.type) {
+        case "text-delta": {
+          ensureStreaming();
+          streamText += event.delta ?? "";
+          updateStreamContent();
+          break;
+        }
+        case "reasoning-delta": {
+          ensureStreaming();
+          reasoningText += event.delta ?? "";
+          updateStreamContent();
+          break;
+        }
+        case "tool-input": {
+          ensureStreaming();
+          const toolLabel = `\`${event.toolName}\` ${event.input ? formatToolArgs(event.input) : ""}`;
+          toolLines.push(toolLabel);
+          updateStreamContent();
+          break;
+        }
+        case "tool-output": {
+          // Tool finished — no visual change needed, result is in final text
+          break;
+        }
+        case "error": {
+          // Error will be handled by the result below
+          break;
+        }
+      }
+    };
+
+    let responseText: string | undefined;
     try {
       // Sign a fresh JWT for each request so long-lived sessions don't expire
       const jwt = await signInviteToken(secret);
-      const result = await sendChatMessage(deployedUrl, jwt, message, loader.signal);
+      const result = await sendChatMessage(
+        deployedUrl,
+        jwt,
+        message,
+        loader.signal,
+        sessionId,
+        onEvent,
+      );
       if (result.error) {
         responseText = colors.error(result.error);
-      } else if (result.toolCalls.length > 0) {
-        const toolLines = result.toolCalls
-          .map((tc) => `\`${tc.name}\` ${formatToolArgs(tc.arguments)}`)
-          .join("\n");
-        responseText = toolLines + "\n\n" + result.text;
-      } else {
-        responseText = result.text;
+      } else if (!streaming) {
+        // No streaming events were received — fall back to batch rendering
+        if (result.toolCalls.length > 0) {
+          const tl = result.toolCalls
+            .map((tc) => `\`${tc.name}\` ${formatToolArgs(tc.arguments)}`)
+            .join("\n");
+          responseText = tl + "\n\n" + result.text;
+        } else {
+          responseText = result.text;
+        }
       }
+      // If streaming happened and no error, streamMd already has the final text
     } catch (err) {
       if (loader.aborted) {
         responseText = colors.dim("(cancelled)");
@@ -264,12 +347,20 @@ export async function startChatTUI(
       }
     }
 
-    // Clean up loader
-    loader.stop();
-    loader.dispose();
-    statusContainer.clear();
+    // Clean up loader (may already be stopped if streaming started)
+    if (!streaming) {
+      loader.stop();
+      loader.dispose();
+      statusContainer.clear();
+    }
 
-    addAgentMessage(responseText);
+    if (responseText != null) {
+      // Error or batch fallback — remove any partial stream widget and show final
+      if (streaming && streamMsg) {
+        chatContainer.removeChild(streamMsg);
+      }
+      addAgentMessage(responseText);
+    }
 
     // Restore editor
     editor.borderColor = editorTheme.borderColor;

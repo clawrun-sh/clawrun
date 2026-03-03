@@ -3,3 +3,5 @@
 !packages/*/
 !packages/*/src/
 !packages/*/src/**
+packages/*/src/components/ai-elements/**
+packages/*/src/components/ui/**

@@ -36,12 +36,28 @@ export interface SandboxHandle {
   domain?(port: number): string;
 }
 
+/**
+ * Tool call data from a batch (non-streaming) agent response.
+ *
+ * Used only by `sendMessage()`. The streaming path (`streamMessage()`) writes
+ * AI SDK events directly (tool-input-available, tool-output-available) and
+ * does not use this type.
+ */
 export interface ToolCallInfo {
   name: string;
   arguments: Record<string, unknown>;
   output?: string;
 }
 
+/**
+ * Batch response from `Agent.sendMessage()`.
+ *
+ * For streaming, agents implement `streamMessage()` which writes AI SDK
+ * UIMessageStreamWriter events directly — no AgentResponse involved.
+ *
+ * Consumers: runner.ts (ephemeral sandbox), chat handler batch fallback,
+ * CLI one-shot mode.
+ */
 export interface AgentResponse {
   success: boolean;
   message: string;
@@ -101,8 +117,36 @@ export interface Agent {
     opts?: {
       env?: Record<string, string>;
       signal?: AbortSignal;
+      sessionId?: string;
     },
   ): Promise<AgentResponse>;
+
+  /**
+   * Stream a message exchange to the given writer using AI SDK stream events.
+   *
+   * The agent acts as an adapter: it translates its own protocol (WS, CLI, etc.)
+   * into AI SDK UIMessageStream events (text-start, text-delta, text-end,
+   * tool-input-available, tool-output-available, error).
+   *
+   * The writer is structurally compatible with the AI SDK UIMessageStreamWriter.
+   * Agents that don't support streaming can omit this method — the handler will
+   * fall back to sendMessage().
+   */
+  streamMessage?(
+    sandbox: SandboxHandle,
+    root: string,
+    message: string,
+    writer: { write(part: unknown): void },
+    opts?: { signal?: AbortSignal; sessionId?: string },
+  ): Promise<void>;
+
+  /** Fetch conversation history for a session from the agent daemon. */
+  fetchHistory?(
+    sandbox: SandboxHandle,
+    root: string,
+    sessionId: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<Array<{ role: string; content: string }>>;
 
   getDaemonCommand(
     root: string,

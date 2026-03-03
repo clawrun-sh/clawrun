@@ -1,6 +1,7 @@
 import { command, option, optional, string } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
+import { randomUUID } from "node:crypto";
 import { readConfig } from "../instance/index.js";
 import { resolveRunningId } from "../sandbox/resolve.js";
 import { createSandboxClient } from "../sandbox/index.js";
@@ -76,7 +77,13 @@ export const agentCommand = command({
       s.start("Thinking...");
 
       const jwt = await signInviteToken(jwtSecret);
-      const result = await sendChatMessage(deployedUrl, jwt, message, AbortSignal.timeout(150_000));
+      const result = await sendChatMessage(
+        deployedUrl,
+        jwt,
+        message,
+        AbortSignal.timeout(150_000),
+        randomUUID().replaceAll("-", "_"),
+      );
 
       if (result.success) {
         s.stop("Done");

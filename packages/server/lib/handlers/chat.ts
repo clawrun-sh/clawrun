@@ -17,12 +17,16 @@ export async function POST(req: Request) {
   const denied = await requireSessionOrBearerAuth(req);
   if (denied) return denied;
 
-  let body: { message?: unknown; messages?: unknown };
+  let body: { message?: unknown; messages?: unknown; sessionId?: unknown };
   try {
-    body = (await req.json()) as { message?: unknown; messages?: unknown };
+    body = (await req.json()) as { message?: unknown; messages?: unknown; sessionId?: unknown };
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
+
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : undefined;
+  log.info(`[chat] sessionId=${sessionId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`);
+
 
   // Accept both { message } (CLI) and { messages } (useChat).
   let message: string | undefined;
@@ -71,45 +75,50 @@ export async function POST(req: Request) {
           const root = await resolveRoot(sandbox);
 
           const agent = getAgent();
-          const resp = await agent.sendMessage(sandbox, root, message, {
-            signal: AbortSignal.timeout(120_000),
-          });
 
-          if (resp.success) {
-            // Emit tool calls as dynamic-tool events
-            if (resp.toolCalls?.length) {
-              for (let i = 0; i < resp.toolCalls.length; i++) {
-                const tc = resp.toolCalls[i];
-                const id = `tc-${i}`;
-                writer.write({
-                  type: "tool-input-available",
-                  toolCallId: id,
-                  toolName: tc.name,
-                  input: tc.arguments,
-                  dynamic: true,
-                });
-                writer.write({
-                  type: "tool-output-available",
-                  toolCallId: id,
-                  output: tc.output ?? "completed",
-                  dynamic: true,
-                });
-              }
-            }
-
-            // Emit text response
-            writer.write({ type: "text-start", id: "text-0" });
-            writer.write({
-              type: "text-delta",
-              id: "text-0",
-              delta: resp.message,
+          // Prefer streaming — the agent writes AI SDK stream events directly
+          if (agent.streamMessage) {
+            await agent.streamMessage(sandbox, root, message, writer, {
+              signal: AbortSignal.timeout(120_000),
+              sessionId,
             });
-            writer.write({ type: "text-end", id: "text-0" });
           } else {
-            writer.write({
-              type: "error",
-              errorText: resp.error ?? resp.message,
+            // Batch fallback for agents that don't support streaming
+            const resp = await agent.sendMessage(sandbox, root, message, {
+              signal: AbortSignal.timeout(120_000),
+              sessionId,
             });
+
+            if (resp.success) {
+              if (resp.toolCalls?.length) {
+                for (const tc of resp.toolCalls) {
+                  const toolCallId = crypto.randomUUID();
+                  writer.write({
+                    type: "tool-input-available",
+                    toolCallId,
+                    toolName: tc.name,
+                    input: tc.arguments,
+                    dynamic: true,
+                  });
+                  writer.write({
+                    type: "tool-output-available",
+                    toolCallId,
+                    output: tc.output ?? "completed",
+                    dynamic: true,
+                  });
+                }
+              }
+
+              const textId = crypto.randomUUID();
+              writer.write({ type: "text-start", id: textId });
+              writer.write({ type: "text-delta", id: textId, delta: resp.message });
+              writer.write({ type: "text-end", id: textId });
+            } else {
+              writer.write({
+                type: "error",
+                errorText: resp.error ?? resp.message,
+              });
+            }
           }
         } catch (err) {
           log.error("Chat error:", err instanceof Error ? err.message : "Unknown error");
