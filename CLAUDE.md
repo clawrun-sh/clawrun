@@ -71,7 +71,7 @@ Core orchestration logic. The big one:
   - `health.ts` — HTTP health server on port 3001
   - `mtime.ts` — filesystem change detection
   - `tools.ts` — tool installation inside sandbox
-- **`storage/`** — state store abstraction (Upstash Redis, Postgres via Neon)
+- **`storage/`** — state store abstraction (Redis via ioredis)
 - **`config.ts`** + **`schema.ts`** — `clawrun.json` config loading + Zod validation
 
 ### `packages/agent` (`@clawrun/agent`)
@@ -193,7 +193,7 @@ Declarative. A preset = `preset.json` + optional files (personality.md, vercel.j
 
 - **Agent runs inside the sandbox, not the serverless function.** The function is the orchestrator. The sandbox is where the agent lives.
 - **Persistent sandbox, not per-request.** The daemon runs continuously. Sandbox sleeps (snapshot) when idle, wakes on message or cron.
-- **Memory/state lives outside the sandbox.** Sandbox is ephemeral. State store (Redis/Postgres) persists across sleep/wake cycles.
+- **Memory/state lives outside the sandbox.** Sandbox is ephemeral. State store (Redis) persists across sleep/wake cycles.
 - **Sidecar pattern.** A single supervisor process inside the sandbox handles daemon lifecycle, heartbeat, and health — the parent only needs one HTTP endpoint to manage the sandbox.
 - **Agent interface is pluggable.** ZeroClaw is default, but `Agent` interface exists from day one. Implementations are separate packages that self-register.
 - **Provider interface is pluggable.** Vercel Sandbox is default, but the `SandboxProvider` abstraction allows other runtimes.

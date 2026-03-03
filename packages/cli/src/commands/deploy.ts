@@ -48,7 +48,7 @@ import { promptProvider, promptChannels } from "../setup/index.js";
 import type { ChannelSetupResult } from "../setup/index.js";
 
 /** Test whether `domain` matches a wildcard `pattern` (e.g. *.example.com, cdn.*.net). */
-function domainMatchesWildcard(domain: string, pattern: string): boolean {
+export function domainMatchesWildcard(domain: string, pattern: string): boolean {
   if (pattern === domain) return true;
   // Convert wildcard pattern to regex: escape dots, replace * with [^.]+ (single label)
   const re = new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$");
@@ -60,7 +60,7 @@ function generateInstanceName(): string {
 }
 
 /** Map known provider/channel names to their API domains. */
-const PROVIDER_DOMAINS: Record<string, string[]> = {
+export const PROVIDER_DOMAINS: Record<string, string[]> = {
   openai: ["api.openai.com"],
   openrouter: ["openrouter.ai"],
   anthropic: ["api.anthropic.com"],
@@ -70,7 +70,7 @@ const PROVIDER_DOMAINS: Record<string, string[]> = {
   deepseek: ["api.deepseek.com"],
 };
 
-const CHANNEL_DOMAINS: Record<string, string[]> = {
+export const CHANNEL_DOMAINS: Record<string, string[]> = {
   telegram: ["api.telegram.org"],
   discord: ["discord.com", "gateway.discord.gg"],
   slack: ["slack.com"],
@@ -91,7 +91,7 @@ interface DerivedDomains {
   groups: Array<{ reason: string; domains: string[] }>;
 }
 
-function deriveAllowedDomains(
+export function deriveAllowedDomains(
   platform: PlatformProvider,
   provider?: string,
   channelNames?: string[],

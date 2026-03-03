@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SandboxClient, SandboxEntry } from "./types.js";
 
 // --- Mocks ---
@@ -54,6 +54,16 @@ function makeClient(sandboxes: SandboxEntry[]): SandboxClient {
 beforeEach(() => {
   vi.clearAllMocks();
   mockExit.mockClear();
+
+  // Stub setTimeout to fire callbacks instantly (avoids 3s poll delay in resolve code)
+  const _realSetTimeout = globalThis.setTimeout;
+  vi.stubGlobal("setTimeout", (fn: Function, _ms?: number) => {
+    return _realSetTimeout(() => fn(), 0);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 // --- getRunningId ---

@@ -17,7 +17,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint lib",
-    "format:check": "prettier --check lib"
+    "format:check": "prettier --check lib",
+    "test": "vitest run"
   },
   "files": [
     "app",
@@ -55,6 +56,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

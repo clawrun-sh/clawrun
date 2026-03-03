@@ -1,0 +1,141 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock all channel wake-hook adapters
+vi.mock("./telegram/wake-hook.js", () => ({
+  TelegramWakeHookAdapter: vi.fn().mockImplementation((token: string, secret: string) => ({
+    channelId: "telegram",
+    botToken: token,
+    webhookSecret: secret,
+    programmableWebhook: true,
+  })),
+}));
+
+vi.mock("./slack/wake-hook.js", () => ({
+  SlackWakeHookAdapter: vi.fn().mockImplementation((token: string, signingSecret: string) => ({
+    channelId: "slack",
+    botToken: token,
+    signingSecret,
+    programmableWebhook: false,
+  })),
+}));
+
+vi.mock("./whatsapp/wake-hook.js", () => ({
+  WhatsAppWakeHookAdapter: vi.fn().mockImplementation(() => ({
+    channelId: "whatsapp",
+    programmableWebhook: true,
+  })),
+}));
+
+vi.mock("./discord/wake-hook.js", () => ({
+  DiscordWakeHookAdapter: vi.fn().mockImplementation(() => ({
+    channelId: "discord",
+    programmableWebhook: false,
+  })),
+}));
+
+vi.mock("./lark/wake-hook.js", () => ({
+  LarkWakeHookAdapter: vi
+    .fn()
+    .mockImplementation((_a: string, _b: string, _c: string, feishu: boolean) => ({
+      channelId: "lark",
+      useFeishu: feishu,
+      programmableWebhook: true,
+    })),
+}));
+
+vi.mock("./qq/wake-hook.js", () => ({
+  QQWakeHookAdapter: vi.fn().mockImplementation((_a: string, _b: string, env: string) => ({
+    channelId: "qq",
+    environment: env,
+    programmableWebhook: true,
+  })),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("channel registry", () => {
+  let initializeAdapters: typeof import("./registry.js").initializeAdapters;
+  let getAdapter: typeof import("./registry.js").getAdapter;
+  let getAllAdapters: typeof import("./registry.js").getAllAdapters;
+  let hasWakeHook: typeof import("./registry.js").hasWakeHook;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    const mod = await import("./registry.js");
+    initializeAdapters = mod.initializeAdapters;
+    getAdapter = mod.getAdapter;
+    getAllAdapters = mod.getAllAdapters;
+    hasWakeHook = mod.hasWakeHook;
+  });
+
+  it("creates adapters for channels with credentials", () => {
+    initializeAdapters({ telegram: { bot_token: "123:ABC" } }, { telegram: "tg-secret" });
+
+    const adapter = getAdapter("telegram");
+    expect(adapter).toBeDefined();
+    expect((adapter as any).botToken).toBe("123:ABC");
+    expect((adapter as any).webhookSecret).toBe("tg-secret");
+  });
+
+  it("falls back to empty string when no webhook secret", () => {
+    initializeAdapters({ telegram: { bot_token: "123:ABC" } }, {});
+
+    const adapter = getAdapter("telegram");
+    expect(adapter).toBeDefined();
+    expect((adapter as any).webhookSecret).toBe("");
+  });
+
+  it("skips channels without credentials", () => {
+    initializeAdapters({}, { telegram: "secret" });
+
+    expect(getAdapter("telegram")).toBeUndefined();
+    expect(getAllAdapters()).toHaveLength(0);
+  });
+
+  it("creates multiple adapters from config", () => {
+    initializeAdapters(
+      {
+        telegram: { bot_token: "tg-token" },
+        slack: { bot_token: "xoxb-token", signing_secret: "slack-sig" },
+      },
+      { telegram: "tg-secret" },
+    );
+
+    expect(getAllAdapters()).toHaveLength(2);
+    expect(getAdapter("telegram")).toBeDefined();
+    expect(getAdapter("slack")).toBeDefined();
+  });
+
+  it("clears and rebuilds on re-init", () => {
+    initializeAdapters({ telegram: { bot_token: "old" } }, {});
+    expect(getAllAdapters()).toHaveLength(1);
+
+    initializeAdapters({ slack: { bot_token: "xoxb-new", signing_secret: "sig" } }, {});
+    expect(getAllAdapters()).toHaveLength(1);
+    expect(getAdapter("telegram")).toBeUndefined();
+    expect(getAdapter("slack")).toBeDefined();
+  });
+
+  it("returns undefined for unknown channel", () => {
+    initializeAdapters({}, {});
+    expect(getAdapter("unknown")).toBeUndefined();
+  });
+
+  it("hasWakeHook returns true for supported channels", () => {
+    // hasWakeHook checks factories, not live adapters
+    expect(hasWakeHook("telegram")).toBe(true);
+    expect(hasWakeHook("slack")).toBe(true);
+    expect(hasWakeHook("discord")).toBe(true);
+    expect(hasWakeHook("whatsapp")).toBe(true);
+    expect(hasWakeHook("lark")).toBe(true);
+    expect(hasWakeHook("qq")).toBe(true);
+  });
+
+  it("hasWakeHook returns false for unsupported channels", () => {
+    expect(hasWakeHook("imessage")).toBe(false);
+    expect(hasWakeHook("signal")).toBe(false);
+    expect(hasWakeHook("unknown")).toBe(false);
+  });
+});
