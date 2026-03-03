@@ -73,5 +73,7 @@ export async function resolveRunningId(
   const s = spinner ?? clack.spinner();
   if (!spinner) s.start("Starting sandbox...");
 
-  return ensureRunning(client, deployedUrl, jwtSecret, s);
+  const runningId = await ensureRunning(client, deployedUrl, jwtSecret, s);
+  if (!spinner) s.stop("Sandbox ready.");
+  return runningId;
 }
