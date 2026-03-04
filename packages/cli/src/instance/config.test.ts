@@ -144,7 +144,7 @@ describe("readConfig", () => {
     const config = buildConfig(name, preset, agentName, options);
 
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(config) as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(config));
 
     const result = readConfig("my-bot");
     expect(result).not.toBeNull();
@@ -153,7 +153,7 @@ describe("readConfig", () => {
 
   it("throws on invalid config with formatted issues", () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ instance: {} }) as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ instance: {} }));
 
     expect(() => readConfig("bad")).toThrow(/Invalid clawrun\.json/);
   });

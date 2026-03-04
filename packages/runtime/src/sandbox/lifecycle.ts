@@ -693,8 +693,6 @@ export class SandboxLifecycleManager {
    * Start the sidecar daemon inside the sandbox. The sidecar is a single
    * Node process that supervises the agent daemon, runs the heartbeat loop,
    * and exposes an HTTP health endpoint on port 3001.
-   *
-   * Replaces the previous startDaemon() + startSandboxExtendLoop() pair.
    */
   private async startSidecar(sandbox: ManagedSandbox, root: string): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
@@ -710,14 +708,19 @@ export class SandboxLifecycleManager {
     const daemonCmd = this.agent.getDaemonCommand(root, {});
     const monitorConfig = this.agent.getMonitorConfig(root);
 
-    // Build tool install configs from agent's enabled tools
-    const localAgentDir = join(process.cwd(), "agent");
-    const enabledTools = this.agent.getEnabledTools(localAgentDir);
-    const toolConfigs = enabledTools.map((t) => ({
-      id: t.id,
-      check: t.checkCommand,
-      install: t.installCommands,
-    }));
+    // Build tool configs for sidecar (installed inside sandbox as user)
+    const configuredToolIds = getRuntimeConfig().agent.tools ?? [];
+    const toolConfigs =
+      configuredToolIds.length > 0
+        ? this.agent
+            .getAvailableTools()
+            .filter((t) => configuredToolIds.includes(t.id))
+            .map((t) => ({
+              id: t.id,
+              check: t.checkCommand,
+              install: t.installCommands,
+            }))
+        : [];
 
     const sidecarConfig: SidecarConfig = {
       daemon: {

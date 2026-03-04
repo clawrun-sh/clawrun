@@ -17,8 +17,7 @@ let sockets: EventEmitter[] = [];
 
 vi.mock("node:net", () => ({
   createConnection: vi.fn(() => {
-    const sock = new EventEmitter();
-    (sock as any).destroy = vi.fn();
+    const sock = Object.assign(new EventEmitter(), { destroy: vi.fn() });
     sockets.push(sock);
     return sock;
   }),
@@ -34,17 +33,16 @@ let children: (EventEmitter & {
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
-    const child = new EventEmitter() as any;
-    child.pid = 1234 + children.length;
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    child.kill = vi.fn();
+    const child = Object.assign(new EventEmitter(), {
+      pid: 1234 + children.length,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      kill: vi.fn(),
+    });
     children.push(child);
     return child;
   }),
 }));
-
-import { createConnection } from "node:net";
 
 function makeConfig(overrides: Partial<SidecarConfig["daemon"]> = {}): SidecarConfig {
   return {

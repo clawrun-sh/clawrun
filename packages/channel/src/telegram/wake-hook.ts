@@ -1,8 +1,5 @@
 import type { WakeHookAdapter, WakeSignal, AuthResult } from "../types.js";
 import { safeEqual } from "../safe-equal.js";
-import { createLogger } from "@clawrun/logger";
-
-const log = createLogger("channel:telegram");
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
 

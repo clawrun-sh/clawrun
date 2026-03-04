@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Agent } from "@clawrun/agent";
+import type { RuntimeConfig } from "@clawrun/runtime";
 
 const mockSetHooks = vi.fn();
 const mockTeardownWakeHooks = vi.fn(async () => {});
@@ -79,11 +81,11 @@ describe("initializeWakeHookAdapters", () => {
       readSetup: vi.fn(() => ({
         channels: { telegram: { bot_token: "123" } },
       })),
-    } as any;
+    } as unknown as Agent;
     const config = {
       agent: { config: "agent/config.toml" },
       secrets: { webhookSecrets: { telegram: "tg-secret" } },
-    } as any;
+    } as unknown as RuntimeConfig;
 
     initializeWakeHookAdapters(agent, config);
 
@@ -97,10 +99,10 @@ describe("initializeWakeHookAdapters", () => {
   it("handles missing secrets gracefully", () => {
     const agent = {
       readSetup: vi.fn(() => ({ channels: {} })),
-    } as any;
+    } as unknown as Agent;
     const config = {
       agent: { config: "agent/config.toml" },
-    } as any;
+    } as unknown as RuntimeConfig;
 
     initializeWakeHookAdapters(agent, config);
 

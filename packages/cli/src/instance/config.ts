@@ -37,6 +37,7 @@ export function buildConfig(
     provider?: string;
     bundlePaths?: string[];
     configPaths?: string[];
+    tools?: string[];
     serverExternalPackages?: string[];
     platformUrlEnvVars?: string[];
   },
@@ -54,6 +55,7 @@ export function buildConfig(
       config: options.agentConfigPath,
       bundlePaths: options.bundlePaths,
       configPaths: options.configPaths,
+      tools: options.tools,
     },
     sandbox: {
       activeDuration: options.activeDuration,

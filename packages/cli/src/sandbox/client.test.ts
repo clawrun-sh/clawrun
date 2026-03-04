@@ -11,7 +11,7 @@ vi.mock("node:module", () => ({
 }));
 
 import { ProviderSandboxClient } from "./client.js";
-import type { SandboxProvider, ManagedSandbox, SandboxInfo, SnapshotInfo } from "@clawrun/provider";
+import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
 import type { PlatformProvider } from "../platform/types.js";
 
 function mockManagedSandbox(id = "sbx-1"): ManagedSandbox {

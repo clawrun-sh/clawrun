@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runTools, type Tool, type ToolResult } from "./tools.js";
+import { runTools, type Tool } from "./tools.js";
 import type { SandboxHandle } from "./types.js";
 
 function mockSandbox(): SandboxHandle {
@@ -15,6 +15,7 @@ function makeTool(overrides?: Partial<Tool>): Tool {
   return {
     id: "test-tool",
     name: "Test Tool",
+    description: "A test tool",
     installDomains: ["example.com"],
     checkCommand: { cmd: "which", args: ["test-tool"] },
     installCommands: [{ cmd: "apt-get", args: ["install", "test-tool"] }],

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Agent } from "@clawrun/agent";
 
 vi.mock("../config.js", () => ({
   getRuntimeConfig: vi.fn(() => ({ agent: { name: "zeroclaw" } })),
@@ -12,7 +13,7 @@ beforeEach(() => {
 describe("runtime agent registry", () => {
   it("registers and retrieves agent by id", async () => {
     const { registerAgent, getAgent } = await import("./registry.js");
-    const agent = { name: "mock" } as any;
+    const agent = { name: "mock" } as unknown as Agent;
     registerAgent("mock", agent);
 
     expect(getAgent("mock")).toBe(agent);
@@ -20,7 +21,7 @@ describe("runtime agent registry", () => {
 
   it("falls back to config agent name when no id provided", async () => {
     const { registerAgent, getAgent } = await import("./registry.js");
-    const agent = { name: "zeroclaw" } as any;
+    const agent = { name: "zeroclaw" } as unknown as Agent;
     registerAgent("zeroclaw", agent);
 
     expect(getAgent()).toBe(agent);
@@ -28,7 +29,7 @@ describe("runtime agent registry", () => {
 
   it("throws on unknown agent with registered list", async () => {
     const { registerAgent, getAgent } = await import("./registry.js");
-    registerAgent("zeroclaw", {} as any);
+    registerAgent("zeroclaw", {} as unknown as Agent);
 
     expect(() => getAgent("nanobot")).toThrow(/Unknown agent: "nanobot"/);
     expect(() => getAgent("nanobot")).toThrow(/Registered agents: zeroclaw/);

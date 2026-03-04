@@ -33,19 +33,21 @@ export async function promptChannels(
 
     for (const ch of supportedChannels) {
       const s = status.get(ch.id) ?? "pending";
-      const indicator =
-        s === "configured"
-          ? chalk.green("\u2713")
-          : s === "failed"
-            ? chalk.red("\u2717")
-            : chalk.dim("\u25CB");
-      const hint =
-        s === "configured"
-          ? "configured"
-          : s === "failed"
-            ? "failed \u2014 select to retry"
-            : undefined;
-      options.push({ value: ch.id, label: `${indicator} ${ch.name}`, hint });
+      if (s === "configured") {
+        options.push({
+          value: ch.id,
+          label: `${chalk.green("\u2713")} ${ch.name}`,
+          hint: "configured",
+        });
+      } else if (s === "failed") {
+        options.push({
+          value: ch.id,
+          label: `${chalk.red("\u2717")} ${ch.name}`,
+          hint: "failed \u2014 select to retry",
+        });
+      } else {
+        options.push({ value: ch.id, label: ch.name });
+      }
     }
 
     // Disabled separator

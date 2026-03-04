@@ -47,7 +47,7 @@ describe("RedisLockStore", () => {
   });
 
   it("tryAcquire calls SET NX with TTL and returns nonce on success", async () => {
-    vi.mocked(redis.set).mockResolvedValue("OK" as any);
+    vi.mocked(redis.set).mockResolvedValue("OK" as string | null);
 
     const nonce = await store.tryAcquire("creation_lock", 30000);
 
@@ -60,7 +60,7 @@ describe("RedisLockStore", () => {
   });
 
   it("tryAcquire returns null when lock already held", async () => {
-    vi.mocked(redis.set).mockResolvedValue(null as any);
+    vi.mocked(redis.set).mockResolvedValue(null as string | null);
 
     const nonce = await store.tryAcquire("creation_lock", 10000);
     expect(nonce).toBeNull();
@@ -78,7 +78,7 @@ describe("RedisLockStore", () => {
   });
 
   it("tryAcquire rounds TTL up to next second", async () => {
-    vi.mocked(redis.set).mockResolvedValue("OK" as any);
+    vi.mocked(redis.set).mockResolvedValue("OK" as string | null);
 
     await store.tryAcquire("lock", 1500); // 1.5s → 2s
 

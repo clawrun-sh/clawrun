@@ -23,10 +23,12 @@ import { getAdapter } from "@clawrun/channel";
 import { getProvider } from "@clawrun/provider";
 import {
   getAgent,
-  getRuntimeConfig,
   resolveRoot,
   SandboxLifecycleManager,
 } from "@clawrun/runtime";
+import type { WakeHookAdapter } from "@clawrun/channel";
+import type { SandboxProvider } from "@clawrun/provider";
+import type { Agent } from "@clawrun/agent";
 import { handleWakeWebhook, handleWakeWebhookGet } from "./webhook-wake.js";
 
 function mockAdapter(overrides: Record<string, unknown> = {}) {
@@ -82,7 +84,7 @@ describe("handleWakeWebhookGet", () => {
 
   it("returns 405 when adapter has no handleVerifyGet", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = new Request("http://localhost");
     const resp = await handleWakeWebhookGet(req, "telegram");
     expect(resp.status).toBe(405);
@@ -92,7 +94,7 @@ describe("handleWakeWebhookGet", () => {
     const adapter = mockAdapter({
       handleVerifyGet: vi.fn(() => new Response("challenge-ok", { status: 200 })),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = new Request("http://localhost?hub.challenge=abc");
     const resp = await handleWakeWebhookGet(req, "telegram");
     expect(resp.status).toBe(200);
@@ -103,7 +105,7 @@ describe("handleWakeWebhookGet", () => {
     const adapter = mockAdapter({
       handleVerifyGet: vi.fn(() => null),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = new Request("http://localhost");
     const resp = await handleWakeWebhookGet(req, "telegram");
     expect(resp.status).toBe(405);
@@ -120,7 +122,7 @@ describe("handleWakeWebhook", () => {
 
   it("returns 400 when body read fails", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const errorStream = new ReadableStream({
       start(controller) {
         controller.error(new Error("read error"));
@@ -140,7 +142,7 @@ describe("handleWakeWebhook", () => {
     const adapter = mockAdapter({
       verifyRequest: vi.fn(async () => ({ valid: false, error: "Bad signature" })),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = jsonRequest({ text: "hi" });
     const resp = await handleWakeWebhook(req, "telegram");
     expect(resp.status).toBe(401);
@@ -150,7 +152,7 @@ describe("handleWakeWebhook", () => {
     const adapter = mockAdapter({
       verifyRequest: vi.fn(async () => ({ valid: false, error: "Server misconfigured" })),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = jsonRequest({ text: "hi" });
     const resp = await handleWakeWebhook(req, "telegram");
     expect(resp.status).toBe(500);
@@ -158,7 +160,7 @@ describe("handleWakeWebhook", () => {
 
   it("returns 400 for non-JSON body", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = new Request("http://localhost", {
       method: "POST",
       body: "not-valid-json{{{",
@@ -171,7 +173,7 @@ describe("handleWakeWebhook", () => {
     const adapter = mockAdapter({
       handleChallenge: vi.fn(() => new Response(JSON.stringify({ type: 1 }), { status: 200 })),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = jsonRequest({ type: 1 });
     const resp = await handleWakeWebhook(req, "telegram");
     expect(resp.status).toBe(200);
@@ -183,7 +185,7 @@ describe("handleWakeWebhook", () => {
     const adapter = mockAdapter({
       parseWakeSignal: vi.fn(() => null),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
     const req = jsonRequest({ edited_message: {} });
     const resp = await handleWakeWebhook(req, "telegram");
     expect(resp.status).toBe(200);
@@ -191,10 +193,10 @@ describe("handleWakeWebhook", () => {
 
   it("always-on channel returns 200 when sandbox already running", async () => {
     const adapter = mockAdapter({ programmableWebhook: false, wakeResponseStatus: 200 });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager({ getStatus: vi.fn(async () => ({ running: true })) });
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     const req = jsonRequest({ message: { text: "hi" } });
     const resp = await handleWakeWebhook(req, "slack");
@@ -204,18 +206,18 @@ describe("handleWakeWebhook", () => {
 
   it("always-on channel proceeds with wake when getStatus throws", async () => {
     const adapter = mockAdapter({ programmableWebhook: false, wakeResponseStatus: 200 });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager({
       getStatus: vi.fn(async () => { throw new Error("state unavailable"); }),
     });
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     // Mock provider for message forwarding
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: true, message: "ok" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     const resp = await handleWakeWebhook(req, "slack");
@@ -225,15 +227,15 @@ describe("handleWakeWebhook", () => {
 
   it("sends courtesy message when chatId present and not acknowledged", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: true, message: "ok" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");
@@ -250,15 +252,15 @@ describe("handleWakeWebhook", () => {
         acknowledged: true,
       })),
     });
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: true, message: "ok" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ type: 2, data: {} });
     await handleWakeWebhook(req, "discord");
@@ -272,15 +274,15 @@ describe("handleWakeWebhook", () => {
 
   it("wakes with skipTeardownWakeHooks: true", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: true, message: "ok" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");
@@ -289,17 +291,17 @@ describe("handleWakeWebhook", () => {
 
   it("forwards message to agent and sends response via adapter", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     const mockSandbox = { id: "sbx-1" };
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => mockSandbox) } as any);
-    vi.mocked(resolveRoot).mockResolvedValue("/agent" as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => mockSandbox) } as unknown as SandboxProvider);
+    vi.mocked(resolveRoot).mockResolvedValue("/agent");
 
     const agentSendMessage = vi.fn(async () => ({ success: true, message: "Agent reply" }));
-    vi.mocked(getAgent).mockReturnValue({ sendMessage: agentSendMessage } as any);
+    vi.mocked(getAgent).mockReturnValue({ sendMessage: agentSendMessage } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");
@@ -315,15 +317,15 @@ describe("handleWakeWebhook", () => {
 
   it("tears down hooks after successful flow", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: true, message: "ok" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");
@@ -332,12 +334,12 @@ describe("handleWakeWebhook", () => {
 
   it("tears down hooks even on wake failure", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager({
       wake: vi.fn(async () => { throw new Error("wake failed"); }),
     });
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     const req = jsonRequest({ message: { text: "hi" } });
     const resp = await handleWakeWebhook(req, "telegram");
@@ -347,15 +349,15 @@ describe("handleWakeWebhook", () => {
 
   it("does not forward message when wake result is not running", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager({
       wake: vi.fn(async () => ({ status: "failed", sandboxId: undefined })),
     });
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     const agentSendMessage = vi.fn();
-    vi.mocked(getAgent).mockReturnValue({ sendMessage: agentSendMessage } as any);
+    vi.mocked(getAgent).mockReturnValue({ sendMessage: agentSendMessage } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");
@@ -364,14 +366,14 @@ describe("handleWakeWebhook", () => {
 
   it("does not crash when agent message forwarding throws", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
     vi.mocked(getProvider).mockReturnValue({
       get: vi.fn(async () => { throw new Error("provider error"); }),
-    } as any);
+    } as unknown as SandboxProvider);
 
     const req = jsonRequest({ message: { text: "hi" } });
     const resp = await handleWakeWebhook(req, "telegram");
@@ -382,15 +384,15 @@ describe("handleWakeWebhook", () => {
 
   it("does not send agent response when agent returns unsuccessful", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAdapter).mockReturnValue(adapter as any);
+    vi.mocked(getAdapter).mockReturnValue(adapter as unknown as WakeHookAdapter);
 
     const manager = mockManager();
-    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as any);
+    vi.mocked(SandboxLifecycleManager).mockImplementation(() => manager as unknown as SandboxLifecycleManager);
 
-    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as any);
+    vi.mocked(getProvider).mockReturnValue({ get: vi.fn(async () => ({})) } as unknown as SandboxProvider);
     vi.mocked(getAgent).mockReturnValue({
       sendMessage: vi.fn(async () => ({ success: false, error: "agent error" })),
-    } as any);
+    } as unknown as Agent);
 
     const req = jsonRequest({ message: { text: "hi" } });
     await handleWakeWebhook(req, "telegram");

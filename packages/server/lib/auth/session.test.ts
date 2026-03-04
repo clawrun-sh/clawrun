@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { generateSecret, signInviteToken, signSessionToken, signAdminToken } from "@clawrun/auth";
 
 const TEST_SECRET = generateSecret();

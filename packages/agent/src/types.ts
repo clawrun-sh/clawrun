@@ -110,6 +110,12 @@ export interface Agent {
    */
   getEnabledTools(agentDir: string): Tool[];
 
+  /**
+   * Return ALL tools this agent supports, regardless of current config.
+   * Used by the CLI to present a tool selection step during deploy.
+   */
+  getAvailableTools(): Tool[];
+
   sendMessage(
     sandbox: SandboxHandle,
     root: string,

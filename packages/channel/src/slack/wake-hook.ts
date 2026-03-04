@@ -1,9 +1,5 @@
 import type { WakeHookAdapter, WakeSignal, AuthResult } from "../types.js";
 import { verifyHmacSha256 } from "../hmac.js";
-import { createLogger } from "@clawrun/logger";
-
-const log = createLogger("channel:slack");
-
 const SLACK_API = "https://slack.com/api";
 
 /**

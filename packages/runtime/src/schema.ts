@@ -27,6 +27,8 @@ export const cloudClawConfigSchema = z.object({
     config: z.string().default("agent/config.toml"),
     bundlePaths: z.array(z.string()).default([]),
     configPaths: z.array(z.string()).default([]),
+    /** Tool IDs selected during deploy. The sidecar installs these at startup. */
+    tools: z.array(z.string()).default([]),
   }),
   sandbox: z.object({
     activeDuration: z.number().default(SANDBOX_DEFAULTS.activeDuration),

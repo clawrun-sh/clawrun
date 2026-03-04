@@ -25,7 +25,7 @@ import type {
   AgentSetupData,
 } from "@clawrun/agent";
 import type { Tool } from "@clawrun/agent";
-import { AgentBrowserTool } from "@clawrun/agent";
+import { AgentBrowserTool, GhCliTool } from "@clawrun/agent";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("agent:zeroclaw");
@@ -66,6 +66,10 @@ export class ZeroclawAgent implements Agent {
       secretKey: opts.secretKey,
       fromSnapshot: opts.fromSnapshot,
     });
+  }
+
+  getAvailableTools(): Tool[] {
+    return [new AgentBrowserTool(), new GhCliTool()];
   }
 
   getEnabledTools(agentDir: string): Tool[] {

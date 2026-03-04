@@ -1,9 +1,6 @@
 import type { WakeHookAdapter, WakeSignal, AuthResult } from "../types.js";
 import { verifyHmacSha256 } from "../hmac.js";
 import { safeEqual } from "../safe-equal.js";
-import { createLogger } from "@clawrun/logger";
-
-const log = createLogger("channel:whatsapp");
 
 const GRAPH_API = "https://graph.facebook.com/v22.0";
 

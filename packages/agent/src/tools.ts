@@ -8,6 +8,8 @@ export interface ToolInstallStep {
 export interface Tool {
   readonly id: string;
   readonly name: string;
+  /** Short human-readable description of what the tool does. */
+  readonly description: string;
   /** Hostnames the tool needs to reach during installation (npm, CDNs, etc.). */
   readonly installDomains: string[];
   /** Command to check if the tool is already installed (exit 0 = installed). */

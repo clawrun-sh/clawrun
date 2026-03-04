@@ -21,11 +21,11 @@ describe("discord validator", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ username: "my_bot" }),
-      } as any)
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ id: "app-123", verify_key: "pubkey-hex" }),
-      } as any);
+      } as Response);
 
     const result = await validator.validate({ bot_token: "bot-token" });
     expect(result.ok).toBe(true);
@@ -39,8 +39,8 @@ describe("discord validator", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ username: "my_bot" }),
-      } as any)
-      .mockResolvedValueOnce({ ok: false } as any);
+      } as Response)
+      .mockResolvedValueOnce({ ok: false } as Response);
 
     const result = await validator.validate({ bot_token: "bot-token" });
     expect(result.ok).toBe(true);
@@ -49,7 +49,7 @@ describe("discord validator", () => {
   });
 
   it("returns ok false on initial HTTP failure", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as any);
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
     const result = await validator.validate({ bot_token: "bad-token" });
     expect(result.ok).toBe(false);

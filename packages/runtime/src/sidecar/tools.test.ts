@@ -18,9 +18,9 @@ let children: Array<{
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
-    const handlers: Record<string, Function> = {};
+    const handlers: Record<string, (...args: unknown[]) => void> = {};
     const child = {
-      on: vi.fn((event: string, handler: Function) => {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         handlers[event] = handler;
       }),
       emit: (event: string, ...args: unknown[]) => {

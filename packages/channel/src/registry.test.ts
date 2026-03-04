@@ -75,8 +75,8 @@ describe("channel registry", () => {
 
     const adapter = getAdapter("telegram");
     expect(adapter).toBeDefined();
-    expect((adapter as any).botToken).toBe("123:ABC");
-    expect((adapter as any).webhookSecret).toBe("tg-secret");
+    expect((adapter as unknown as Record<string, unknown>).botToken).toBe("123:ABC");
+    expect((adapter as unknown as Record<string, unknown>).webhookSecret).toBe("tg-secret");
   });
 
   it("falls back to empty string when no webhook secret", () => {
@@ -84,7 +84,7 @@ describe("channel registry", () => {
 
     const adapter = getAdapter("telegram");
     expect(adapter).toBeDefined();
-    expect((adapter as any).webhookSecret).toBe("");
+    expect((adapter as unknown as Record<string, unknown>).webhookSecret).toBe("");
   });
 
   it("skips channels without credentials", () => {

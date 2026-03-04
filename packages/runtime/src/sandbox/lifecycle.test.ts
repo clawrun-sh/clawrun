@@ -80,6 +80,7 @@ function mockAgent(): Agent {
     daemonPort: 3000,
     provision: vi.fn().mockResolvedValue(undefined),
     getEnabledTools: vi.fn().mockReturnValue([]),
+    getAvailableTools: vi.fn().mockReturnValue([]),
     sendMessage: vi.fn().mockResolvedValue({ success: true, message: "ok" }),
     getDaemonCommand: vi
       .fn()
@@ -197,7 +198,7 @@ beforeEach(async () => {
 
   // Stub setTimeout to fire callbacks instantly (avoids 5s/2s/1s real delays in lifecycle code)
   const _realSetTimeout = globalThis.setTimeout;
-  vi.stubGlobal("setTimeout", (fn: Function, _ms?: number) => {
+  vi.stubGlobal("setTimeout", (fn: () => void, _ms?: number) => {
     return _realSetTimeout(() => fn(), 0);
   });
 

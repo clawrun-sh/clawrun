@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { WakeHookAdapter } from "./types.js";
 
 vi.mock("./registry.js", () => ({
   getAllAdapters: vi.fn(() => []),
@@ -35,14 +36,14 @@ describe("registerWakeHooks", () => {
 
   it("skips always-on adapters (programmableWebhook: false)", async () => {
     const adapter = mockAdapter({ programmableWebhook: false });
-    vi.mocked(getAllAdapters).mockReturnValue([adapter as any]);
+    vi.mocked(getAllAdapters).mockReturnValue([adapter as unknown as WakeHookAdapter]);
     await registerWakeHooks("https://example.com");
     expect(adapter.registerWebhook).not.toHaveBeenCalled();
   });
 
   it("registers webhook for programmable adapters with correct URL", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAllAdapters).mockReturnValue([adapter as any]);
+    vi.mocked(getAllAdapters).mockReturnValue([adapter as unknown as WakeHookAdapter]);
     await registerWakeHooks("https://example.com");
     expect(adapter.registerWebhook).toHaveBeenCalledWith(
       "https://example.com/api/v1/webhook/telegram",
@@ -52,7 +53,7 @@ describe("registerWakeHooks", () => {
   it("registers multiple programmable adapters", async () => {
     const telegram = mockAdapter({ channelId: "telegram", name: "Telegram" });
     const slack = mockAdapter({ channelId: "slack", name: "Slack" });
-    vi.mocked(getAllAdapters).mockReturnValue([telegram, slack] as any);
+    vi.mocked(getAllAdapters).mockReturnValue([telegram, slack] as unknown as WakeHookAdapter[]);
     await registerWakeHooks("https://example.com");
     expect(telegram.registerWebhook).toHaveBeenCalled();
     expect(slack.registerWebhook).toHaveBeenCalled();
@@ -67,7 +68,7 @@ describe("registerWakeHooks", () => {
       }),
     });
     const working = mockAdapter({ channelId: "slack", name: "Slack" });
-    vi.mocked(getAllAdapters).mockReturnValue([failing, working] as any);
+    vi.mocked(getAllAdapters).mockReturnValue([failing, working] as unknown as WakeHookAdapter[]);
     await registerWakeHooks("https://example.com");
     expect(working.registerWebhook).toHaveBeenCalled();
   });
@@ -81,14 +82,14 @@ describe("teardownWakeHooks", () => {
 
   it("skips always-on adapters", async () => {
     const adapter = mockAdapter({ programmableWebhook: false });
-    vi.mocked(getAllAdapters).mockReturnValue([adapter as any]);
+    vi.mocked(getAllAdapters).mockReturnValue([adapter as unknown as WakeHookAdapter]);
     await teardownWakeHooks();
     expect(adapter.deleteWebhook).not.toHaveBeenCalled();
   });
 
   it("deletes webhook for programmable adapters", async () => {
     const adapter = mockAdapter();
-    vi.mocked(getAllAdapters).mockReturnValue([adapter as any]);
+    vi.mocked(getAllAdapters).mockReturnValue([adapter as unknown as WakeHookAdapter]);
     await teardownWakeHooks();
     expect(adapter.deleteWebhook).toHaveBeenCalled();
   });
@@ -102,7 +103,7 @@ describe("teardownWakeHooks", () => {
       }),
     });
     const working = mockAdapter({ channelId: "slack", name: "Slack" });
-    vi.mocked(getAllAdapters).mockReturnValue([failing, working] as any);
+    vi.mocked(getAllAdapters).mockReturnValue([failing, working] as unknown as WakeHookAdapter[]);
     await teardownWakeHooks();
     expect(working.deleteWebhook).toHaveBeenCalled();
   });

@@ -20,7 +20,7 @@ describe("slack validator", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ ok: true, team: "My Workspace" }),
-    } as any);
+    } as Response);
 
     const result = await validator.validate({ bot_token: "xoxb-token" });
     expect(result.ok).toBe(true);
@@ -31,7 +31,7 @@ describe("slack validator", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ ok: false, error: "invalid_auth" }),
-    } as any);
+    } as Response);
 
     const result = await validator.validate({ bot_token: "xoxb-bad" });
     expect(result.ok).toBe(false);
@@ -39,7 +39,7 @@ describe("slack validator", () => {
   });
 
   it("returns ok false on HTTP failure", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as any);
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
     const result = await validator.validate({ bot_token: "xoxb-token" });
     expect(result.ok).toBe(false);

@@ -36,7 +36,7 @@ describe("createNextConfig", () => {
         agent: { name: "zeroclaw", bundlePaths: ["bin/zeroclaw"] },
         instance: { provider: "vercel" },
         serverExternalPackages: ["@vercel/sandbox"],
-      }) as any,
+      }) as string,
     );
 
     const { createNextConfig } = await import("./config.js");
@@ -56,7 +56,7 @@ describe("createNextConfig", () => {
       JSON.stringify({
         agent: { name: "zeroclaw", bundlePaths: ["bin/zeroclaw"], configPaths: ["config.toml"] },
         instance: { provider: "vercel" },
-      }) as any,
+      }) as string,
     );
 
     const { createNextConfig } = await import("./config.js");

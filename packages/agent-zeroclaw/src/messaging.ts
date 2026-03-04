@@ -63,7 +63,7 @@ export function extractToolCalls(text: string): {
 // ---------------------------------------------------------------------------
 
 /** Known tag names the parser recognises. */
-const KNOWN_TAGS = ["thinking", "response", "tool_call", "tool_result"] as const;
+const _KNOWN_TAGS = ["thinking", "response", "tool_call", "tool_result"] as const;
 
 /** Maximum bytes we buffer while waiting for a potential tag to complete. */
 const MAX_TAG_BUFFER = 512;

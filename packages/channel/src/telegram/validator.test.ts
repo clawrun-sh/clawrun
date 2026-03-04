@@ -20,7 +20,7 @@ describe("telegram validator", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ result: { username: "my_bot" } }),
-    } as any);
+    } as Response);
 
     const result = await validator.validate({ bot_token: "123:ABC" });
     expect(result.ok).toBe(true);
@@ -28,7 +28,7 @@ describe("telegram validator", () => {
   });
 
   it("returns ok false on HTTP failure", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as any);
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
     const result = await validator.validate({ bot_token: "bad-token" });
     expect(result.ok).toBe(false);

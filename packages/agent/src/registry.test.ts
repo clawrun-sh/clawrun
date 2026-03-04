@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Agent } from "./types.js";
 
 beforeEach(() => {
   vi.resetModules();
@@ -7,7 +8,7 @@ beforeEach(() => {
 describe("agent registry", () => {
   it("creates agent from registered factory", async () => {
     const { registerAgentFactory, createAgent } = await import("./registry.js");
-    const mockAgent = { name: "mock" } as any;
+    const mockAgent = { name: "mock" } as Agent;
     registerAgentFactory("mock", () => mockAgent);
 
     expect(createAgent("mock")).toBe(mockAgent);
@@ -15,7 +16,7 @@ describe("agent registry", () => {
 
   it("throws on unknown agent with available list", async () => {
     const { registerAgentFactory, createAgent } = await import("./registry.js");
-    registerAgentFactory("zeroclaw", () => ({}) as any);
+    registerAgentFactory("zeroclaw", () => ({}) as Agent);
 
     expect(() => createAgent("nanobot")).toThrow(/Unknown agent: "nanobot"/);
     expect(() => createAgent("nanobot")).toThrow(/Available: zeroclaw/);

@@ -21,7 +21,11 @@ vi.mock("./paths.js", () => ({
 vi.mock("./config.js", () => ({
   readConfig: vi.fn(),
   writeConfig: vi.fn(),
-  sanitizeConfig: vi.fn((c: any) => ({ instance: c.instance, agent: c.agent, sandbox: c.sandbox })),
+  sanitizeConfig: vi.fn((c: { instance: unknown; agent: unknown; sandbox: unknown }) => ({
+    instance: c.instance,
+    agent: c.agent,
+    sandbox: c.sandbox,
+  })),
 }));
 
 vi.mock("@clawrun/agent", () => ({
@@ -46,13 +50,14 @@ vi.mock("chalk", () => ({
 
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { readConfig } from "./config.js";
+import type { ClawRunConfigWithSecrets } from "./config.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 // --- Minimal config for mocking ---
-function fakeConfig(overrides?: any) {
+function fakeConfig(overrides?: Record<string, Record<string, unknown>>): ClawRunConfigWithSecrets {
   return {
     instance: { name: "my-bot", preset: "starter", provider: "vercel", ...overrides?.instance },
     agent: {
@@ -65,7 +70,7 @@ function fakeConfig(overrides?: any) {
     sandbox: { activeDuration: 600, resources: { vcpus: 2 }, networkPolicy: "allow-all" },
     secrets: { cronSecret: "c", jwtSecret: "j", sandboxSecret: "s" },
     ...overrides,
-  };
+  } as unknown as ClawRunConfigWithSecrets;
 }
 
 describe("listInstances", () => {
@@ -85,9 +90,11 @@ describe("listInstances", () => {
 
   it("returns instances with metadata", () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([{ name: "my-bot", isDirectory: () => true }] as any);
+    vi.mocked(readdirSync).mockReturnValue([
+      { name: "my-bot", isDirectory: () => true },
+    ] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readConfig).mockReturnValue(fakeConfig());
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ version: "1.0.0" }) as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ version: "1.0.0" }));
 
     const instances = listInstances();
 
@@ -100,7 +107,9 @@ describe("listInstances", () => {
 
   it("skips non-directories", () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([{ name: "file.txt", isDirectory: () => false }] as any);
+    vi.mocked(readdirSync).mockReturnValue([
+      { name: "file.txt", isDirectory: () => false },
+    ] as unknown as ReturnType<typeof readdirSync>);
 
     expect(listInstances()).toEqual([]);
   });
@@ -111,7 +120,9 @@ describe("listInstances", () => {
       if (String(path).endsWith("clawrun.json")) return false;
       return true;
     });
-    vi.mocked(readdirSync).mockReturnValue([{ name: "orphan", isDirectory: () => true }] as any);
+    vi.mocked(readdirSync).mockReturnValue([
+      { name: "orphan", isDirectory: () => true },
+    ] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readConfig).mockReturnValue(null);
 
     expect(listInstances()).toEqual([]);
@@ -135,7 +146,7 @@ describe("getInstance", () => {
   it("returns metadata when instance exists", () => {
     vi.mocked(readConfig).mockReturnValue(fakeConfig());
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ version: "2.0.0" }) as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ version: "2.0.0" }));
 
     const meta = getInstance("my-bot");
     expect(meta).not.toBeNull();

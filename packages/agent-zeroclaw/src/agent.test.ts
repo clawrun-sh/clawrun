@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SandboxHandle } from "@clawrun/agent";
 
 // --- Mocks (hoisted) ---
 
@@ -33,7 +34,18 @@ vi.mock("@clawrun/logger", () => ({
 vi.mock("@clawrun/agent", () => ({
   AgentBrowserTool: class {
     id = "agent-browser";
+    description = "Headless Chromium browser for web browsing and screenshots";
     installDomains = ["*"];
+  },
+  GhCliTool: class {
+    id = "gh-cli";
+    description = "GitHub CLI for managing repos, issues, and PRs";
+    installDomains = [
+      "webi.sh",
+      "github.com",
+      "release-assets.githubusercontent.com",
+      "api.github.com",
+    ];
   },
 }));
 
@@ -122,7 +134,7 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(true);
 
-      const result = await agent.sendMessage(sandbox as any, "/root", "hello");
+      const result = await agent.sendMessage(sandbox as unknown as SandboxHandle, "/root", "hello");
 
       expect(sendMessageViaDaemon).toHaveBeenCalledOnce();
       expect(sendMessageViaCli).not.toHaveBeenCalled();
@@ -134,7 +146,7 @@ describe("ZeroclawAgent", () => {
       const sandbox = mockSandbox(true);
       vi.mocked(sendMessageViaDaemon).mockRejectedValueOnce(new Error("connection refused"));
 
-      const result = await agent.sendMessage(sandbox as any, "/root", "hello");
+      const result = await agent.sendMessage(sandbox as unknown as SandboxHandle, "/root", "hello");
 
       expect(sendMessageViaDaemon).toHaveBeenCalledOnce();
       expect(sendMessageViaCli).toHaveBeenCalledOnce();
@@ -147,7 +159,9 @@ describe("ZeroclawAgent", () => {
       const abortError = new DOMException("Aborted", "AbortError");
       vi.mocked(sendMessageViaDaemon).mockRejectedValueOnce(abortError);
 
-      await expect(agent.sendMessage(sandbox as any, "/root", "hello")).rejects.toThrow("Aborted");
+      await expect(
+        agent.sendMessage(sandbox as unknown as SandboxHandle, "/root", "hello"),
+      ).rejects.toThrow("Aborted");
       expect(sendMessageViaCli).not.toHaveBeenCalled();
     });
 
@@ -155,7 +169,7 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(false);
 
-      const result = await agent.sendMessage(sandbox as any, "/root", "hello");
+      const result = await agent.sendMessage(sandbox as unknown as SandboxHandle, "/root", "hello");
 
       expect(sendMessageViaDaemon).not.toHaveBeenCalled();
       expect(sendMessageViaCli).toHaveBeenCalledOnce();
@@ -169,7 +183,7 @@ describe("ZeroclawAgent", () => {
       const sandbox = mockSandbox(true);
       const writer = { write: vi.fn() };
 
-      await agent.streamMessage(sandbox as any, "/root", "hello", writer);
+      await agent.streamMessage(sandbox as unknown as SandboxHandle, "/root", "hello", writer);
 
       expect(streamMessageViaDaemon).toHaveBeenCalledOnce();
     });
@@ -179,12 +193,12 @@ describe("ZeroclawAgent", () => {
       const sandbox = mockSandbox(false);
       const writer = { write: vi.fn() };
 
-      await agent.streamMessage(sandbox as any, "/root", "hello", writer);
+      await agent.streamMessage(sandbox as unknown as SandboxHandle, "/root", "hello", writer);
 
       expect(streamMessageViaDaemon).not.toHaveBeenCalled();
       expect(sendMessageViaCli).toHaveBeenCalledOnce();
       // Should emit text-start, text-delta, text-end
-      const types = writer.write.mock.calls.map((c: any) => c[0].type);
+      const types = writer.write.mock.calls.map((c) => (c[0] as { type: string }).type);
       expect(types).toContain("text-start");
       expect(types).toContain("text-delta");
       expect(types).toContain("text-end");
@@ -201,11 +215,13 @@ describe("ZeroclawAgent", () => {
         toolCalls: [],
       });
 
-      await agent.streamMessage(sandbox as any, "/root", "hello", writer);
+      await agent.streamMessage(sandbox as unknown as SandboxHandle, "/root", "hello", writer);
 
-      const errorCall = writer.write.mock.calls.find((c: any) => c[0].type === "error");
+      const errorCall = writer.write.mock.calls.find(
+        (c) => (c[0] as { type: string }).type === "error",
+      );
       expect(errorCall).toBeDefined();
-      expect(errorCall![0].errorText).toBe("bad request");
+      expect((errorCall![0] as { errorText: string }).errorText).toBe("bad request");
     });
   });
 
@@ -214,7 +230,11 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(true);
 
-      const messages = await agent.fetchHistory(sandbox as any, "/root", "session-1");
+      const messages = await agent.fetchHistory(
+        sandbox as unknown as SandboxHandle,
+        "/root",
+        "session-1",
+      );
 
       expect(fetchHistoryViaDaemon).toHaveBeenCalledOnce();
       expect(messages).toHaveLength(2);
@@ -224,7 +244,11 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(false);
 
-      const messages = await agent.fetchHistory(sandbox as any, "/root", "session-1");
+      const messages = await agent.fetchHistory(
+        sandbox as unknown as SandboxHandle,
+        "/root",
+        "session-1",
+      );
 
       expect(fetchHistoryViaDaemon).not.toHaveBeenCalled();
       expect(messages).toEqual([]);
@@ -235,7 +259,11 @@ describe("ZeroclawAgent", () => {
       const sandbox = mockSandbox(true);
       vi.mocked(fetchHistoryViaDaemon).mockRejectedValueOnce(new Error("ws error"));
 
-      const messages = await agent.fetchHistory(sandbox as any, "/root", "session-1");
+      const messages = await agent.fetchHistory(
+        sandbox as unknown as SandboxHandle,
+        "/root",
+        "session-1",
+      );
 
       expect(messages).toEqual([]);
     });
@@ -245,7 +273,9 @@ describe("ZeroclawAgent", () => {
     it("returns browser tool when browser.enabled is true", () => {
       const agent = new ZeroclawAgent();
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(TOML.parse).mockReturnValue({ browser: { enabled: true } } as any);
+      vi.mocked(TOML.parse).mockReturnValue({ browser: { enabled: true } } as ReturnType<
+        typeof TOML.parse
+      >);
 
       const tools = agent.getEnabledTools("/agent");
 
@@ -265,7 +295,9 @@ describe("ZeroclawAgent", () => {
     it("returns empty when browser.enabled is false", () => {
       const agent = new ZeroclawAgent();
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(TOML.parse).mockReturnValue({ browser: { enabled: false } } as any);
+      vi.mocked(TOML.parse).mockReturnValue({ browser: { enabled: false } } as ReturnType<
+        typeof TOML.parse
+      >);
 
       const tools = agent.getEnabledTools("/agent");
 
@@ -285,6 +317,16 @@ describe("ZeroclawAgent", () => {
     });
   });
 
+  describe("getAvailableTools", () => {
+    it("returns all supported tools regardless of config", () => {
+      const agent = new ZeroclawAgent();
+      const tools = agent.getAvailableTools();
+
+      expect(tools).toHaveLength(2);
+      expect(tools.map((t) => t.id)).toEqual(["agent-browser", "gh-cli"]);
+    });
+  });
+
   describe("getCrons", () => {
     it("runs cron-list command and parses output", async () => {
       const agent = new ZeroclawAgent();
@@ -292,9 +334,9 @@ describe("ZeroclawAgent", () => {
       vi.mocked(parseCronListOutput).mockReturnValue({
         jobs: [{ schedule: "0 * * * *", task: "check" }],
         nextRunAt: 1234,
-      } as any);
+      } as unknown as ReturnType<typeof parseCronListOutput>);
 
-      const result = await agent.getCrons(sandbox as any, "/root");
+      const result = await agent.getCrons(sandbox as unknown as SandboxHandle, "/root");
 
       expect(sandbox.runCommand).toHaveBeenCalledOnce();
       expect(parseCronListOutput).toHaveBeenCalledWith("cron output");

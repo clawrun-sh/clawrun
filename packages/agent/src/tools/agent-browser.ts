@@ -9,6 +9,7 @@ import type { SandboxHandle } from "../types.js";
 export class AgentBrowserTool implements Tool {
   readonly id = "agent-browser";
   readonly name = "Agent Browser";
+  readonly description = "Headless Chromium browser for web browsing and screenshots";
   readonly installDomains = [
     "registry.npmjs.org",
     "cdn.playwright.dev",

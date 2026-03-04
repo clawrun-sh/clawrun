@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Agent, SandboxHandle } from "@clawrun/agent";
+import type { RuntimeConfig, SandboxLifecycleManager as SLMType } from "@clawrun/runtime";
+import type { SandboxProvider } from "@clawrun/provider";
 
 vi.mock("../auth/session", () => ({
   requireSessionOrBearerAuth: vi.fn(async () => null),
@@ -35,8 +38,8 @@ vi.mock("@clawrun/logger", () => ({
 
 import { requireSessionOrBearerAuth } from "../auth/session";
 
-let mockManagedSandbox: any;
-let mockAgent: any;
+let mockManagedSandbox: Partial<SandboxHandle>;
+let mockAgent: Partial<Agent>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -60,19 +63,19 @@ describe("history handler", () => {
 
     // Re-apply mock values after resetModules
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.getAgent).mockReturnValue(mockAgent);
+    vi.mocked(runtimeMod.getAgent).mockReturnValue(mockAgent as Agent);
     vi.mocked(runtimeMod.getRuntimeConfig).mockReturnValue({
       instance: { provider: "vercel" },
-    } as any);
+    } as RuntimeConfig);
     vi.mocked(runtimeMod.resolveRoot).mockResolvedValue("/home/user/.clawrun");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(() => ({
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
       getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
-    }) as any);
+    })) as unknown as typeof SLMType);
 
     const providerMod = await import("@clawrun/runtime");
     vi.mocked(providerMod.getProvider).mockReturnValue({
       get: vi.fn(async () => mockManagedSandbox),
-    } as any);
+    } as unknown as SandboxProvider);
 
     const mod = await import("./history.js");
     GET = mod.GET;
@@ -107,9 +110,9 @@ describe("history handler", () => {
 
   it("returns empty when sandbox is not running", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(() => ({
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
       getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
-    }) as any);
+    })) as unknown as typeof SLMType);
 
     const req = new Request("http://localhost/api/v1/history?sessionId=s1");
     const resp = await GET(req);
@@ -120,7 +123,7 @@ describe("history handler", () => {
 
   it("returns empty when agent lacks fetchHistory", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.getAgent).mockReturnValue({} as any);
+    vi.mocked(runtimeMod.getAgent).mockReturnValue({} as Agent);
 
     const req = new Request("http://localhost/api/v1/history?sessionId=s1");
     const resp = await GET(req);
@@ -139,7 +142,7 @@ describe("history handler", () => {
   });
 
   it("returns empty on error (does not throw)", async () => {
-    mockAgent.fetchHistory.mockRejectedValueOnce(new Error("timeout"));
+    vi.mocked(mockAgent.fetchHistory!).mockRejectedValueOnce(new Error("timeout"));
 
     const req = new Request("http://localhost/api/v1/history?sessionId=s1");
     const resp = await GET(req);

@@ -183,18 +183,47 @@ async function promptNetworkPolicy(derived: DerivedDomains): Promise<NetworkPoli
 }
 
 /**
- * After a restricted policy is chosen, check if enabled tools need domains
+ * Prompt for tool selection using clack multiselect checkboxes.
+ * All tools checked by default.
+ */
+async function promptTools(
+  agent: Agent,
+  initialEnabled?: string[],
+): Promise<import("@clawrun/agent").Tool[]> {
+  const available = agent.getAvailableTools();
+  if (available.length === 0) return [];
+
+  const selected = await clack.multiselect({
+    message: "Select tools to install in the sandbox",
+    options: available.map((t) => ({
+      value: t.id,
+      label: t.name,
+      hint: t.description,
+    })),
+    initialValues: initialEnabled ?? available.map((t) => t.id),
+    required: false,
+  });
+
+  if (clack.isCancel(selected)) {
+    clack.cancel("Setup cancelled.");
+    process.exit(0);
+  }
+
+  const selectedIds = selected as string[];
+  return available.filter((t) => selectedIds.includes(t.id));
+}
+
+/**
+ * After a restricted policy is chosen, check if selected tools need domains
  * that aren't in the allow-list. Prompt the user to add them.
  */
 async function promptToolDomains(
-  agent: Agent,
-  agentDir: string,
+  tools: import("@clawrun/agent").Tool[],
   policy: NetworkPolicy,
 ): Promise<NetworkPolicy> {
   if (policy === "allow-all" || policy === "deny-all") return policy;
   if (!("allow" in policy)) return policy;
 
-  const tools = agent.getToolDomains(agentDir);
   if (tools.length === 0) return policy;
 
   const currentAllow = policy.allow ?? [];
@@ -207,10 +236,10 @@ async function promptToolDomains(
     const missing = tool.installDomains.filter((d) => !isAllowed(d));
     if (missing.length === 0) continue;
 
-    clack.note(missing.join("\n"), `${tool.name} — required domains`);
+    clack.note(missing.map((d) => chalk.dim(d)).join("\n"), `${tool.name} Tool`);
 
     const addThem = await clack.confirm({
-      message: `Add these to your allow-list?`,
+      message: `Allow ${tool.name} install domains?`,
       initialValue: true,
     });
 
@@ -222,9 +251,7 @@ async function promptToolDomains(
     if (addThem) {
       currentAllow.push(...missing);
     } else {
-      clack.log.warn(
-        `${tool.name} will not be available — it cannot be installed without network access to: ${missing.join(", ")}`,
-      );
+      clack.log.warn(`${tool.name} will not work — requires: ${missing.join(", ")}`);
     }
   }
 
@@ -349,6 +376,17 @@ async function handleNewInstance(
     channelSetup = await promptChannels(agent, undefined, name);
   }
 
+  // Tool selection
+  let selectedTools: import("@clawrun/agent").Tool[] = [];
+  if (!options.yes) {
+    selectedTools = await promptTools(agent);
+    if (selectedTools.length > 0) {
+      clack.log.success(`Tools: ${selectedTools.map((t) => chalk.green(t.name)).join(", ")}`);
+    }
+  } else {
+    selectedTools = agent.getAvailableTools();
+  }
+
   // Write agent config (provider + channels)
   agent.writeSetupConfig(agentConfigDir, {
     provider: providerResult,
@@ -370,7 +408,7 @@ async function handleNewInstance(
       channelSetup.channelNames,
     );
     networkPolicy = await promptNetworkPolicy(derived);
-    networkPolicy = await promptToolDomains(agent, agentConfigDir, networkPolicy);
+    networkPolicy = await promptToolDomains(selectedTools, networkPolicy);
   }
 
   // ClawRun-specific settings
@@ -457,6 +495,7 @@ async function handleNewInstance(
     provider: platform.id,
     bundlePaths: agent.getBinaryBundlePaths(),
     configPaths: agent.getBundleFiles(),
+    tools: selectedTools.map((t) => t.id),
     networkPolicy,
     serverExternalPackages: platform.getServerExternalPackages(),
     platformUrlEnvVars: platform.getUrlEnvVars(),
@@ -601,6 +640,25 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       existingConfig.secrets = { ...existingConfig.secrets, webhookSecrets: currentSecrets };
     }
 
+    // Tool reconfiguration
+    const currentToolIds = existingConfig.agent.tools ?? [];
+    const reconfigureTools = await clack.confirm({
+      message: `Reconfigure tools?`,
+      initialValue: false,
+    });
+
+    let redeployTools: import("@clawrun/agent").Tool[] = [];
+    if (!clack.isCancel(reconfigureTools) && reconfigureTools) {
+      redeployTools = await promptTools(agent, currentToolIds);
+      existingConfig.agent.tools = redeployTools.map((t) => t.id);
+      if (redeployTools.length > 0) {
+        clack.log.success(`Tools: ${redeployTools.map((t) => chalk.green(t.name)).join(", ")}`);
+      }
+    } else {
+      const allTools = agent.getAvailableTools();
+      redeployTools = allTools.filter((t) => currentToolIds.includes(t.id));
+    }
+
     // ── Infrastructure ───────────────────────────────────────────
     clack.note("Network policy", "Infrastructure");
 
@@ -624,8 +682,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         const derived = deriveAllowedDomains(platform, undefined, channelNames);
         existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);
         existingConfig.sandbox.networkPolicy = await promptToolDomains(
-          agent,
-          agentConfigDir,
+          redeployTools,
           existingConfig.sandbox.networkPolicy,
         );
       } else if (policyAction === "allow-all") {
@@ -659,8 +716,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         }
         // Also check tool domains
         existingConfig.sandbox.networkPolicy = await promptToolDomains(
-          agent,
-          agentConfigDir,
+          redeployTools,
           existingConfig.sandbox.networkPolicy,
         );
       }

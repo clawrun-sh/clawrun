@@ -57,7 +57,7 @@ beforeEach(() => {
 
   // Stub setTimeout to fire callbacks instantly (avoids 3s poll delay in resolve code)
   const _realSetTimeout = globalThis.setTimeout;
-  vi.stubGlobal("setTimeout", (fn: Function, _ms?: number) => {
+  vi.stubGlobal("setTimeout", (fn: () => void, _ms?: number) => {
     return _realSetTimeout(() => fn(), 0);
   });
 });

@@ -8,6 +8,7 @@ export interface RuntimeConfig {
     name: string;
     config: string;
     bundlePaths: string[];
+    tools: string[];
   };
   sandbox: {
     activeDuration: number;
@@ -55,6 +56,7 @@ export function getRuntimeConfig(): RuntimeConfig {
       name: parsed.agent.name,
       config: parsed.agent.config,
       bundlePaths: parsed.agent.bundlePaths,
+      tools: parsed.agent.tools,
     },
     sandbox: {
       activeDuration: parsed.sandbox.activeDuration,
