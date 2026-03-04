@@ -13,7 +13,11 @@ const RETRY_DELAY_MS = 5_000;
 
 function run(cmd: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: "ignore" });
+    const home = process.env.HOME ?? "/root";
+    const child = spawn(cmd, args, {
+      stdio: "ignore",
+      env: { ...process.env, PATH: `${home}/.local/bin:${process.env.PATH}` },
+    });
     child.on("error", reject);
     child.on("exit", (code) => resolve(code ?? 1));
   });

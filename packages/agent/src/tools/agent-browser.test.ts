@@ -24,27 +24,30 @@ describe("AgentBrowserTool", () => {
   it("has correct id and metadata", () => {
     expect(tool.id).toBe("agent-browser");
     expect(tool.name).toBe("Agent Browser");
+    expect(tool.version).toBe("0.16.3");
     expect(tool.installDomains.length).toBeGreaterThan(0);
   });
 
   describe("isInstalled", () => {
-    it("returns true when which and version both succeed", async () => {
+    it("returns true when check and version both succeed", async () => {
       const sandbox = mockSandbox();
 
       expect(await tool.isInstalled(sandbox)).toBe(true);
       expect(sandbox.runCommand).toHaveBeenCalledTimes(2);
     });
 
-    it("returns false when which fails", async () => {
-      const sandbox = mockSandbox({ "which agent-browser": 1 });
+    it("returns false when check command fails", async () => {
+      const sandbox = mockSandbox({
+        [`sh -c test -x "$HOME/.local/opt/agent-browser-v0.16.3/bin/agent-browser"`]: 1,
+      });
 
       expect(await tool.isInstalled(sandbox)).toBe(false);
-      // Should not check version if which fails
+      // Should not check version if binary doesn't exist
       expect(sandbox.runCommand).toHaveBeenCalledTimes(1);
     });
 
     it("returns false when version check fails", async () => {
-      const sandbox = mockSandbox({ "agent-browser --version": 1 });
+      const sandbox = mockSandbox({ "$HOME/.local/bin/agent-browser --version": 1 });
 
       expect(await tool.isInstalled(sandbox)).toBe(false);
     });
@@ -56,12 +59,24 @@ describe("AgentBrowserTool", () => {
 
       await tool.install(sandbox);
 
-      expect(sandbox.runCommand).toHaveBeenCalledTimes(2);
+      // 5 release install steps (raw binary, no extract) + 1 chromium install = 6
+      expect(sandbox.runCommand).toHaveBeenCalledTimes(6);
+    });
+
+    it("includes chromium install as final step", async () => {
+      const sandbox = mockSandbox();
+
+      await tool.install(sandbox);
+
+      const calls = vi.mocked(sandbox.runCommand).mock.calls;
+      const lastCall = calls[calls.length - 1] as unknown as [string, string[]];
+      expect(lastCall[0]).toBe("sh");
+      expect(lastCall[1]).toEqual(["-c", "$HOME/.local/bin/agent-browser install --with-deps"]);
     });
 
     it("throws on non-zero exit code", async () => {
       const sandbox = mockSandbox({
-        "sh -c agent-browser install --with-deps": 1,
+        "sh -c $HOME/.local/bin/agent-browser install --with-deps": 1,
       });
 
       await expect(tool.install(sandbox)).rejects.toThrow(/Failed/);

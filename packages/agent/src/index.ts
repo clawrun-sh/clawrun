@@ -19,6 +19,8 @@ export type {
 export type { Tool, ToolResult } from "./tools.js";
 export { runTools } from "./tools.js";
 export { AgentBrowserTool, GhCliTool } from "./tools/index.js";
+export type { ReleaseSpec } from "./tools/installer.js";
+export { releaseInstallSteps, releaseCheckCommand, githubReleaseUrl } from "./tools/installer.js";
 export { agentSetupDataSchema, channelInfoSchema, providerSetupSchema } from "./schemas.js";
 export { createAgent, registerAgentFactory } from "./registry.js";
 export { baseWorkspaceDir } from "./workspace.js";

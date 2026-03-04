@@ -34,18 +34,15 @@ vi.mock("@clawrun/logger", () => ({
 vi.mock("@clawrun/agent", () => ({
   AgentBrowserTool: class {
     id = "agent-browser";
+    version = "0.16.3";
     description = "Headless Chromium browser for web browsing and screenshots";
     installDomains = ["*"];
   },
   GhCliTool: class {
     id = "gh-cli";
+    version = "2.65.0";
     description = "GitHub CLI for managing repos, issues, and PRs";
-    installDomains = [
-      "webi.sh",
-      "github.com",
-      "release-assets.githubusercontent.com",
-      "api.github.com",
-    ];
+    installDomains = ["github.com", "objects.githubusercontent.com", "api.github.com"];
   },
 }));
 
