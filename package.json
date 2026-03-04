@@ -22,7 +22,8 @@
     "format:check": "turbo run format:check",
     "format": "turbo run format",
     "test": "turbo run test",
-    "clawrun": "node packages/cli/dist/cli.js"
+    "clawrun": "node packages/cli/dist/cli.js",
+    "web:dev": "turbo run dev --filter @clawrun/web"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "3.2.4",

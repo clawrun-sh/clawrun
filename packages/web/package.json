@@ -1,0 +1,43 @@
+{
+  "name": "@clawrun/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf .next .source",
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "fumadocs-mdx",
+    "lint": "eslint app lib components",
+    "format:check": "prettier --check app lib components content",
+    "format": "prettier --write app lib components content"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "fumadocs-core": "^16.2.0",
+    "fumadocs-mdx": "^14.0.0",
+    "fumadocs-ui": "^16.2.0",
+    "lucide-react": "^0.555.0",
+    "next": "^16.0.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.0"
+  },
+  "devDependencies": {
+    "@clawrun/tsconfig": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.0",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5.7.0"
+  }
+}
