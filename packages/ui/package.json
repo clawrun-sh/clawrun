@@ -15,8 +15,8 @@
   "scripts": {
     "build": "tsc --noEmit",
     "lint": "eslint src --ignore-pattern src/components/ai-elements --ignore-pattern src/components/ui",
-    "format:check": "prettier --check --ignore-path ../../.prettierignore src",
-    "format": "prettier --write --ignore-path ../../.prettierignore src"
+    "format:check": "prettier --check src",
+    "format": "prettier --write src"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

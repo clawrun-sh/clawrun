@@ -18,8 +18,8 @@
     "start": "next start",
     "lint": "eslint lib",
     "test": "vitest run",
-    "format:check": "prettier --check --ignore-path ../../.prettierignore lib",
-    "format": "prettier --write --ignore-path ../../.prettierignore lib"
+    "format:check": "prettier --check lib",
+    "format": "prettier --write lib"
   },
   "files": [
     "app",

@@ -1,9 +1,0 @@
-*
-!packages/
-!packages/*/
-!packages/*/src/
-!packages/*/src/**
-!packages/*/lib/
-!packages/*/lib/**
-packages/*/src/components/ai-elements/**
-packages/*/src/components/ui/**
