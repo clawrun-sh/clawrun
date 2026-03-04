@@ -124,12 +124,7 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
   }
 
   // 10. Forward the triggering message to the agent, then tear down hooks
-  if (
-    signal.messageText &&
-    signal.chatId &&
-    result.status === "running" &&
-    result.sandboxId
-  ) {
+  if (signal.messageText && signal.chatId && result.status === "running" && result.sandboxId) {
     try {
       const config = getRuntimeConfig();
       const provider = getProvider(config.instance.provider);
@@ -138,9 +133,7 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
       const root = await resolveRoot(sandbox);
 
       const agent = getAgent();
-      const sessionId = signal.chatId
-        ? `${signal.channelId}-${signal.chatId}`
-        : signal.channelId;
+      const sessionId = signal.chatId ? `${signal.channelId}-${signal.chatId}` : signal.channelId;
 
       const resp = await agent.sendMessage(sandbox, root, signal.messageText, {
         signal: AbortSignal.timeout(120_000),

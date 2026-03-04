@@ -43,10 +43,7 @@ export function createNextConfig(overrides?: Partial<NextConfig>): NextConfig {
   const resolvedAgentPaths = agentBundlePaths.map((p) => `./${p}`);
 
   // Config files that must be bundled with every function.
-  const configPaths = [
-    "./clawrun.json",
-    ...agentConfigPaths.map((p) => `./agent/${p}`),
-  ];
+  const configPaths = ["./clawrun.json", ...agentConfigPaths.map((p) => `./agent/${p}`)];
 
   // Sidecar scripts injected into sandbox (daemon supervisor + heartbeat + health).
   const sidecarPaths = ["./node_modules/@clawrun/runtime/dist/scripts/sidecar/*"];

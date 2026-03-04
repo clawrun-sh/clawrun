@@ -57,9 +57,7 @@ describe("sandbox-heartbeat POST", () => {
   });
 
   it("rejects when sandbox auth fails", async () => {
-    vi.mocked(requireSandboxAuth).mockReturnValue(
-      new Response("Unauthorized", { status: 401 }),
-    );
+    vi.mocked(requireSandboxAuth).mockReturnValue(new Response("Unauthorized", { status: 401 }));
     const req = heartbeatRequest(validPayload);
     const resp = await POST(req);
     expect(resp.status).toBe(401);
@@ -101,7 +99,11 @@ describe("sandbox-heartbeat POST", () => {
   });
 
   it("returns 400 when lastChangedAt is not a number", async () => {
-    const req = heartbeatRequest({ sandboxId: "sbx-1", lastChangedAt: "not-a-number", root: "/root" });
+    const req = heartbeatRequest({
+      sandboxId: "sbx-1",
+      lastChangedAt: "not-a-number",
+      root: "/root",
+    });
     const resp = await POST(req);
     expect(resp.status).toBe(400);
     const body = await resp.json();
@@ -138,7 +140,10 @@ describe("sandbox-heartbeat POST", () => {
 
   it("returns 500 when handleExtend returns error action", async () => {
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => ({ handleExtend: vi.fn(async () => ({ action: "error", error: "boom" })) }) as unknown as SandboxLifecycleManager,
+      () =>
+        ({
+          handleExtend: vi.fn(async () => ({ action: "error", error: "boom" })),
+        }) as unknown as SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest(validPayload);
@@ -150,7 +155,12 @@ describe("sandbox-heartbeat POST", () => {
 
   it("returns 500 when handleExtend throws", async () => {
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => ({ handleExtend: vi.fn(async () => { throw new Error("internal failure"); }) }) as unknown as SandboxLifecycleManager,
+      () =>
+        ({
+          handleExtend: vi.fn(async () => {
+            throw new Error("internal failure");
+          }),
+        }) as unknown as SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest(validPayload);
@@ -168,9 +178,7 @@ describe("sandbox-heartbeat POST", () => {
 
     const req = heartbeatRequest({ ...validPayload, sandboxCreatedAt: 1000 });
     await POST(req);
-    expect(handleExtend).toHaveBeenCalledWith(
-      expect.objectContaining({ sandboxCreatedAt: 1000 }),
-    );
+    expect(handleExtend).toHaveBeenCalledWith(expect.objectContaining({ sandboxCreatedAt: 1000 }));
   });
 
   it("omits sandboxCreatedAt when not a number", async () => {

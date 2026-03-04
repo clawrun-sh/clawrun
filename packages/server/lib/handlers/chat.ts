@@ -25,8 +25,9 @@ export async function POST(req: Request) {
   }
 
   const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : undefined;
-  log.info(`[chat] sessionId=${sessionId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`);
-
+  log.info(
+    `[chat] sessionId=${sessionId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`,
+  );
 
   // Accept both { message } (CLI) and { messages } (useChat).
   let message: string | undefined;

@@ -20,7 +20,7 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format:check": "turbo run format:check",
-    "format": "prettier --write .",
+    "format": "turbo run format",
     "test": "turbo run test",
     "clawrun": "node packages/cli/dist/cli.js"
   },

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   releaseInstallSteps,
   releaseCheckCommand,
@@ -25,6 +25,14 @@ describe("releaseCheckCommand", () => {
   it("uses the correct binary name and version", () => {
     const check = releaseCheckCommand("jq", "1.7.1");
     expect(check.args[1]).toContain("jq-v1.7.1/bin/jq");
+  });
+
+  it("produces different checks for different versions of the same tool", () => {
+    const v1 = releaseCheckCommand("gh", "2.65.0");
+    const v2 = releaseCheckCommand("gh", "2.66.0");
+    expect(v1.args[1]).not.toBe(v2.args[1]);
+    expect(v1.args[1]).toContain("gh-v2.65.0");
+    expect(v2.args[1]).toContain("gh-v2.66.0");
   });
 });
 
@@ -129,5 +137,81 @@ describe("releaseInstallSteps", () => {
     };
     const steps = releaseInstallSteps(tgzSpec);
     expect(steps[2].args[1]).toContain("tar xzf");
+  });
+});
+
+describe("version change triggers reinstall", () => {
+  function specForVersion(version: string): ReleaseSpec {
+    return {
+      downloadUrl: githubReleaseUrl("cli/cli", version, `gh_${version}_linux_amd64.tar.gz`),
+      version,
+      binaryPathInArchive: `gh_${version}_linux_amd64/bin/gh`,
+      binaryName: "gh",
+    };
+  }
+
+  /** Mock sandbox where only specific versioned directories exist. */
+  function mockSandbox(installedVersions: string[]) {
+    const ran: Array<{ cmd: string; shell: string }> = [];
+    return {
+      ran,
+      runCommand: vi.fn(async (cmd: string, args: string[] = []) => {
+        const shell = args[1] ?? "";
+        ran.push({ cmd, shell });
+        // Simulate `test -x`: succeed only if the versioned dir is "installed"
+        if (shell.includes("test -x")) {
+          const found = installedVersions.some((v) => shell.includes(`gh-v${v}`));
+          return { exitCode: found ? 0 : 1, stderr: async () => "" };
+        }
+        return { exitCode: 0, stderr: async () => "" };
+      }),
+    };
+  }
+
+  it("bump from v2.65.0 to v2.66.0: check fails, install targets new version", async () => {
+    // Sandbox has gh v2.65.0 installed
+    const sandbox = mockSandbox(["2.65.0"]);
+
+    const oldTool = {
+      check: releaseCheckCommand("gh", "2.65.0"),
+      install: releaseInstallSteps(specForVersion("2.65.0")),
+    };
+    const newTool = {
+      check: releaseCheckCommand("gh", "2.66.0"),
+      install: releaseInstallSteps(specForVersion("2.66.0")),
+    };
+
+    // Old version check passes — already installed, would be skipped
+    const oldResult = await sandbox.runCommand(oldTool.check.cmd, oldTool.check.args);
+    expect(oldResult.exitCode).toBe(0);
+
+    // New version check fails — triggers install
+    const newResult = await sandbox.runCommand(newTool.check.cmd, newTool.check.args);
+    expect(newResult.exitCode).toBe(1);
+
+    // Run install for new version
+    sandbox.ran.length = 0;
+    for (const step of newTool.install) {
+      const result = await sandbox.runCommand(step.cmd, step.args);
+      expect(result.exitCode).toBe(0);
+    }
+
+    // Install downloaded the new version's asset
+    expect(sandbox.ran.some((r) => r.shell.includes("v2.66.0/gh_2.66.0_linux_amd64.tar.gz"))).toBe(
+      true,
+    );
+    // Install placed binary in new versioned directory
+    expect(
+      sandbox.ran.some((r) => r.shell.includes("gh-v2.66.0/bin") && r.shell.includes("chmod +x")),
+    ).toBe(true);
+    // Symlink points to new version
+    expect(
+      sandbox.ran.some(
+        (r) =>
+          r.shell.includes("ln -sf") &&
+          r.shell.includes("gh-v2.66.0/bin/gh") &&
+          r.shell.includes("$HOME/.local/bin/gh"),
+      ),
+    ).toBe(true);
   });
 });

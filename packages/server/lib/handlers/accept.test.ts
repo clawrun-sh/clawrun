@@ -108,7 +108,9 @@ describe("accept handler GET", () => {
     expect(resp.status).toBe(307);
     expect(resp.headers.get("Location")).toContain("/chat");
 
-    const cookieCalls = (resp as unknown as { _cookieCalls: { name: string; value: string; options: unknown }[] })._cookieCalls;
+    const cookieCalls = (
+      resp as unknown as { _cookieCalls: { name: string; value: string; options: unknown }[] }
+    )._cookieCalls;
     expect(cookieCalls.length).toBe(1);
     expect(cookieCalls[0].name).toBe("clawrun-session");
     expect(cookieCalls[0].value).toBe("mock-session-jwt");

@@ -91,9 +91,7 @@ function resetSessionId(): string {
   return id;
 }
 
-function historyToUIMessages(
-  history: Array<{ role: string; content: string }>,
-): UIMessage[] {
+function historyToUIMessages(history: Array<{ role: string; content: string }>): UIMessage[] {
   return history.map((msg) => ({
     id: crypto.randomUUID(),
     role: msg.role as "user" | "assistant",
@@ -139,7 +137,9 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
           credentials: "same-origin",
         });
         if (res.ok) {
-          const data = (await res.json()) as { messages?: Array<{ role: string; content: string }> };
+          const data = (await res.json()) as {
+            messages?: Array<{ role: string; content: string }>;
+          };
           if (data.messages && data.messages.length > 0) {
             setMessages(historyToUIMessages(data.messages));
             setHistoryLoaded(true);
@@ -269,10 +269,7 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
                       }
                       if (part.type === "reasoning") {
                         return (
-                          <Reasoning
-                            key={i}
-                            isStreaming={part.state === "streaming"}
-                          >
+                          <Reasoning key={i} isStreaming={part.state === "streaming"}>
                             <ReasoningTrigger />
                             <ReasoningContent>{part.text}</ReasoningContent>
                           </Reasoning>
