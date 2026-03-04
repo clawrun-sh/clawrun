@@ -1,0 +1,54 @@
+---
+title: logs
+description: Tail or search Vercel runtime logs for an instance. Filter by level, time range, or query string.
+---
+
+## Usage
+
+```bash
+clawrun logs <instance> [options]
+```
+
+Stream runtime logs from the deployed instance. Logs are fetched from the platform provider (Vercel) and streamed directly to your terminal.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--follow` | `-f` | Follow log output (stream live) |
+| `--limit` | `-n` | Number of log entries to show |
+| `--json` | `-j` | Output logs as JSON (useful for piping to `jq`) |
+| `--query` | `-q` | Filter logs by query string |
+| `--since` | | Show logs since a specific time (e.g., `1h`, `30m`, `2d`) |
+| `--level` | | Filter by log level (`error`, `warn`, `info`) |
+
+## Behavior
+
+The command delegates to the Vercel CLI's logging infrastructure, which streams logs from the deployed Next.js app. This includes logs from API route handlers (sandbox lifecycle, webhooks, chat), not logs from inside the sandbox itself.
+
+To see logs from inside the sandbox (agent output, sidecar), use [`clawrun connect`](/docs/cli/connect) to open a shell session.
+
+## Examples
+
+```bash
+# Show recent logs
+clawrun logs my-instance
+
+# Follow live logs
+clawrun logs my-instance -f
+
+# Last 50 entries as JSON
+clawrun logs my-instance -n 50 -j
+
+# Only errors from the last hour
+clawrun logs my-instance --level error --since 1h
+
+# Filter by query string
+clawrun logs my-instance -q "webhook"
+```

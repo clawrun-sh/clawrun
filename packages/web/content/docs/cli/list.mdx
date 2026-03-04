@@ -1,0 +1,57 @@
+---
+title: list
+description: Show all deployed instances with sandbox status, creation time, agent name, and URL in a formatted table.
+---
+
+## Usage
+
+```bash
+clawrun list
+```
+
+Alias: `clawrun ls`
+
+List all deployed instances with their current status.
+
+## Output
+
+Displays a formatted table:
+
+```
+  Instances (2):
+
+  NAME                        SANDBOX       CREATED       AGENT       URL
+  ────────────────────────────────────────────────────────────────────────
+  clawrun-pink-hoops-serve    running       2h ago        zeroclaw    https://clawrun-pink-hoops-serve.vercel.app
+  clawrun-test-agent          stopped       1d ago        zeroclaw    https://clawrun-test-agent.vercel.app
+```
+
+Sandbox status for each instance is fetched in parallel. The status shown is from the most recent sandbox (by creation time).
+
+### Status colors
+
+| Status | Color | Description |
+|--------|-------|-------------|
+| `running` | Green | Sandbox is active |
+| `stopped` | Yellow | Sandbox is stopped (snapshotted) |
+| `stopping` | Yellow | Sandbox is being stopped |
+| `snapshotting` | Yellow | Sandbox is being snapshotted |
+| `failed` | Red | Sandbox failed to start or run |
+| `aborted` | Red | Sandbox was aborted |
+
+### Time formatting
+
+The "CREATED" column shows relative time: seconds (`<60s`), minutes (`Nm ago`), hours (`Nh ago`), or days (`Nd ago`).
+
+If no instances exist, the command prints:
+
+```
+No instances found. Create one with: clawrun deploy
+```
+
+## Examples
+
+```bash
+clawrun list
+clawrun ls
+```

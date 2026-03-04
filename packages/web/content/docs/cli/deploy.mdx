@@ -1,0 +1,137 @@
+---
+title: deploy
+description: Scaffold a new instance with interactive setup, or upgrade an existing one. Handles preset selection, agent configuration, channel wiring, network policy, and Vercel deployment.
+---
+
+## Usage
+
+```bash
+clawrun deploy [preset] [--name <name>] [--yes]
+```
+
+Create or upgrade and deploy an instance.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `preset` | No | Preset name or folder path containing a `preset.json` |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--name` | `-n` | Instance name. If omitted, a random name is generated (e.g., `clawrun-pink-hoops-serve`) |
+| `--yes` | `-y` | Skip confirmation prompts. Automatically selects all available tools |
+
+## New instance
+
+When no existing instance matches the given name, `deploy` runs the full setup flow.
+
+### Platform prerequisites
+
+Before deploying, the CLI verifies:
+
+1. **Node.js version** must be 20 or later
+2. **Vercel CLI** is installed. If not found, attempts `npm install -g vercel` automatically
+3. **Vercel authentication** via `vercel whoami`. If not authenticated, starts the `vercel login` flow
+
+The CLI also detects your Vercel account tier (hobby or paid) to set appropriate defaults for heartbeat frequency, concurrent sandbox limits, and snapshot expiration.
+
+### Setup flow
+
+1. **Preset selection** picks the preset from the argument, or auto-selects if only one preset exists
+2. **Instance naming** uses `--name` or generates a random name
+3. **Agent configuration** prompts for LLM provider, messaging channels, and tools (see below)
+4. **Network policy** prompts for `allow-all` or `restricted` (see below)
+5. **Deployment** scaffolds the app, deploys to Vercel, and starts the sandbox
+6. **First message** opens an interactive chat session with the agent
+
+### LLM providers
+
+The deploy prompt offers:
+
+`openai`, `openrouter`, `anthropic`, `google`, `groq`, `mistral`, `deepseek`
+
+### Channels
+
+The deploy prompt offers:
+
+`telegram`, `discord`, `slack`, `matrix`, `whatsapp`, `linq`, `nextcloud_talk`, `dingtalk`, `qq`, `lark`, `nostr`
+
+### Tools
+
+The CLI fetches the list of available tools from the agent and presents a multi-select checklist. With `--yes`, all tools are selected by default.
+
+### Network policy
+
+Two modes are available:
+
+- **allow-all**: no restrictions (default)
+- **restricted**: only allow traffic to specific domains
+
+In restricted mode, the CLI automatically derives required domains based on your selections:
+
+- **Provider domains** such as `api.openai.com` for OpenAI, `api.anthropic.com` for Anthropic
+- **Channel domains** such as `api.telegram.org` for Telegram, `discord.com` for Discord
+- **Platform infra** including `*.vercel.app` and `*.vercel.sh`
+
+You can then add extra domains (comma-separated) and optionally specify blocked CIDRs. The CLI validates that each tool's install domains are covered by the allow-list and warns if any are missing.
+
+### What gets created
+
+The deploy command creates the following on disk:
+
+```
+~/.clawrun/<instance-name>/
+├── clawrun.json          # Instance configuration
+├── agent/
+│   ├── config.toml       # Agent config (provider, model, etc.)
+│   ├── .secret_key       # Agent identity key
+│   └── [workspace files] # Seeded .md templates (SOUL.md, AGENTS.md, TOOLS.md)
+└── .deploy/
+    ├── package.json      # Next.js app dependencies
+    ├── .env              # Environment variables
+    ├── clawrun.json      # Sanitized config (no secrets)
+    ├── vercel.json       # Vercel deployment config
+    └── [server app]      # Scaffolded from @clawrun/server
+```
+
+### Custom preset path
+
+You can pass a directory path as the preset argument. The directory must contain a `preset.json` file:
+
+```bash
+clawrun deploy ./my-preset
+```
+
+## Upgrade existing instance
+
+When `--name` matches an existing instance, `deploy` runs the upgrade flow:
+
+1. Offers to reconfigure the LLM provider and model
+2. Offers to reconfigure messaging channels
+3. Offers to reconfigure tools
+4. Offers to reconfigure network policy (keep current, change to restricted, or change to allow-all)
+5. Automatically adds newly required domains to the allow-list
+6. Re-seeds any missing workspace template files (does not overwrite existing ones)
+7. Redeploys and restarts the sandbox
+
+## Examples
+
+```bash
+# Interactive deploy with prompts
+clawrun deploy
+
+# Deploy with the starter preset
+clawrun deploy starter
+
+# Non-interactive deploy
+clawrun deploy starter --name my-agent --yes
+
+# Upgrade an existing instance
+clawrun deploy --name my-agent
+
+# Deploy from a custom preset directory
+clawrun deploy ./presets/custom
+```

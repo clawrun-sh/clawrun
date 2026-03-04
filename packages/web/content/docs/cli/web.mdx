@@ -1,0 +1,34 @@
+---
+title: web
+description: Generate a short-lived auth token and open the browser-based chat dashboard for an instance.
+---
+
+## Usage
+
+```bash
+clawrun web <instance>
+```
+
+Open the web chat interface for an instance in your default browser.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Behavior
+
+1. Signs a JWT invite token with a 10-minute TTL using the instance's JWT secret
+2. Constructs the URL: `{deployedUrl}/auth/accept?token={jwt}`
+3. Opens the URL in your default browser using the platform-appropriate command (`open` on macOS, `xdg-open` on Linux, `start` on Windows)
+
+The invite link expires after 10 minutes. Once accepted, the browser session lasts 8 hours.
+
+For shareable links with a custom TTL and a QR code, use [`clawrun invite`](/docs/cli/invite) instead.
+
+## Examples
+
+```bash
+clawrun web my-instance
+```

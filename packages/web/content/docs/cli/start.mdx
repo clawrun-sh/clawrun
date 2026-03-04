@@ -1,0 +1,37 @@
+---
+title: start
+description: Boot the sandbox from the latest snapshot, provision the agent, and start the sidecar process.
+---
+
+## Usage
+
+```bash
+clawrun start <instance>
+```
+
+Start the sandbox for an instance. If the sandbox is already running, the command reports the existing sandbox ID.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Behavior
+
+Sends a POST to the instance's `/api/v1/sandbox/start` endpoint with an admin JWT for authentication. The request triggers the full sandbox lifecycle: creating the sandbox from the latest snapshot (if available), provisioning the agent, starting the sidecar, and verifying health.
+
+### Response
+
+| Status | Meaning |
+|--------|---------|
+| `running` | Sandbox started successfully. Displays the sandbox ID |
+| `failed` | Sandbox failed to start. Displays the error message and exits with code 1 |
+
+If the HTTP request itself fails (non-2xx status), the command prints the status code and response body.
+
+## Examples
+
+```bash
+clawrun start my-instance
+```

@@ -1,0 +1,33 @@
+---
+title: connect
+description: SSH into the sandbox's Firecracker microVM for debugging, inspecting files, or running commands directly.
+---
+
+## Usage
+
+```bash
+clawrun connect <instance>
+```
+
+Alias: `clawrun ssh`
+
+Open an interactive shell session inside the instance's sandbox. If the sandbox is not running, it will be started first.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Behavior
+
+The command resolves the running sandbox for the instance (starting one if needed), then delegates to the Vercel Sandbox CLI to establish the shell connection. Your terminal's stdin/stdout/stderr are passed through directly, giving you a native shell experience inside the sandbox.
+
+This is useful for debugging, inspecting the agent's workspace, checking configuration files, or running commands inside the sandbox environment.
+
+## Examples
+
+```bash
+clawrun connect my-instance
+clawrun ssh my-instance
+```

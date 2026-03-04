@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 
 const footerLinks = {
@@ -22,7 +25,56 @@ const footerLinks = {
   ],
 };
 
+const docsFooterLinks = [
+  { href: "/", label: "Home" },
+  {
+    href: "https://github.com/clawrun-sh/clawrun",
+    label: "GitHub",
+    external: true,
+  },
+  { href: "https://discord.gg/clawrun", label: "Discord", external: true },
+  { href: "https://x.com/clawrun", label: "Twitter", external: true },
+];
+
 export function Footer() {
+  const pathname = usePathname();
+  const isDocs = pathname?.startsWith("/docs");
+
+  if (isDocs) {
+    return (
+      <footer className="border-t border-border">
+        <div className="flex flex-col items-center justify-between gap-4 px-6 py-6 sm:flex-row">
+          <span className="text-xs text-dim">
+            &copy; {new Date().getFullYear()} ClawRun
+          </span>
+          <div className="flex items-center gap-5">
+            {docsFooterLinks.map((link) =>
+              "external" in link && link.external ? (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-dim no-underline transition-colors hover:text-heading"
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="text-xs text-dim no-underline transition-colors hover:text-heading"
+                >
+                  {link.label}
+                </Link>
+              ),
+            )}
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer className="border-t border-border bg-secondary">
       <div className="mx-auto max-w-5xl px-6 py-12 min-[1088px]:px-0 md:py-16">

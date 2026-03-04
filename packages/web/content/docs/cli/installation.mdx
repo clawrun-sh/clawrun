@@ -1,0 +1,48 @@
+---
+title: Installation
+description: System requirements, package managers, and environment setup for the clawrun CLI.
+---
+
+## Requirements
+
+- Node.js 20 or later
+
+The [`deploy`](/docs/cli/deploy) command will also check for the [Vercel CLI](https://vercel.com/docs/cli) and attempt to install it automatically if missing. If you prefer to install it manually:
+
+```bash
+npm install -g vercel
+```
+
+## Package managers
+
+npm:
+
+```bash
+npm install -g clawrun
+```
+
+pnpm:
+
+```bash
+pnpm add -g clawrun
+```
+
+Verify the installation:
+
+```bash
+clawrun --version
+```
+
+## Instance directory
+
+ClawRun stores all instance data under `~/.clawrun/`. You can override this by setting the `CLAWRUN_HOME` environment variable:
+
+```bash
+export CLAWRUN_HOME=/path/to/custom/dir
+```
+
+## Updating
+
+```bash
+npm update -g clawrun
+```

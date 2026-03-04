@@ -1,47 +1,37 @@
 ---
 title: Introduction
-description: Get started with ClawRun — the hosting and lifecycle layer for open-source AI agents.
+description: ClawRun is a hosting and lifecycle layer for open-source AI agents. Deploy into secure sandboxes with one command.
 ---
 
 ## What is ClawRun?
 
 ClawRun is a hosting and lifecycle layer for open-source AI agents. It deploys agents into secure Firecracker microVMs and manages their full lifecycle:
 
-- **Startup** — provision a sandbox, install the agent, start the daemon
-- **Keep-alive** — heartbeat monitoring, TTL extension based on activity
-- **Snapshot/Resume** — automatic snapshotting on idle, instant resume on new messages
-- **Wake-on-message** — webhook-driven wake from any connected channel
+- **Startup**: provision a sandbox, install the agent, start the daemon
+- **Keep-alive**: heartbeat monitoring, TTL extension based on activity
+- **Snapshot/Resume**: automatic snapshotting on idle, instant resume on new messages
+- **Wake-on-message**: webhook-driven wake from any connected channel
 
-## Quick Start
+ClawRun does not build its own agent. It hosts existing ones. [ZeroClaw](https://github.com/nichochar/zeroclaw) is the default agent; the pluggable `Agent` interface makes it easy to swap in your own.
 
-Install the CLI globally:
+## How it works
 
-```bash
-npm install -g clawrun
-```
-
-Deploy your first agent:
-
-```bash
-clawrun deploy
-```
-
-Send a message:
-
-```bash
-clawrun agent -m "Hello, agent!"
-```
-
-## Architecture
-
-ClawRun follows a **persistent sandbox** model. The agent daemon runs continuously inside a sandbox. ClawRun manages the sandbox lifecycle around it — extending TTL when active, snapshotting when idle, and waking on incoming messages.
+ClawRun follows a **persistent sandbox** model. The agent daemon runs continuously inside a sandbox. ClawRun manages the sandbox lifecycle around it, extending TTL when active, snapshotting when idle, and waking on incoming messages.
 
 The agent runs **inside** the sandbox, not in the serverless function. The function is the orchestrator. The sandbox is where the agent lives.
 
 ## Key Concepts
 
-- **Agent** — the AI agent running inside the sandbox (e.g., ZeroClaw)
-- **Sandbox** — an isolated microVM managed by a provider (e.g., Vercel Sandbox)
-- **Sidecar** — a supervisor process inside the sandbox that manages the agent daemon
-- **Channel** — a messaging platform connected via webhooks (Telegram, Discord, Slack, etc.)
-- **Preset** — a declarative configuration bundle (agent + provider + defaults)
+| Concept | Description |
+|---------|-------------|
+| **Agent** | The AI agent running inside the sandbox (e.g., ZeroClaw) |
+| **Sandbox** | An isolated microVM managed by a provider (e.g., Vercel Sandbox) |
+| **Sidecar** | A supervisor process inside the sandbox that manages the agent daemon |
+| **Channel** | A messaging platform connected via webhooks (Telegram, Discord, Slack, etc.) |
+| **Preset** | A declarative configuration bundle (agent + provider + defaults) |
+
+## Next steps
+
+- [Quickstart](/docs/getting-started/quickstart): deploy your first agent in under a minute
+- [CLI Installation](/docs/cli/installation): install the `clawrun` CLI
+- [Use Cases](/docs/use-cases/telegram-bot): connect your agent to Telegram, Discord, or Slack

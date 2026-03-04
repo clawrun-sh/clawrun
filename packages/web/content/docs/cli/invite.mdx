@@ -1,0 +1,60 @@
+---
+title: invite
+description: Create a shareable invite URL with a custom TTL and a scannable QR code for giving others access to the web chat.
+---
+
+## Usage
+
+```bash
+clawrun invite <instance> [--ttl <duration>]
+```
+
+Generate a shareable invite link and QR code for the web chat interface. Useful for giving others access to your agent without sharing credentials.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--ttl` | `-t` | Invite link lifetime. Default: `10m`. Maximum: `7d` |
+
+### TTL format
+
+Durations use the format `<number><unit>`:
+
+| Unit | Meaning | Example |
+|------|---------|---------|
+| `m` | Minutes | `30m` |
+| `h` | Hours | `1h` |
+| `d` | Days | `2d` |
+
+If the TTL exceeds 7 days, it is capped at `7d`.
+
+## Behavior
+
+1. Signs a JWT invite token with the specified TTL using the instance's JWT secret
+2. Constructs the URL: `{deployedUrl}/auth/accept?token={jwt}`
+3. Displays the instance name, expiration time (human-readable), and the full URL
+4. Renders an ASCII QR code in the terminal for easy scanning on mobile devices
+
+The invite link authenticates the user when visited. Once accepted, the browser session lasts 8 hours regardless of the original invite TTL.
+
+Unlike [`clawrun web`](/docs/cli/web), which opens your own browser with a short-lived token, `invite` is designed for sharing. The output includes both a copyable URL and a scannable QR code.
+
+## Examples
+
+```bash
+# Default 10-minute invite
+clawrun invite my-instance
+
+# 1-hour invite
+clawrun invite my-instance --ttl 1h
+
+# 2-day invite
+clawrun invite my-instance -t 2d
+```

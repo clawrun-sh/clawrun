@@ -1,0 +1,60 @@
+---
+title: agent
+description: Open an interactive terminal chat or send a single message to the agent running inside an instance's sandbox.
+---
+
+## Usage
+
+```bash
+clawrun agent <instance> [--message <text>]
+```
+
+Alias: `clawrun tui`
+
+Chat with the agent running in an instance. Opens an interactive terminal UI by default, or sends a single message with `--message`.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--message` | `-m` | Send a single message (non-interactive mode) |
+
+## Interactive mode
+
+Without `--message`, the command opens a full terminal chat interface powered by [pi-tui](https://github.com/nichochar/pi-tui). The TUI includes:
+
+- **Scrollable conversation** with messages rendered as markdown and syntax highlighting
+- **Streaming responses** that appear incrementally as the agent generates them
+- **Tool call display** showing tool names and arguments as the agent invokes them
+- **Image rendering** for base64 images, rendered natively in Kitty/iTerm2 terminals
+- **Input editor** supporting `Enter` to send, `Alt+Enter` for newline, `Esc` to cancel
+- **History** via arrow keys to cycle through previous messages
+- **Commands** including `/clear` to reset the conversation and `/exit` to quit
+
+The header shows the instance name and sandbox ID. The footer displays keybinding hints.
+
+## Single-shot mode
+
+With `--message`, the command sends a POST to the instance's `/api/v1/chat` endpoint with the message and a unique session ID. The response is streamed via Server-Sent Events.
+
+The request has a 150-second timeout. Authentication is handled via a locally-signed JWT included as a Bearer token.
+
+Exit codes:
+- `0` on success (message sent and response received)
+- `1` on error (agent unreachable, timeout, etc.)
+
+## Examples
+
+```bash
+# Interactive chat
+clawrun agent my-instance
+
+# Single message
+clawrun agent my-instance -m "What files are in the workspace?"
+```

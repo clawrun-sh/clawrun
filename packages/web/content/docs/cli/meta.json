@@ -1,0 +1,17 @@
+{
+  "title": "CLI",
+  "pages": [
+    "installation",
+    "deploy",
+    "list",
+    "agent",
+    "connect",
+    "start",
+    "stop",
+    "logs",
+    "pull",
+    "web",
+    "invite",
+    "destroy"
+  ]
+}

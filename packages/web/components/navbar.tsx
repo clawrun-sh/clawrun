@@ -21,6 +21,37 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 
+  const isDocs = pathname?.startsWith("/docs");
+
+  if (isDocs) {
+    return (
+      <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
+        <div className="flex h-14 items-center justify-between px-6">
+          <div className="flex items-center gap-2.5">
+            <Logo size={18} className="text-primary" />
+            <Link href="/" className="text-lg font-bold text-heading no-underline">
+              ClawRun
+            </Link>
+            <span className="border border-primary px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-primary">
+              BETA
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/clawrun-sh/clawrun"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-dim no-underline transition-colors hover:text-heading"
+              aria-label="GitHub (opens in new tab)"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6 min-[1088px]:px-0">

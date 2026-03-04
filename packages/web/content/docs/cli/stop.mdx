@@ -1,0 +1,49 @@
+---
+title: stop
+description: Snapshot the sandbox's filesystem state and shut it down. The next start or incoming message restores from the snapshot.
+---
+
+## Usage
+
+```bash
+clawrun stop <instance> [--yes]
+```
+
+Stop the sandbox for an instance. A snapshot is taken before stopping so state is preserved for the next wake.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `instance` | Yes | The instance name |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--yes` | `-y` | Skip confirmation prompt |
+
+## Behavior
+
+Without `--yes`, the command prompts for confirmation:
+
+> Stop sandbox for "my-instance"? A snapshot will be taken before stopping.
+
+On confirmation, it sends a POST to the instance's `/api/v1/sandbox/stop` endpoint with an admin JWT.
+
+### Response
+
+| Status | Meaning |
+|--------|---------|
+| `stopped` (with sandbox ID) | Sandbox stopped and snapshot saved |
+| `stopped` (no sandbox ID) | No running sandbox to stop |
+| `failed` | Stop operation failed. Displays error and exits with code 1 |
+
+The snapshot preserves the full sandbox filesystem state. The next `start`, `agent`, or incoming webhook will restore from this snapshot.
+
+## Examples
+
+```bash
+clawrun stop my-instance
+clawrun stop my-instance -y
+```
