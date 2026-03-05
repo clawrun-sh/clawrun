@@ -1,0 +1,96 @@
+---
+title: Sidecar
+description: The supervisor process that runs inside each sandbox.
+---
+
+## Overview
+
+The sidecar is a single Node.js process that runs inside the sandbox as a detached process. It has four responsibilities: supervising the agent daemon, sending heartbeats, serving health checks, and installing tools.
+
+## Initialization order
+
+The sidecar starts its subsystems in a specific order:
+
+1. **Health server** — starts first on port 3001, since the parent begins polling immediately after launching the sidecar
+2. **Supervisor** — spawns the agent daemon and begins port probing
+3. **Heartbeat** — sends an immediate first tick, then continues every 60 seconds
+4. **Tools** — installs required tools in the background (non-blocking, fire-and-forget)
+
+## Supervisor
+
+The supervisor spawns and monitors the agent daemon:
+
+- **Starts** the daemon process (e.g., `zeroclaw serve --port 3000 --host 0.0.0.0`)
+- **Monitors** via TCP port probe every 500ms, checking if the daemon is listening
+- **Restarts** on crash after a 2-second delay, up to 5 times. The counter resets after 60 seconds of stable operation. After 5 failed restarts, the daemon status is reported as `"failed"` and the [lifecycle manager stops the sandbox](/docs/sandbox/lifecycle#extend).
+- **Reports** daemon status in each heartbeat
+- **Shutdown** sends `SIGTERM` to the daemon and waits up to 5 seconds for graceful exit
+
+If the daemon hasn't started listening after 3 seconds, the supervisor logs a warning but continues probing — this is not a hard timeout.
+
+## Heartbeat
+
+Every 60 seconds, the sidecar POSTs to the parent server:
+
+```json
+{
+  "sandboxId": "sbx_abc123",
+  "lastChangedAt": 1710000000000,
+  "sandboxCreatedAt": 1709990000000,
+  "root": "/home/user",
+  "daemonStatus": "running",
+  "daemonRestarts": 0
+}
+```
+
+- `lastChangedAt` is epoch milliseconds (number), tracking the most recent filesystem modification. Used by the file-activity extend reason.
+- `sandboxCreatedAt` is epoch milliseconds (number), used by the grace-period extend reason.
+- `daemonStatus` is one of `"starting"`, `"running"`, `"stopped"`, or `"failed"`.
+
+The parent uses this to decide whether to extend the sandbox TTL or snapshot and stop. If `daemonStatus` is `"failed"`, the parent stops the sandbox immediately.
+
+## Health server
+
+An HTTP health server runs on port 3001 inside the sandbox:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "running",
+    "pid": 1234,
+    "restarts": 0
+  },
+  "heartbeat": {
+    "lastTick": 1710000060000,
+    "lastSuccess": true
+  },
+  "uptime": 3600
+}
+```
+
+- `ok` is `true` when the daemon status is `"running"`.
+- `daemon` reports the current daemon process state.
+- `heartbeat` tracks the last heartbeat tick time (epoch ms) and whether it succeeded.
+- `uptime` is seconds since the sidecar started.
+
+The parent polls this endpoint during startup to verify the sandbox is healthy.
+
+## Tools
+
+The sidecar handles tool installation inside the sandbox at startup. When the agent requires external tools (e.g., a browser), the sidecar provisions them in the background.
+
+- Installation is retried up to 3 times with a 5-second delay between attempts
+- `PATH` is augmented with `~/.local/bin` for tools installed to the user's local directory
+- Tool installation is non-blocking — if all attempts fail, the sidecar logs a warning and continues without the tool
+
+## Configuration
+
+The sidecar receives its configuration as a JSON file written into the sandbox. The heartbeat secret is passed via the `CLAWRUN_HB_SECRET` environment variable (not in the command line, for security).
+
+## Logging
+
+The sidecar logs to `{root}/logs/sidecar.log` inside the sandbox. Daemon output is captured and prefixed:
+
+- stdout lines are prefixed with `[daemon:out]`
+- stderr lines are prefixed with `[daemon:err]`

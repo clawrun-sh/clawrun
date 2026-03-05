@@ -1,0 +1,55 @@
+---
+title: Snapshot & Resume
+description: How sandbox state is preserved across sleep/wake cycles.
+---
+
+## Overview
+
+ClawRun snapshots the sandbox filesystem when it goes to sleep and restores from that snapshot when it wakes. This means the agent picks up exactly where it left off. Files, configuration, conversation history, and working state are all preserved.
+
+## How snapshots work
+
+When the sandbox is about to stop:
+
+1. The provider captures a filesystem snapshot of the sandbox (retried up to 3 times with a 2-second delay between attempts)
+2. The snapshot ID is stored in the state store (Redis)
+3. Wake hooks are registered for all channels so incoming messages can trigger a wake
+
+When a wake event arrives:
+
+1. A new sandbox is created from the stored snapshot
+2. The filesystem is restored to its exact state at snapshot time
+3. The sidecar starts and relaunches the agent daemon
+4. The agent resumes with all its state intact
+
+## What's preserved
+
+- Agent configuration files (e.g., `~/.zeroclaw/config.toml`)
+- Memory and conversation databases
+- Downloaded files, tool outputs, workspace state
+- Installed packages and dependencies
+
+## What's not preserved
+
+- Running processes (the sidecar restarts the agent daemon)
+- Network connections (re-established on wake)
+- Ephemeral `/tmp` contents (provider-dependent)
+
+## Snapshot retention
+
+ClawRun uses `CountBasedRetention` to manage snapshots. The 3 most recent snapshots are kept and older ones are deleted automatically. This prevents unbounded snapshot storage growth.
+
+If all 3 snapshot attempts fail during shutdown, the sandbox is **not** stopped — it keeps running to preserve state rather than risk losing unsaved work.
+
+## State store
+
+Some state lives outside the sandbox entirely, in Redis. Keys are prefixed with `clawrun:{instance}:` where `{instance}` is the instance name.
+
+Stored data includes:
+
+- Sandbox metadata (ID, status, snapshot reference)
+- Creation locks (acquired via `SET NX EX`, released via atomic Lua script to prevent race conditions)
+- Channel webhook registrations
+- `next_wake_at` — the next scheduled cron wake time, used to determine whether to wake the sandbox ahead of a cron job
+
+This separation ensures that orchestration state survives even if a snapshot is lost.

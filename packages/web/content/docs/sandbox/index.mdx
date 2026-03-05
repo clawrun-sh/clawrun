@@ -1,0 +1,24 @@
+---
+title: Sandbox
+description: How ClawRun runs agents inside isolated Firecracker microVMs.
+---
+
+ClawRun deploys each agent into its own **sandbox** — an isolated Firecracker microVM managed by the sandbox provider. The agent daemon runs continuously inside the sandbox, not as a per-request function.
+
+## Persistent sandbox model
+
+Unlike serverless functions that spin up per request, a ClawRun sandbox stays running as long as there's activity. The agent daemon listens for messages on its own HTTP server, processes work, and writes to the filesystem. ClawRun manages the TTL around it: extending when the agent is active, snapshotting and stopping when it's idle, and waking on the next incoming message.
+
+## State lives outside
+
+The sandbox filesystem is ephemeral — it can be destroyed and recreated at any time. To survive sleep/wake cycles:
+
+- **Filesystem snapshots** capture the full sandbox state (agent config, memory databases, workspace files) before shutdown and restore it on wake.
+- **Redis state store** holds orchestration data (sandbox ID, snapshot references, creation locks, wake schedule) that persists independently of any sandbox.
+
+## In this section
+
+- [Lifecycle](/docs/sandbox/lifecycle) — startup, keep-alive, and shutdown
+- [Snapshot & Resume](/docs/sandbox/snapshot-resume) — state preservation across sleep/wake cycles
+- [Sidecar](/docs/sandbox/sidecar) — the supervisor process inside each sandbox
+- [Providers](/docs/sandbox/providers) — sandbox provider abstraction and the Vercel implementation

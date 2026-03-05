@@ -8,6 +8,7 @@ import { ArchitectureDiagram } from "@/components/docs/architecture-diagram";
 import { PackageCommand } from "@/components/docs/package-command";
 import { ClickableCodeBlock } from "@/components/docs/code-block";
 import { CronWakeDiagram } from "@/components/docs/cron-wake-diagram";
+import { LifecycleDiagram } from "@/components/docs/lifecycle-diagram";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { TypeTable } from "fumadocs-ui/components/type-table";
 
@@ -23,7 +24,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents, pre: ClickableCodeBlock, ProvidersTable, Mermaid, ArchitectureDiagram, PackageCommand, CronWakeDiagram, Steps, Step, TypeTable }} />
+        <MDX components={{ ...defaultMdxComponents, pre: ClickableCodeBlock, ProvidersTable, Mermaid, ArchitectureDiagram, PackageCommand, CronWakeDiagram, LifecycleDiagram, Steps, Step, TypeTable }} />
       </DocsBody>
     </DocsPage>
   );

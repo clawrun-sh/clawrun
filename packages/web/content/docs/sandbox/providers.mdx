@@ -1,0 +1,74 @@
+---
+title: Providers
+description: Sandbox provider abstraction and the Vercel Sandbox implementation.
+---
+
+## Overview
+
+ClawRun uses a pluggable `SandboxProvider` interface to abstract sandbox creation and management. This allows different runtime backends without changing the orchestration logic.
+
+## SandboxProvider interface
+
+Every provider implements:
+
+| Method | Description |
+|--------|-------------|
+| `create()` | Create a new sandbox, optionally from a snapshot |
+| `get()` | Get a sandbox by ID |
+| `list()` | List all sandboxes |
+| `listSnapshots()` | List available snapshots |
+| `deleteSnapshot()` | Delete a snapshot by ID |
+
+## ManagedSandbox interface
+
+Each sandbox returned by a provider is wrapped in a `ManagedSandbox` with methods for file operations, process execution, networking, and lifecycle management.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `string` | Sandbox identifier |
+| `status` | `string` | Current sandbox status |
+| `timeout` | `number` | Current timeout in ms (includes extensions) |
+| `createdAt` | `number` | Creation time (epoch ms) |
+
+**Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `runCommand(cmd, args?)` | Execute a command inside the sandbox |
+| `writeFiles(files)` | Write files into the sandbox filesystem |
+| `readFile(path)` | Read a file from the sandbox (returns `null` if not found) |
+| `stop()` | Stop the sandbox |
+| `snapshot()` | Capture a filesystem snapshot, returns `{ id }` |
+| `extendTimeout(ms)` | Push the native TTL forward by `ms` milliseconds |
+| `updateNetworkPolicy(policy)` | Update the sandbox's network access rules |
+| `domain(port)` | Get the public domain for a given port |
+
+## Vercel Sandbox (default)
+
+The default provider uses [Vercel Sandbox](https://vercel.com/docs/sandbox), which runs Firecracker microVMs with:
+
+- **Fast cold start** for sub-second sandbox creation
+- **Filesystem snapshots** for instant state capture and restore
+- **Network isolation** with configurable network policies
+- **Resource limits** including vCPU and memory allocation
+
+The `@clawrun/provider-vercel` package implements the provider interface using the `@vercel/sandbox` SDK. Credentials are resolved from `.vercel/project.json` in the project directory, reading `projectId` and `orgId` (mapped to `teamId` for the SDK). If explicit credentials aren't available, the provider delegates to the SDK's built-in auth resolution.
+
+## Writing a custom provider
+
+To support a different runtime:
+
+1. Create a new package (e.g., `@clawrun/provider-custom`)
+2. Implement the `SandboxProvider` interface
+3. Implement the `ManagedSandbox` interface for individual sandboxes
+4. Self-register via the provider registry
+
+```typescript
+import { registerProvider } from "@clawrun/provider";
+
+registerProvider("custom", () => new CustomProvider());
+```
+
+The orchestration layer (`@clawrun/runtime`) will use your provider transparently.
