@@ -25,7 +25,7 @@ export function Navbar() {
 
   if (isDocs) {
     return (
-      <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
+      <nav className="sticky top-0 z-40 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
         <div className="flex h-14 items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
             <Logo size={18} className="text-primary" />
@@ -53,7 +53,7 @@ export function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
+    <nav className="sticky top-0 z-40 w-full border-b border-border bg-background/95 font-mono backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6 min-[1088px]:px-0">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
