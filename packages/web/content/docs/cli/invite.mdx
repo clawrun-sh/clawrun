@@ -13,25 +13,25 @@ Generate a shareable invite link and QR code for the web chat interface. Useful 
 
 ## Arguments
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `instance` | Yes | The instance name |
+| Argument   | Required | Description       |
+| ---------- | -------- | ----------------- |
+| `instance` | Yes      | The instance name |
 
 ## Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--ttl` | `-t` | Invite link lifetime. Default: `10m`. Maximum: `7d` |
+| Option  | Short | Description                                         |
+| ------- | ----- | --------------------------------------------------- |
+| `--ttl` | `-t`  | Invite link lifetime. Default: `10m`. Maximum: `7d` |
 
 ### TTL format
 
 Durations use the format `<number><unit>`:
 
 | Unit | Meaning | Example |
-|------|---------|---------|
-| `m` | Minutes | `30m` |
-| `h` | Hours | `1h` |
-| `d` | Days | `2d` |
+| ---- | ------- | ------- |
+| `m`  | Minutes | `30m`   |
+| `h`  | Hours   | `1h`    |
+| `d`  | Days    | `2d`    |
 
 If the TTL exceeds 7 days, it is capped at `7d`.
 

@@ -17,26 +17,26 @@ Identity and deployment metadata for the instance.
 <TypeTable
   type={{
     name: {
-      description: 'Instance identifier, used in the CLI and dashboard.',
-      type: 'string',
+      description: "Instance identifier, used in the CLI and dashboard.",
+      type: "string",
       default: '"default"',
     },
     preset: {
-      description: 'The preset used to scaffold this instance.',
-      type: 'string',
+      description: "The preset used to scaffold this instance.",
+      type: "string",
     },
     provider: {
-      description: 'Sandbox provider.',
-      type: 'string',
+      description: "Sandbox provider.",
+      type: "string",
       required: true,
     },
     deployedUrl: {
-      description: 'Public URL of the deployed orchestrator app.',
-      type: 'string',
+      description: "Public URL of the deployed orchestrator app.",
+      type: "string",
     },
     sandboxRoot: {
-      description: 'Root directory path inside the sandbox where agent files are mounted.',
-      type: 'string',
+      description: "Root directory path inside the sandbox where agent files are mounted.",
+      type: "string",
       default: '".clawrun"',
     },
   }}
@@ -49,29 +49,29 @@ Agent selection and configuration.
 <TypeTable
   type={{
     name: {
-      description: 'Agent implementation name.',
-      type: 'string',
+      description: "Agent implementation name.",
+      type: "string",
       required: true,
     },
     config: {
-      description: 'Path to the agent config file, relative to the sandbox root.',
-      type: 'string',
+      description: "Path to the agent config file, relative to the sandbox root.",
+      type: "string",
       default: '"agent/config.toml"',
     },
     bundlePaths: {
-      description: 'Paths to agent binaries to bundle into the deployment.',
-      type: 'string[]',
-      default: '[]',
+      description: "Paths to agent binaries to bundle into the deployment.",
+      type: "string[]",
+      default: "[]",
     },
     configPaths: {
-      description: 'Paths to agent config files to bundle.',
-      type: 'string[]',
-      default: '[]',
+      description: "Paths to agent config files to bundle.",
+      type: "string[]",
+      default: "[]",
     },
     tools: {
-      description: 'Tool IDs to install inside the sandbox at startup.',
-      type: 'string[]',
-      default: '[]',
+      description: "Tool IDs to install inside the sandbox at startup.",
+      type: "string[]",
+      default: "[]",
     },
   }}
 />
@@ -83,19 +83,20 @@ Controls sandbox lifecycle, resource allocation, and network access.
 <TypeTable
   type={{
     activeDuration: {
-      description: 'How long the sandbox stays alive after the last activity.',
-      type: 'number (seconds)',
-      default: '600',
+      description: "How long the sandbox stays alive after the last activity.",
+      type: "number (seconds)",
+      default: "600",
     },
     cronKeepAliveWindow: {
-      description: 'Time window before a cron job to keep the sandbox alive instead of snapshotting.',
-      type: 'number (seconds)',
-      default: '900',
+      description:
+        "Time window before a cron job to keep the sandbox alive instead of snapshotting.",
+      type: "number (seconds)",
+      default: "900",
     },
     cronWakeLeadTime: {
-      description: 'How early to wake the sandbox before a scheduled cron job.',
-      type: 'number (seconds)',
-      default: '60',
+      description: "How early to wake the sandbox before a scheduled cron job.",
+      type: "number (seconds)",
+      default: "60",
     },
   }}
 />
@@ -105,14 +106,14 @@ Controls sandbox lifecycle, resource allocation, and network access.
 <TypeTable
   type={{
     vcpus: {
-      description: 'Number of CPU cores allocated to the sandbox.',
-      type: 'number',
-      default: '2',
+      description: "Number of CPU cores allocated to the sandbox.",
+      type: "number",
+      default: "2",
     },
     memory: {
-      description: 'RAM in MB. If not set, calculated automatically as vcpus x 2048.',
-      type: 'number',
-      default: 'vcpus x 2048',
+      description: "RAM in MB. If not set, calculated automatically as vcpus x 2048.",
+      type: "number",
+      default: "vcpus x 2048",
     },
   }}
 />
@@ -144,23 +145,25 @@ All secrets are generated automatically during [`clawrun deploy`](/docs/cli/depl
 <TypeTable
   type={{
     cronSecret: {
-      description: 'Authenticates cron endpoint requests.',
-      type: 'string',
+      description: "Authenticates cron endpoint requests.",
+      type: "string",
       required: true,
     },
     jwtSecret: {
-      description: 'Signs and verifies JWT tokens for auth.',
-      type: 'string',
+      description: "Signs and verifies JWT tokens for auth.",
+      type: "string",
       required: true,
     },
     sandboxSecret: {
-      description: 'Authenticates sidecar heartbeat requests. Passed to the sandbox via the CLAWRUN_HB_SECRET environment variable.',
-      type: 'string',
+      description:
+        "Authenticates sidecar heartbeat requests. Passed to the sandbox via the CLAWRUN_HB_SECRET environment variable.",
+      type: "string",
       required: true,
     },
     webhookSecrets: {
-      description: 'Per-channel webhook secrets, keyed by channel ID (e.g., "telegram", "discord").',
-      type: 'Record<string, string>',
+      description:
+        'Per-channel webhook secrets, keyed by channel ID (e.g., "telegram", "discord").',
+      type: "Record<string, string>",
     },
   }}
 />
@@ -172,8 +175,8 @@ ClawRun uses Redis for persisting sandbox state across [sleep/wake cycles](/docs
 <TypeTable
   type={{
     redisUrl: {
-      description: 'Redis connection string for the state store.',
-      type: 'string',
+      description: "Redis connection string for the state store.",
+      type: "string",
       required: true,
     },
   }}

@@ -24,7 +24,21 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents, pre: ClickableCodeBlock, ProvidersTable, Mermaid, ArchitectureDiagram, PackageCommand, CronWakeDiagram, LifecycleDiagram, Steps, Step, TypeTable }} />
+        <MDX
+          components={{
+            ...defaultMdxComponents,
+            pre: ClickableCodeBlock,
+            ProvidersTable,
+            Mermaid,
+            ArchitectureDiagram,
+            PackageCommand,
+            CronWakeDiagram,
+            LifecycleDiagram,
+            Steps,
+            Step,
+            TypeTable,
+          }}
+        />
       </DocsBody>
     </DocsPage>
   );

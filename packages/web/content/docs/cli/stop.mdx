@@ -13,15 +13,15 @@ Stop the sandbox for an instance. A snapshot is taken before stopping so state i
 
 ## Arguments
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `instance` | Yes | The instance name |
+| Argument   | Required | Description       |
+| ---------- | -------- | ----------------- |
+| `instance` | Yes      | The instance name |
 
 ## Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--yes` | `-y` | Skip confirmation prompt |
+| Option  | Short | Description              |
+| ------- | ----- | ------------------------ |
+| `--yes` | `-y`  | Skip confirmation prompt |
 
 ## Behavior
 
@@ -33,11 +33,11 @@ On confirmation, it sends a POST to the instance's `/api/v1/sandbox/stop` endpoi
 
 ### Response
 
-| Status | Meaning |
-|--------|---------|
-| `stopped` (with sandbox ID) | Sandbox stopped and snapshot saved |
-| `stopped` (no sandbox ID) | No running sandbox to stop |
-| `failed` | Stop operation failed. Displays error and exits with code 1 |
+| Status                      | Meaning                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| `stopped` (with sandbox ID) | Sandbox stopped and snapshot saved                          |
+| `stopped` (no sandbox ID)   | No running sandbox to stop                                  |
+| `failed`                    | Stop operation failed. Displays error and exits with code 1 |
 
 The snapshot preserves the full sandbox filesystem state. The next `start`, `agent`, or incoming webhook will restore from this snapshot.
 

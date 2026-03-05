@@ -1,0 +1,56 @@
+---
+title: FAQ
+description: Frequently asked questions about ClawRun.
+---
+
+## General
+
+### What is ClawRun?
+
+ClawRun is an open-source hosting and lifecycle layer for AI agents. It deploys agents into isolated Firecracker microVMs and manages their full lifecycle: startup, keep-alive, snapshot/resume, and wake-on-message. ClawRun does not build its own agent. It hosts existing ones.
+
+### Is ClawRun free?
+
+Yes. ClawRun is open source under the [Apache 2.0 license](https://github.com/clawrun-sh/clawrun), free for both personal and commercial use. Infrastructure costs (Vercel, Redis, LLM API keys) depend on your own usage and provider choices.
+
+### Does ClawRun build its own AI agent?
+
+No. ClawRun is a hosting layer. [ZeroClaw](https://github.com/nichochar/zeroclaw) is the default agent, but the `Agent` interface is pluggable. You can use any agent that implements it.
+
+### What happens when my agent is idle?
+
+ClawRun monitors activity via [heartbeats](/docs/sandbox/sidecar#heartbeat). When no extend reason applies (no file changes, no active cron window, past the grace period), the sandbox is [snapshotted and stopped](/docs/sandbox/lifecycle#snapshot-and-stop). The next incoming message or scheduled event wakes it back up.
+
+### Is my agent's state preserved between sessions?
+
+Yes. The filesystem is [snapshotted on sleep and restored on wake](/docs/sandbox/snapshot-resume). Files, databases, configuration, and workspace state are all preserved. Running processes are restarted by the sidecar.
+
+## LLM providers
+
+### Which LLM providers are supported?
+
+ZeroClaw supports 46 LLM providers across several tiers: recommended (OpenRouter, Anthropic, OpenAI, DeepSeek, Gemini, and others), fast inference (Groq, Fireworks, Together AI), gateways (Vercel AI, Cloudflare AI, Amazon Bedrock), specialized (Kimi, Qwen, Moonshot, and more), and local (Ollama, LM Studio, llama.cpp). Configure your preferred provider during [`clawrun deploy`](/docs/cli/deploy).
+
+## Channels
+
+### Which messaging platforms are supported?
+
+ClawRun has 9 channel adapter directories: Telegram, Discord, Slack, WhatsApp, DingTalk, Lark, LinQ, Matrix, and QQ. Of these, 6 have full wake-hook support (Telegram, Discord, Slack, WhatsApp, Lark, QQ), meaning they can wake a sleeping sandbox when a message arrives.
+
+### Can I connect multiple channels at once?
+
+Yes. Each channel is independent. You can have the same agent responding on Telegram, Discord, and Slack simultaneously.
+
+## Infrastructure
+
+### What is a Firecracker microVM?
+
+[Firecracker](https://firecracker-microvm.github.io/) is a lightweight virtual machine monitor created by AWS. It creates microVMs that boot in milliseconds with minimal overhead. Vercel Sandbox uses Firecracker to provide isolated, ephemeral compute environments.
+
+### Can I use a provider other than Vercel?
+
+The [`SandboxProvider`](/docs/sandbox/providers) interface is pluggable. Vercel Sandbox is currently the only built-in provider. You can implement a custom provider for other runtimes by implementing the `SandboxProvider` and `ManagedSandbox` interfaces.
+
+### Where does state live?
+
+Orchestration state (sandbox metadata, locks, webhook registrations) lives in Redis, prefixed per instance. Agent state (files, databases, config) lives inside the sandbox filesystem and is preserved via [snapshots](/docs/sandbox/snapshot-resume).

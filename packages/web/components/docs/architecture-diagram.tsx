@@ -13,24 +13,12 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-function Node({
-  icon: Icon,
-  title,
-  desc,
-}: {
-  icon: LucideIcon;
-  title: string;
-  desc?: string;
-}) {
+function Node({ icon: Icon, title, desc }: { icon: LucideIcon; title: string; desc?: string }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-1.5 rounded-md border border-border/50 bg-background px-2 py-3 text-center">
       <Icon size={16} className="shrink-0 text-muted-foreground" />
       <div className="text-xs font-medium text-foreground">{title}</div>
-      {desc && (
-        <div className="text-[10px] leading-snug text-muted-foreground/70">
-          {desc}
-        </div>
-      )}
+      {desc && <div className="text-[10px] leading-snug text-muted-foreground/70">{desc}</div>}
     </div>
   );
 }
@@ -65,19 +53,10 @@ function Arrow({ label }: { label?: string }) {
   return (
     <div className="flex flex-col items-center py-1">
       <div className="h-4 w-px bg-border" />
-      <svg
-        width="8"
-        height="5"
-        viewBox="0 0 8 5"
-        className="-mt-px text-muted-foreground/50"
-      >
+      <svg width="8" height="5" viewBox="0 0 8 5" className="-mt-px text-muted-foreground/50">
         <path d="M0 0 L4 5 L8 0" fill="currentColor" />
       </svg>
-      {label && (
-        <div className="mt-1 text-[10px] text-muted-foreground/50">
-          {label}
-        </div>
-      )}
+      {label && <div className="mt-1 text-[10px] text-muted-foreground/50">{label}</div>}
     </div>
   );
 }

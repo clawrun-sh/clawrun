@@ -15,15 +15,15 @@ Chat with the agent running in an instance. Opens an interactive terminal UI by 
 
 ## Arguments
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `instance` | Yes | The instance name |
+| Argument   | Required | Description       |
+| ---------- | -------- | ----------------- |
+| `instance` | Yes      | The instance name |
 
 ## Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--message` | `-m` | Send a single message (non-interactive mode) |
+| Option      | Short | Description                                  |
+| ----------- | ----- | -------------------------------------------- |
+| `--message` | `-m`  | Send a single message (non-interactive mode) |
 
 ## Interactive mode
 
@@ -46,6 +46,7 @@ With `--message`, the command sends a POST to the instance's `/api/v1/chat` endp
 The request has a 150-second timeout. Authentication is handled via a locally-signed JWT included as a Bearer token.
 
 Exit codes:
+
 - `0` on success (message sent and response received)
 - `1` on error (agent unreachable, timeout, etc.)
 

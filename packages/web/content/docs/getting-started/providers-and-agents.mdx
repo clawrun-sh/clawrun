@@ -10,11 +10,11 @@ ClawRun acts as a translation layer between **agents** and **providers**. Both i
 
 ClawRun's `Agent` interface is pluggable. Implementations self-register via the agent registry.
 
-| Agent | Status | Description |
-|-------|--------|-------------|
-| [ZeroClaw](https://github.com/nichochar/zeroclaw) | Supported | Fully autonomous AI agent with tools, memory, and cron support |
-| OpenClaw | Coming soon | |
-| NanoClaw | Coming soon | |
+| Agent                                             | Status      | Description                                                    |
+| ------------------------------------------------- | ----------- | -------------------------------------------------------------- |
+| [ZeroClaw](https://github.com/nichochar/zeroclaw) | Supported   | Fully autonomous AI agent with tools, memory, and cron support |
+| OpenClaw                                          | Coming soon |                                                                |
+| NanoClaw                                          | Coming soon |                                                                |
 
 ## Providers
 
@@ -28,72 +28,72 @@ ZeroClaw supports 48 LLM providers out of the box. Select your provider and mode
 
 ### Recommended
 
-| Provider | ID |
-|----------|-----|
-| OpenRouter | `openrouter` |
-| Anthropic | `anthropic` |
-| OpenAI | `openai` |
-| OpenAI Codex | `openai-codex` |
-| Google Gemini | `gemini` |
-| DeepSeek | `deepseek` |
-| Mistral | `mistral` |
-| xAI / Grok | `xai` |
-| Perplexity | `perplexity` |
-| Venice AI | `venice` |
+| Provider      | ID             |
+| ------------- | -------------- |
+| OpenRouter    | `openrouter`   |
+| Anthropic     | `anthropic`    |
+| OpenAI        | `openai`       |
+| OpenAI Codex  | `openai-codex` |
+| Google Gemini | `gemini`       |
+| DeepSeek      | `deepseek`     |
+| Mistral       | `mistral`      |
+| xAI / Grok    | `xai`          |
+| Perplexity    | `perplexity`   |
+| Venice AI     | `venice`       |
 
 ### Fast inference
 
-| Provider | ID |
-|----------|-----|
-| Groq | `groq` |
-| Fireworks AI | `fireworks` |
-| Together AI | `together-ai` |
-| Novita AI | `novita` |
-| NVIDIA NIM | `nvidia` |
+| Provider     | ID            |
+| ------------ | ------------- |
+| Groq         | `groq`        |
+| Fireworks AI | `fireworks`   |
+| Together AI  | `together-ai` |
+| Novita AI    | `novita`      |
+| NVIDIA NIM   | `nvidia`      |
 
 ### Gateway / Proxy
 
-| Provider | ID |
-|----------|-----|
-| Vercel AI Gateway | `vercel` |
+| Provider              | ID           |
+| --------------------- | ------------ |
+| Vercel AI Gateway     | `vercel`     |
 | Cloudflare AI Gateway | `cloudflare` |
-| Amazon Bedrock | `bedrock` |
-| Astrai | `astrai` |
+| Amazon Bedrock        | `bedrock`    |
+| Astrai                | `astrai`     |
 
 ### Specialized
 
-| Provider | ID |
-|----------|-----|
-| Cohere | `cohere` |
-| Kimi Code | `kimi-code` |
-| Qwen Code | `qwen-code` |
-| Qwen (DashScope, China) | `qwen` |
-| Qwen (International) | `qwen-intl` |
-| Qwen (US) | `qwen-us` |
-| Qwen Coding Plan | `qwen-coding-plan` |
-| Moonshot (China) | `moonshot` |
-| Moonshot (International) | `moonshot-intl` |
-| GLM / Zhipu (International) | `glm` |
-| GLM / Zhipu (China) | `glm-cn` |
-| MiniMax (International) | `minimax` |
-| MiniMax (China) | `minimax-cn` |
-| Hunyuan / Tencent | `hunyuan` |
-| Qianfan / Baidu | `qianfan` |
-| Z.AI (Global) | `zai` |
-| Z.AI (China) | `zai-cn` |
-| Synthetic | `synthetic` |
-| OpenCode Zen | `opencode` |
+| Provider                    | ID                 |
+| --------------------------- | ------------------ |
+| Cohere                      | `cohere`           |
+| Kimi Code                   | `kimi-code`        |
+| Qwen Code                   | `qwen-code`        |
+| Qwen (DashScope, China)     | `qwen`             |
+| Qwen (International)        | `qwen-intl`        |
+| Qwen (US)                   | `qwen-us`          |
+| Qwen Coding Plan            | `qwen-coding-plan` |
+| Moonshot (China)            | `moonshot`         |
+| Moonshot (International)    | `moonshot-intl`    |
+| GLM / Zhipu (International) | `glm`              |
+| GLM / Zhipu (China)         | `glm-cn`           |
+| MiniMax (International)     | `minimax`          |
+| MiniMax (China)             | `minimax-cn`       |
+| Hunyuan / Tencent           | `hunyuan`          |
+| Qianfan / Baidu             | `qianfan`          |
+| Z.AI (Global)               | `zai`              |
+| Z.AI (China)                | `zai-cn`           |
+| Synthetic                   | `synthetic`        |
+| OpenCode Zen                | `opencode`         |
 
 ### Local / Private
 
-| Provider | ID |
-|----------|-----|
-| Ollama | `ollama` |
+| Provider  | ID         |
+| --------- | ---------- |
+| Ollama    | `ollama`   |
 | LM Studio | `lmstudio` |
 | llama.cpp | `llamacpp` |
-| SGLang | `sglang` |
-| vLLM | `vllm` |
-| Osaurus | `osaurus` |
+| SGLang    | `sglang`   |
+| vLLM      | `vllm`     |
+| Osaurus   | `osaurus`  |
 
 ## Messaging channels
 
@@ -103,36 +103,36 @@ ClawRun supports 15 messaging channels. Channels with wake-hook adapters can wak
 
 These channels can wake a sleeping sandbox when a message arrives:
 
-| Channel | ID |
-|---------|-----|
-| Telegram | `telegram` |
-| Discord | `discord` |
-| Slack | `slack` |
-| WhatsApp | `whatsapp` |
-| Lark / Feishu | `lark` |
-| QQ | `qq` |
+| Channel       | ID         |
+| ------------- | ---------- |
+| Telegram      | `telegram` |
+| Discord       | `discord`  |
+| Slack         | `slack`    |
+| WhatsApp      | `whatsapp` |
+| Lark / Feishu | `lark`     |
+| QQ            | `qq`       |
 
 ### Agent-side only
 
 These channels are configured in the agent but do not have wake-hook adapters yet:
 
-| Channel | ID |
-|---------|-----|
-| iMessage | `imessage` |
-| Matrix | `matrix` |
-| Signal | `signal` |
-| Linq | `linq` |
-| IRC | `irc` |
-| DingTalk | `dingtalk` |
-| Nostr | `nostr` |
-| Nextcloud Talk | `nextcloud_talk` |
-| Webhook (generic) | `webhook` |
+| Channel           | ID               |
+| ----------------- | ---------------- |
+| iMessage          | `imessage`       |
+| Matrix            | `matrix`         |
+| Signal            | `signal`         |
+| Linq              | `linq`           |
+| IRC               | `irc`            |
+| DingTalk          | `dingtalk`       |
+| Nostr             | `nostr`          |
+| Nextcloud Talk    | `nextcloud_talk` |
+| Webhook (generic) | `webhook`        |
 
 ## Tools
 
 Tools are installed inside the sandbox at startup. Select which tools to enable during [`clawrun deploy`](/docs/cli/deploy).
 
-| Tool | ID | Description |
-|------|-----|-------------|
+| Tool          | ID              | Description                                                |
+| ------------- | --------------- | ---------------------------------------------------------- |
 | Agent Browser | `agent-browser` | Headless Chromium browser for web browsing and screenshots |
-| GitHub CLI | `gh-cli` | GitHub CLI for managing repos, issues, and PRs |
+| GitHub CLI    | `gh-cli`        | GitHub CLI for managing repos, issues, and PRs             |

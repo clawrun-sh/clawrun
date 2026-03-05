@@ -44,9 +44,7 @@ export function Footer() {
     return (
       <footer className="border-t border-border">
         <div className="flex flex-col items-center justify-between gap-4 px-6 py-6 sm:flex-row">
-          <span className="text-xs text-dim">
-            &copy; {new Date().getFullYear()} ClawRun
-          </span>
+          <span className="text-xs text-dim">&copy; {new Date().getFullYear()} ClawRun</span>
           <div className="flex items-center gap-5">
             {docsFooterLinks.map((link) =>
               "external" in link && link.external ? (

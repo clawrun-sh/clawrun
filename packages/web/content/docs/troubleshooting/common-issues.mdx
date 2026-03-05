@@ -1,0 +1,52 @@
+---
+title: Common Issues
+description: Solutions for common problems when using ClawRun.
+---
+
+## Sandbox won't start
+
+**Symptom:** `clawrun start` returns an error or the sandbox stays stuck.
+
+**Possible causes:**
+
+- **Instance not deployed.** `clawrun start` requires a fully deployed instance. If you see "Instance is not fully deployed", run [`clawrun deploy`](/docs/cli/deploy) first. It handles all Vercel project creation, environment variables, and state store setup automatically.
+- **Creation lock held.** A previous start attempt may have left a lock in Redis. The lock auto-expires after 60 seconds. Wait and retry.
+- **Health check timeout.** The sidecar has 15 seconds to report a healthy daemon. If this fails, ClawRun reads the sidecar log from inside the sandbox and includes it in the error output. Check for agent startup issues in that output.
+
+## Agent daemon keeps crashing
+
+**Symptom:** The [sidecar](/docs/sandbox/sidecar#supervisor) reports repeated daemon restarts in heartbeats.
+
+**Possible causes:**
+
+- **Invalid API key.** The agent can't authenticate with the LLM provider. Verify your provider and API key. You can reconfigure them by redeploying with [`clawrun deploy`](/docs/cli/deploy).
+- **Missing binary.** The agent binary wasn't provisioned correctly. Run [`clawrun destroy`](/docs/cli/destroy) and redeploy.
+
+The sidecar allows up to 5 restarts before reporting `"failed"` status. The counter resets after 60 seconds of stable operation. Once failed, the [lifecycle manager stops the sandbox](/docs/sandbox/lifecycle#extend).
+
+## Webhook messages not arriving
+
+**Symptom:** Messages sent via Telegram, Discord, or Slack don't reach the agent.
+
+**Check:**
+
+1. The webhook URL is correct: `https://<your-deployed-url>/api/v1/webhook/<channel>`
+2. The webhook secret matches what's configured in ClawRun
+3. The deployed app is accessible (try visiting the URL in a browser)
+4. For local development, ensure ngrok is running and the URL is up to date
+
+## Sandbox snapshots failing
+
+**Symptom:** The sandbox stops but doesn't resume properly on wake.
+
+**Possible causes:**
+
+- **Redis unreachable.** The state store connection is down. Check that your `KV_URL` or `REDIS_URL` environment variables are set correctly in your Vercel project. These are provisioned automatically during [`clawrun deploy`](/docs/cli/deploy).
+- **Snapshot storage full.** Check your provider's storage limits. ClawRun keeps the 3 most recent snapshots and deletes older ones automatically.
+- **All snapshot retries failed.** Snapshots are retried up to 3 times. If all fail, the sandbox is kept running to preserve state. Check [`clawrun logs`](/docs/cli/logs) for details.
+
+## Slow sandbox wake
+
+**Symptom:** The agent takes several seconds to respond after being idle.
+
+This is expected. When the sandbox is sleeping, waking involves creating a new sandbox from the snapshot, starting the sidecar and agent daemon, and verifying health. The wake time depends on the sandbox provider.

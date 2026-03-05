@@ -62,11 +62,11 @@ The agent itself (ZeroClaw) brings its own tools: web search, code execution, fi
 
 ClawRun acts as a translation layer between agents and providers. Each concern is abstracted behind a pluggable interface:
 
-| Interface | What it abstracts | Today | Coming soon |
-|-----------|------------------|-------|-------------|
-| [`Agent`](/docs/getting-started/providers-and-agents#agents) | Agent provisioning, messaging, config | ZeroClaw | OpenClaw, NanoClaw |
-| [`SandboxProvider`](/docs/getting-started/providers-and-agents#providers) | Sandbox creation, snapshots, lifecycle | Vercel | Cloudflare, Fly.io, Netlify |
-| [`WakeHookAdapter`](/docs/getting-started/providers-and-agents#messaging-channels) | Webhook registration, verification, parsing | 6 channels | More planned |
+| Interface                                                                          | What it abstracts                           | Today      | Coming soon                 |
+| ---------------------------------------------------------------------------------- | ------------------------------------------- | ---------- | --------------------------- |
+| [`Agent`](/docs/getting-started/providers-and-agents#agents)                       | Agent provisioning, messaging, config       | ZeroClaw   | OpenClaw, NanoClaw          |
+| [`SandboxProvider`](/docs/getting-started/providers-and-agents#providers)          | Sandbox creation, snapshots, lifecycle      | Vercel     | Cloudflare, Fly.io, Netlify |
+| [`WakeHookAdapter`](/docs/getting-started/providers-and-agents#messaging-channels) | Webhook registration, verification, parsing | 6 channels | More planned                |
 
 Each implementation self-registers via a factory registry. Adding a new agent, provider, or channel means implementing an interface and calling `register()`. No core code changes required. Your agent code stays the same regardless of which provider runs the sandbox.
 
@@ -89,8 +89,24 @@ A built-in dead-man's switch ensures sandboxes can't run forever. If anything go
 ## Next steps
 
 <Cards>
-  <Card title="Quickstart" description="Deploy your first agent in under a minute" href="/docs/getting-started/quickstart" />
-  <Card title="Providers & Agents" description="See all supported agents, providers, LLM providers, and channels" href="/docs/getting-started/providers-and-agents" />
-  <Card title="CLI Reference" description="Full command reference for the clawrun CLI" href="/docs/cli" />
-  <Card title="Sandbox Lifecycle" description="How startup, keep-alive, snapshot, and wake work" href="/docs/sandbox/lifecycle" />
+  <Card
+    title="Quickstart"
+    description="Deploy your first agent in under a minute"
+    href="/docs/getting-started/quickstart"
+  />
+  <Card
+    title="Providers & Agents"
+    description="See all supported agents, providers, LLM providers, and channels"
+    href="/docs/getting-started/providers-and-agents"
+  />
+  <Card
+    title="CLI Reference"
+    description="Full command reference for the clawrun CLI"
+    href="/docs/cli"
+  />
+  <Card
+    title="Sandbox Lifecycle"
+    description="How startup, keep-alive, snapshot, and wake work"
+    href="/docs/sandbox/lifecycle"
+  />
 </Cards>

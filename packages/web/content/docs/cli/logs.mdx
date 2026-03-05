@@ -13,20 +13,20 @@ Stream runtime logs from the deployed instance. Logs are fetched from the platfo
 
 ## Arguments
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `instance` | Yes | The instance name |
+| Argument   | Required | Description       |
+| ---------- | -------- | ----------------- |
+| `instance` | Yes      | The instance name |
 
 ## Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--follow` | `-f` | Follow log output (stream live) |
-| `--limit` | `-n` | Number of log entries to show |
-| `--json` | `-j` | Output logs as JSON (useful for piping to `jq`) |
-| `--query` | `-q` | Filter logs by query string |
-| `--since` | | Show logs since a specific time (e.g., `1h`, `30m`, `2d`) |
-| `--level` | | Filter by log level (`error`, `warn`, `info`) |
+| Option     | Short | Description                                               |
+| ---------- | ----- | --------------------------------------------------------- |
+| `--follow` | `-f`  | Follow log output (stream live)                           |
+| `--limit`  | `-n`  | Number of log entries to show                             |
+| `--json`   | `-j`  | Output logs as JSON (useful for piping to `jq`)           |
+| `--query`  | `-q`  | Filter logs by query string                               |
+| `--since`  |       | Show logs since a specific time (e.g., `1h`, `30m`, `2d`) |
+| `--level`  |       | Filter by log level (`error`, `warn`, `info`)             |
 
 ## Behavior
 

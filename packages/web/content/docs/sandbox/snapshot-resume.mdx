@@ -39,7 +39,7 @@ When a wake event arrives:
 
 ClawRun uses `CountBasedRetention` to manage snapshots. The 3 most recent snapshots are kept and older ones are deleted automatically. This prevents unbounded snapshot storage growth.
 
-If all 3 snapshot attempts fail during shutdown, the sandbox is **not** stopped — it keeps running to preserve state rather than risk losing unsaved work.
+If all 3 snapshot attempts fail during shutdown, the sandbox is **not** stopped. It keeps running to preserve state rather than risk losing unsaved work.
 
 ## State store
 
@@ -50,6 +50,6 @@ Stored data includes:
 - Sandbox metadata (ID, status, snapshot reference)
 - Creation locks (acquired via `SET NX EX`, released via atomic Lua script to prevent race conditions)
 - Channel webhook registrations
-- `next_wake_at` — the next scheduled cron wake time, used to determine whether to wake the sandbox ahead of a cron job
+- `next_wake_at`, the next scheduled cron wake time, used to determine whether to wake the sandbox ahead of a cron job
 
 This separation ensures that orchestration state survives even if a snapshot is lost.

@@ -23,8 +23,7 @@ const themeConfig = {
       edgeLabelBackground: "#09090b",
       textColor: "#d4d4d4",
       fontSize: "14px",
-      fontFamily:
-        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     },
   },
   light: {
@@ -45,8 +44,7 @@ const themeConfig = {
       edgeLabelBackground: "#ffffff",
       textColor: "#262626",
       fontSize: "14px",
-      fontFamily:
-        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     },
   },
 };
@@ -65,8 +63,7 @@ export function Mermaid({ chart }: { chart: string }) {
   useEffect(() => {
     if (!ref.current || !mounted) return;
 
-    const config =
-      resolvedTheme === "light" ? themeConfig.light : themeConfig.dark;
+    const config = resolvedTheme === "light" ? themeConfig.light : themeConfig.dark;
 
     mermaid.initialize({
       startOnLoad: false,

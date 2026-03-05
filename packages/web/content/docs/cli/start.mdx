@@ -13,9 +13,9 @@ Start the sandbox for an instance. If the sandbox is already running, the comman
 
 ## Arguments
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `instance` | Yes | The instance name |
+| Argument   | Required | Description       |
+| ---------- | -------- | ----------------- |
+| `instance` | Yes      | The instance name |
 
 ## Behavior
 
@@ -23,10 +23,10 @@ Sends a POST to the instance's `/api/v1/sandbox/start` endpoint with an admin JW
 
 ### Response
 
-| Status | Meaning |
-|--------|---------|
-| `running` | Sandbox started successfully. Displays the sandbox ID |
-| `failed` | Sandbox failed to start. Displays the error message and exits with code 1 |
+| Status    | Meaning                                                                   |
+| --------- | ------------------------------------------------------------------------- |
+| `running` | Sandbox started successfully. Displays the sandbox ID                     |
+| `failed`  | Sandbox failed to start. Displays the error message and exits with code 1 |
 
 If the HTTP request itself fails (non-2xx status), the command prints the status code and response body.
 

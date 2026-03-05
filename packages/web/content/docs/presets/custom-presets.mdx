@@ -10,9 +10,9 @@ To create a custom preset, add a directory under `presets/` with a `preset.json`
 ```
 presets/my-preset/
 ├── preset.json
-├── SOUL.md          # optional — override the agent personality
-├── AGENTS.md        # optional — override operating instructions
-└── vercel.json      # optional — Vercel deployment config
+├── SOUL.md          # optional, overrides the agent personality
+├── AGENTS.md        # optional, overrides operating instructions
+└── vercel.json      # optional, Vercel deployment config
 ```
 
 ### preset.json
@@ -35,15 +35,27 @@ See [workspace file resolution](/docs/presets/overview#workspace-files) for the 
 
 ### Common files to override
 
-| File | What it controls |
-|------|-----------------|
-| `SOUL.md` | Agent personality, communication style, boundaries |
+| File        | What it controls                                      |
+| ----------- | ----------------------------------------------------- |
+| `SOUL.md`   | Agent personality, communication style, boundaries    |
 | `AGENTS.md` | Operating instructions, session startup, safety rules |
-| `TOOLS.md` | Tool reference and local notes |
+| `TOOLS.md`  | Tool reference and local notes                        |
 
 ## User overrides at deploy time
 
-When running `clawrun deploy`, you can point to a custom directory. Any `.md` files in that directory that match known template names will override both the base and preset layers. Unrelated `.md` files are ignored.
+You don't need a full preset to customize your agent. Pass any folder to `clawrun deploy` and include only the `.md` files you want to change:
+
+```
+my-agent/
+├── SOUL.md    # your custom personality
+└── TOOLS.md   # your SSH hosts, API endpoints, etc.
+```
+
+```bash
+clawrun deploy ./my-agent
+```
+
+ClawRun merges your files with the defaults. Your `SOUL.md` and `TOOLS.md` take priority, while `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, and the rest are filled in from the starter preset and base templates. Unrelated `.md` files in the folder are ignored.
 
 ## Using a custom agent
 

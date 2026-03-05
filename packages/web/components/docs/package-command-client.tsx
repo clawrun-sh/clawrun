@@ -11,11 +11,7 @@ import { ClickableCodeBlock } from "./code-block";
 
 const items = ["npm", "pnpm", "bun"] as const;
 
-export function PackageCommandTabs({
-  commands,
-}: {
-  commands: { code: ReactNode; raw: string }[];
-}) {
+export function PackageCommandTabs({ commands }: { commands: { code: ReactNode; raw: string }[] }) {
   return (
     <CodeBlockTabs
       groupId="pkg"

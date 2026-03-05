@@ -18,23 +18,23 @@ A sandbox moves through these states:
 When a new instance is deployed or a sleeping sandbox receives a message:
 
 1. ClawRun acquires a distributed creation lock (prevents duplicate sandboxes). The lock auto-expires after 60 seconds if not released.
-2. The provider creates a new sandbox, optionally from a snapshot. The native sandbox TTL is set to `activeDuration × 10` — a dead-man's switch that gives roughly 10 heartbeat cycles of runway before the provider kills the sandbox if heartbeats stop.
+2. The provider creates a new sandbox, optionally from a snapshot. The native sandbox TTL is set to `activeDuration × 10`, a dead-man's switch that gives roughly 10 heartbeat cycles of runway before the provider kills the sandbox if heartbeats stop.
 3. The agent binary and config are provisioned into the sandbox.
 4. The sidecar process is started.
-5. Health checks confirm the agent daemon is running — 15 retries at 1-second intervals against the [sidecar health server](/docs/sandbox/sidecar#health-server) on port 3001. If the daemon reports `"failed"` status, startup breaks early.
+5. Health checks confirm the agent daemon is running. The parent makes 15 retries at 1-second intervals against the [sidecar health server](/docs/sandbox/sidecar#health-server) on port 3001. If the daemon reports `"failed"` status, startup breaks early.
 6. Wake hooks from the previous sleep cycle are torn down (so incoming messages route to the running daemon, not the wake handler).
 
 ## Extend
 
 Every 60 seconds, the sidecar sends a heartbeat to the parent. The parent evaluates whether to extend the sandbox's native TTL. If the remaining TTL is below 5 minutes (roughly 5 heartbeat cycles of runway), the TTL is pushed forward by 3 minutes.
 
-If the daemon status in the heartbeat is `"failed"` (supervisor exhausted all restart attempts), the sandbox is stopped immediately — there's no point extending a sandbox with a dead agent.
+If the daemon status in the heartbeat is `"failed"` (supervisor exhausted all restart attempts), the sandbox is stopped immediately. There is no point extending a sandbox with a dead agent.
 
 Three reasons can trigger an extend:
 
-- **Grace period** — always extend while `now - sandboxCreatedAt < activeDuration`. Prevents premature idle-stop before the agent has had time to initialize.
-- **File activity** — extend if the agent recently modified files (idle time < `activeDuration`). The `lastChangedAt` field from the heartbeat drives this.
-- **Cron schedule** — extend if a cron job is due within the [`cronKeepAliveWindow`](/docs/getting-started/configuration#sandbox).
+- **Grace period.** Always extend while `now - sandboxCreatedAt < activeDuration`. Prevents premature idle-stop before the agent has had time to initialize.
+- **File activity.** Extend if the agent recently modified files (idle time < `activeDuration`). The `lastChangedAt` field from the heartbeat drives this.
+- **Cron schedule.** Extend if a cron job is due within the [`cronKeepAliveWindow`](/docs/getting-started/configuration#sandbox).
 
 If no reason applies, the sandbox proceeds to shutdown.
 
@@ -44,7 +44,7 @@ The `activeDuration`, `cronKeepAliveWindow`, and `cronWakeLeadTime` values are c
 
 When no extend reason applies:
 
-1. The provider creates a snapshot of the sandbox's filesystem state. This is retried up to 3 times with a 2-second delay between attempts. If all retries fail, the sandbox is **not** stopped — it keeps running to preserve state.
+1. The provider creates a snapshot of the sandbox's filesystem state. This is retried up to 3 times with a 2-second delay between attempts. If all retries fail, the sandbox is **not** stopped. It keeps running to preserve state.
 2. Wake hooks are registered for all configured channels (via `WakeHookAdapter`), so incoming messages trigger a wake.
 3. The sandbox is stopped.
 4. Old snapshots are cleaned up via `CountBasedRetention`, keeping the 3 most recent.

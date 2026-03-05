@@ -45,14 +45,15 @@ These settings in [`clawrun.json`](/docs/getting-started/configuration#sandbox) 
 <TypeTable
   type={{
     cronWakeLeadTime: {
-      description: 'How many seconds before a cron job to wake the sandbox.',
-      type: 'number (seconds)',
-      default: '60',
+      description: "How many seconds before a cron job to wake the sandbox.",
+      type: "number (seconds)",
+      default: "60",
     },
     cronKeepAliveWindow: {
-      description: 'If a cron job is due within this window, keep the sandbox alive instead of snapshotting.',
-      type: 'number (seconds)',
-      default: '900',
+      description:
+        "If a cron job is due within this window, keep the sandbox alive instead of snapshotting.",
+      type: "number (seconds)",
+      default: "900",
     },
   }}
 />

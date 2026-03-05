@@ -3,15 +3,7 @@
 import { Clock, Database, Camera, HeartPulse, Sun, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-function Step({
-  icon: Icon,
-  label,
-  sub,
-}: {
-  icon: LucideIcon;
-  label: string;
-  sub: string;
-}) {
+function Step({ icon: Icon, label, sub }: { icon: LucideIcon; label: string; sub: string }) {
   return (
     <div className="flex w-72 items-center gap-3 border border-border-strong bg-surface px-4 py-3 sm:w-96 sm:px-5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-primary/[0.06]">
@@ -21,9 +13,7 @@ function Step({
         <div className="text-[11px] font-medium uppercase tracking-wider text-heading sm:text-xs">
           {label}
         </div>
-        <div className="text-[10px] leading-tight text-dim sm:text-[11px]">
-          {sub}
-        </div>
+        <div className="text-[10px] leading-tight text-dim sm:text-[11px]">{sub}</div>
       </div>
     </div>
   );

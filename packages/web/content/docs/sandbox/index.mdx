@@ -3,13 +3,33 @@ title: Sandbox
 description: How ClawRun runs agents inside isolated Firecracker microVMs.
 ---
 
-import { RefreshCw, Camera, Shield, Layers } from 'lucide-react'
+import { RefreshCw, Camera, Shield, Layers } from "lucide-react";
 
-Each agent runs in its own sandbox — an isolated Firecracker microVM that stays alive as long as there's activity, snapshots when idle, and wakes on the next message.
+Each agent runs in its own sandbox, an isolated Firecracker microVM that stays alive as long as there's activity, snapshots when idle, and wakes on the next message.
 
 <Cards>
-  <Card icon={<RefreshCw />} title="Lifecycle" description="Startup, keep-alive, and shutdown" href="/docs/sandbox/lifecycle" />
-  <Card icon={<Camera />} title="Snapshot & Resume" description="State preservation across sleep/wake cycles" href="/docs/sandbox/snapshot-resume" />
-  <Card icon={<Shield />} title="Sidecar" description="The supervisor process inside each sandbox" href="/docs/sandbox/sidecar" />
-  <Card icon={<Layers />} title="Providers" description="Sandbox provider abstraction and the Vercel implementation" href="/docs/sandbox/providers" />
+  <Card
+    icon={<RefreshCw />}
+    title="Lifecycle"
+    description="Startup, keep-alive, and shutdown"
+    href="/docs/sandbox/lifecycle"
+  />
+  <Card
+    icon={<Camera />}
+    title="Snapshot & Resume"
+    description="State preservation across sleep/wake cycles"
+    href="/docs/sandbox/snapshot-resume"
+  />
+  <Card
+    icon={<Shield />}
+    title="Sidecar"
+    description="The supervisor process inside each sandbox"
+    href="/docs/sandbox/sidecar"
+  />
+  <Card
+    icon={<Layers />}
+    title="Providers"
+    description="Sandbox provider abstraction and the Vercel implementation"
+    href="/docs/sandbox/providers"
+  />
 </Cards>

@@ -11,13 +11,13 @@ ClawRun uses a pluggable `SandboxProvider` interface to abstract sandbox creatio
 
 Every provider implements:
 
-| Method | Description |
-|--------|-------------|
-| `create()` | Create a new sandbox, optionally from a snapshot |
-| `get()` | Get a sandbox by ID |
-| `list()` | List all sandboxes |
-| `listSnapshots()` | List available snapshots |
-| `deleteSnapshot()` | Delete a snapshot by ID |
+| Method             | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `create()`         | Create a new sandbox, optionally from a snapshot |
+| `get()`            | Get a sandbox by ID                              |
+| `list()`           | List all sandboxes                               |
+| `listSnapshots()`  | List available snapshots                         |
+| `deleteSnapshot()` | Delete a snapshot by ID                          |
 
 ## ManagedSandbox interface
 
@@ -25,25 +25,25 @@ Each sandbox returned by a provider is wrapped in a `ManagedSandbox` with method
 
 **Properties:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `id` | `string` | Sandbox identifier |
-| `status` | `string` | Current sandbox status |
-| `timeout` | `number` | Current timeout in ms (includes extensions) |
-| `createdAt` | `number` | Creation time (epoch ms) |
+| Property    | Type     | Description                                 |
+| ----------- | -------- | ------------------------------------------- |
+| `id`        | `string` | Sandbox identifier                          |
+| `status`    | `string` | Current sandbox status                      |
+| `timeout`   | `number` | Current timeout in ms (includes extensions) |
+| `createdAt` | `number` | Creation time (epoch ms)                    |
 
 **Methods:**
 
-| Method | Description |
-|--------|-------------|
-| `runCommand(cmd, args?)` | Execute a command inside the sandbox |
-| `writeFiles(files)` | Write files into the sandbox filesystem |
-| `readFile(path)` | Read a file from the sandbox (returns `null` if not found) |
-| `stop()` | Stop the sandbox |
-| `snapshot()` | Capture a filesystem snapshot, returns `{ id }` |
-| `extendTimeout(ms)` | Push the native TTL forward by `ms` milliseconds |
-| `updateNetworkPolicy(policy)` | Update the sandbox's network access rules |
-| `domain(port)` | Get the public domain for a given port |
+| Method                        | Description                                                |
+| ----------------------------- | ---------------------------------------------------------- |
+| `runCommand(cmd, args?)`      | Execute a command inside the sandbox                       |
+| `writeFiles(files)`           | Write files into the sandbox filesystem                    |
+| `readFile(path)`              | Read a file from the sandbox (returns `null` if not found) |
+| `stop()`                      | Stop the sandbox                                           |
+| `snapshot()`                  | Capture a filesystem snapshot, returns `{ id }`            |
+| `extendTimeout(ms)`           | Push the native TTL forward by `ms` milliseconds           |
+| `updateNetworkPolicy(policy)` | Update the sandbox's network access rules                  |
+| `domain(port)`                | Get the public domain for a given port                     |
 
 ## Vercel Sandbox (default)
 

@@ -11,10 +11,10 @@ The sidecar is a single Node.js process that runs inside the sandbox as a detach
 
 The sidecar starts its subsystems in a specific order:
 
-1. **Health server** — starts first on port 3001, since the parent begins polling immediately after launching the sidecar
-2. **Supervisor** — spawns the agent daemon and begins port probing
-3. **Heartbeat** — sends an immediate first tick, then continues every 60 seconds
-4. **Tools** — installs required tools in the background (non-blocking, fire-and-forget)
+1. **Health server.** Starts first on port 3001, since the parent begins polling immediately after launching the sidecar
+2. **Supervisor.** Spawns the agent daemon and begins port probing
+3. **Heartbeat.** Sends an immediate first tick, then continues every 60 seconds
+4. **Tools.** Installs required tools in the background (non-blocking, fire-and-forget)
 
 ## Supervisor
 
@@ -26,7 +26,7 @@ The supervisor spawns and monitors the agent daemon:
 - **Reports** daemon status in each heartbeat
 - **Shutdown** sends `SIGTERM` to the daemon and waits up to 5 seconds for graceful exit
 
-If the daemon hasn't started listening after 3 seconds, the supervisor logs a warning but continues probing — this is not a hard timeout.
+If the daemon hasn't started listening after 3 seconds, the supervisor logs a warning but continues probing. This is not a hard timeout.
 
 ## Heartbeat
 
@@ -82,7 +82,7 @@ The sidecar handles tool installation inside the sandbox at startup. When the ag
 
 - Installation is retried up to 3 times with a 5-second delay between attempts
 - `PATH` is augmented with `~/.local/bin` for tools installed to the user's local directory
-- Tool installation is non-blocking — if all attempts fail, the sidecar logs a warning and continues without the tool
+- Tool installation is non-blocking. If all attempts fail, the sidecar logs a warning and continues without the tool
 
 ## Configuration
 
