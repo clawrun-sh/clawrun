@@ -2,6 +2,7 @@ import { source } from "@/lib/source";
 import { DocsPage, DocsBody, DocsTitle, DocsDescription } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import { SquarePen, MessageCircle } from "lucide-react";
 import { ProvidersTable } from "@/components/docs/providers-table";
 import { Mermaid } from "@/components/docs/mermaid";
 import { ArchitectureDiagram } from "@/components/docs/architecture-diagram";
@@ -18,9 +19,36 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
   if (!page) notFound();
 
   const MDX = page.data.body;
+  const editUrl = `https://github.com/clawrun-sh/clawrun/blob/main/packages/website/content/docs/${page.path}`;
 
   return (
-    <DocsPage toc={page.data.toc}>
+    <DocsPage
+      toc={page.data.toc}
+      tableOfContent={{
+        footer: (
+          <div className="flex flex-col gap-2 border-t border-fd-border pt-3 mt-2">
+            <a
+              href={editUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 text-xs text-fd-muted-foreground hover:text-fd-foreground transition-colors"
+            >
+              <SquarePen className="size-3.5" />
+              Edit this page
+            </a>
+            <a
+              href="https://github.com/clawrun-sh/clawrun/discussions"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 text-xs text-fd-muted-foreground hover:text-fd-foreground transition-colors"
+            >
+              <MessageCircle className="size-3.5" />
+              Feedback
+            </a>
+          </div>
+        ),
+      }}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
@@ -53,8 +81,17 @@ export async function generateMetadata(props: { params: Promise<{ slug?: string[
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
+  const ogImage = `/docs-og/${page.slugs.join("/")}`;
+
   return {
     title: page.data.title,
     description: page.data.description,
+    openGraph: {
+      images: ogImage,
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: ogImage,
+    },
   };
 }

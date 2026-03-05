@@ -13,7 +13,16 @@ export const metadata: Metadata = {
     template: "%s | ClawRun",
   },
   description:
-    "Deploy and manage AI agents in secure sandboxes. ClawRun handles the full lifecycle — startup, keep-alive, snapshot/resume, and wake-on-message.",
+    "Deploy and manage AI agents in secure sandboxes. ClawRun handles the full lifecycle: startup, keep-alive, snapshot/resume, and wake-on-message.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "ClawRun",
     description:
@@ -21,12 +30,14 @@ export const metadata: Metadata = {
     url: "https://clawrun.sh",
     siteName: "ClawRun",
     type: "website",
+    images: "/og.png",
   },
   twitter: {
     card: "summary_large_image",
     title: "ClawRun",
     description:
       "Deploy and manage AI agents in secure sandboxes. One config to deploy across any cloud.",
+    images: "/og.png",
   },
 };
 

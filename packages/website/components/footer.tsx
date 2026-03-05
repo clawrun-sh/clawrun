@@ -7,7 +7,7 @@ import { Logo } from "@/components/logo";
 const footerLinks = {
   Product: [
     { href: "/docs", label: "Documentation" },
-    { href: "/docs", label: "Quickstart" },
+    { href: "/docs/getting-started/quickstart", label: "Quickstart" },
     { href: "#features", label: "Features" },
   ],
   Developers: [
@@ -16,8 +16,11 @@ const footerLinks = {
       label: "GitHub",
       external: true,
     },
-    { href: "/docs", label: "API Reference" },
-    { href: "/docs", label: "Examples" },
+    {
+      href: "https://github.com/clawrun-sh/clawrun/discussions",
+      label: "Discussions",
+      external: true,
+    },
   ],
   Community: [
     { href: "https://discord.gg/clawrun", label: "Discord", external: true },

@@ -23,7 +23,7 @@
     "format": "turbo run format",
     "test": "turbo run test",
     "clawrun": "node packages/cli/dist/cli.js",
-    "web:dev": "turbo run dev --filter @clawrun/website"
+    "website:dev": "turbo run dev --filter @clawrun/website"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.1.6",

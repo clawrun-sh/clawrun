@@ -158,7 +158,7 @@ export function Hero() {
         {/* CTAs */}
         <div className="flex flex-wrap items-center justify-center gap-4">
           <Link
-            href="/docs"
+            href="/docs/getting-started/quickstart"
             className="flex items-center gap-2 border border-primary bg-primary px-6 py-3 text-sm font-medium text-primary-foreground no-underline transition-all hover:brightness-110 active:brightness-90"
           >
             Get Started <ArrowRight size={16} aria-hidden="true" />

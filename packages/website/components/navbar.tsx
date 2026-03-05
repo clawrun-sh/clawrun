@@ -104,7 +104,7 @@ export function Navbar() {
             )}
           </button>
           <Link
-            href="/docs"
+            href="/docs/getting-started/quickstart"
             className="border border-primary bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground no-underline transition-all hover:brightness-110 active:brightness-90"
           >
             Get Started
