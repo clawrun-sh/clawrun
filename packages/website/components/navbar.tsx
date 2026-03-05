@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Sun, Moon } from "lucide-react";
+import { Menu, X, Sun, Moon, BookOpen, Rocket, Github, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { Logo } from "@/components/logo";
@@ -32,19 +32,49 @@ export function Navbar() {
             <Link href="/" className="text-lg font-bold text-heading no-underline">
               ClawRun
             </Link>
-            <span className="border border-primary px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-primary">
-              BETA
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
             <a
               href="https://github.com/clawrun-sh/clawrun"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-dim no-underline transition-colors hover:text-heading"
+              className="border border-primary px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-primary no-underline transition-colors hover:bg-primary/10"
+            >
+              BETA
+            </a>
+          </div>
+          <div className="flex items-center gap-5">
+            <Link
+              href="/docs"
+              className={`inline-flex items-center gap-1.5 text-sm no-underline transition-colors hover:text-heading ${pathname === "/docs" ? "text-heading" : "text-dim"}`}
+            >
+              <BookOpen size={14} aria-hidden="true" />
+              Docs
+            </Link>
+            <Link
+              href="/docs/getting-started/quickstart"
+              className={`inline-flex items-center gap-1.5 text-sm no-underline transition-colors hover:text-heading ${pathname?.startsWith("/docs/getting-started") ? "text-heading" : "text-dim"}`}
+            >
+              <Rocket size={14} aria-hidden="true" />
+              Quickstart
+            </Link>
+            <a
+              href="https://github.com/clawrun-sh/clawrun"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-dim no-underline transition-colors hover:text-heading"
               aria-label="GitHub (opens in new tab)"
             >
+              <Github size={14} aria-hidden="true" />
               GitHub
+            </a>
+            <a
+              href="https://discord.gg/Bm5P5Md2MY"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-dim no-underline transition-colors hover:text-heading"
+              aria-label="Discord (opens in new tab)"
+            >
+              <MessageCircle size={14} aria-hidden="true" />
+              Discord
             </a>
           </div>
         </div>
@@ -61,9 +91,14 @@ export function Navbar() {
           <Link href="/" className="text-lg font-bold text-heading no-underline">
             ClawRun
           </Link>
-          <span className="border border-primary px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-primary">
+          <a
+            href="https://github.com/clawrun-sh/clawrun"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border border-primary px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-primary no-underline transition-colors hover:bg-primary/10"
+          >
             BETA
-          </span>
+          </a>
         </div>
 
         {/* Desktop */}

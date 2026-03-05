@@ -136,12 +136,21 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-2xl text-center">
         {/* Version badge */}
-        <div className="mb-6 inline-flex items-center gap-2 border border-border px-3 py-1.5">
+        <a
+          href="https://github.com/clawrun-sh/clawrun"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-6 inline-flex items-center gap-2 border border-border px-3 py-1.5 no-underline transition-colors hover:bg-surface-hover"
+        >
           <div className="h-2 w-2 rounded-full bg-term-green shadow-[0_0_6px_#22c55e]" />
-          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-            v0.1.0 — Public Beta
+          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">v0.1.0</span>
+          <span className="text-[8px] text-muted-foreground/50" aria-hidden="true">
+            &#x2022;
           </span>
-        </div>
+          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
+            Public Beta
+          </span>
+        </a>
 
         {/* Headline */}
         <h1 className="mb-5 text-4xl font-bold leading-[1.05] tracking-tight text-heading md:text-6xl">
@@ -151,8 +160,8 @@ export function Hero() {
         </h1>
 
         <p className="mx-auto mb-8 max-w-xl text-base leading-relaxed text-dim md:text-lg">
-          One config to deploy secure, sandboxed AI agents across any cloud. Route to any LLM. Swap
-          frameworks without rewriting code.
+          Deploy and manage AI agents in seconds. One config to launch secure, sandboxed agents
+          across any cloud.
         </p>
 
         {/* CTAs */}

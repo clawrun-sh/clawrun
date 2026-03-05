@@ -1,0 +1,35 @@
+---
+title: Available Tools
+description: Tools currently supported by ClawRun for installation inside sandboxes.
+---
+
+import { TypeTable } from "fumadocs-ui/components/type-table";
+
+ClawRun currently ships two installable tools. Both are selected during [`clawrun deploy`](/docs/cli/deploy) and installed inside the sandbox by the [sidecar](/docs/sandbox/sidecar).
+
+| Tool                                       | Description                                                |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| [Agent Browser](/docs/tools/agent-browser) | Headless Chromium browser for web browsing and screenshots |
+| [GitHub CLI](/docs/tools/github-cli)       | GitHub CLI for managing repos, issues, and PRs             |
+
+## How installation works
+
+Tools are installed by the sidecar in the background after sandbox startup. This means tool installation does not block the agent from starting.
+
+1. The sidecar checks if the tool is already installed (versioned directory check at `~/.local/opt/{name}-v{version}/bin/{name}`)
+2. If not installed, it downloads the binary, extracts it, and symlinks it to `~/.local/bin`
+3. Failed installations retry up to 3 times with a 5-second delay between attempts
+4. If all retries fail, the sidecar logs the error and continues without the tool
+
+<TypeTable
+  type={{
+    "Max attempts": { type: "number", default: "3" },
+    "Retry delay": { type: "string", default: "5s" },
+    "Install path": { type: "string", default: "~/.local/bin" },
+    "Versioned path": { type: "string", default: "~/.local/opt/{name}-v{version}" },
+  }}
+/>
+
+## Network policy
+
+If your sandbox uses a restricted network policy, the deploy CLI will prompt you to add the tool's required domains to the allowlist. Without these domains, the tool cannot be downloaded.

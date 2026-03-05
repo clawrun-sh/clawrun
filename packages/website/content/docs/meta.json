@@ -1,4 +1,13 @@
 {
   "title": "Documentation",
-  "pages": ["index", "getting-started", "use-cases", "sandbox", "presets", "cli", "troubleshooting"]
+  "pages": [
+    "index",
+    "getting-started",
+    "use-cases",
+    "sandbox",
+    "presets",
+    "tools",
+    "cli",
+    "troubleshooting"
+  ]
 }

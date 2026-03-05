@@ -1,0 +1,30 @@
+---
+title: Agent Browser
+description: Headless Chromium browser for web browsing and screenshots inside the sandbox.
+---
+
+A headless Chromium browser for web browsing and screenshots. Uses the [agent-browser](https://github.com/vercel-labs/agent-browser) binary from Vercel Labs.
+
+| Property | Value                        |
+| -------- | ---------------------------- |
+| ID       | `agent-browser`              |
+| Version  | `0.16.3`                     |
+| Binary   | `~/.local/bin/agent-browser` |
+
+## Installation
+
+After the binary is downloaded from GitHub releases, it runs `agent-browser install --with-deps` to fetch Chromium and required system libraries.
+
+**Required network domains:**
+
+- `github.com`
+- `objects.githubusercontent.com`
+- `cdn.playwright.dev`
+- `storage.googleapis.com`
+- `cdn.amazonlinux.com`
+
+If your sandbox uses a restricted [network policy](/docs/getting-started/configuration), the deploy CLI will prompt you to add these domains to the allowlist.
+
+## ZeroClaw configuration
+
+For ZeroClaw, the browser tool is enabled via `[browser] enabled = true` in the agent's `config.toml`.

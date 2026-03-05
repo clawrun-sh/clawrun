@@ -1,0 +1,27 @@
+---
+title: Tools
+description: Additional binaries installed inside the sandbox to extend agent capabilities.
+---
+
+import { Wrench, Plus } from "lucide-react";
+
+Tools are standalone binaries that ClawRun installs inside the sandbox at startup. They give the agent access to capabilities like web browsing or GitHub integration that aren't part of the agent itself.
+
+This is separate from the agent's own built-in tools. For example, ZeroClaw ships with built-in abilities like reading files, running commands, and managing memory. Sandbox tools are additional binaries (like a headless browser or the GitHub CLI) that get downloaded and installed into the sandbox so the agent can use them.
+
+Tools are selected during `clawrun deploy` and stored in `clawrun.json`. The sidecar installs them in the background after the sandbox starts, with retry logic and version pinning.
+
+<Cards>
+  <Card
+    icon={<Wrench />}
+    title="Available Tools"
+    description="Tools currently supported by ClawRun"
+    href="/docs/tools/available-tools"
+  />
+  <Card
+    icon={<Plus />}
+    title="Adding Tools"
+    description="How to add a new tool to ClawRun"
+    href="/docs/tools/adding-tools"
+  />
+</Cards>

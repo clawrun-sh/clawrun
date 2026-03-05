@@ -9,7 +9,7 @@ import "./global.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://clawrun.sh"),
   title: {
-    default: "ClawRun",
+    default: "ClawRun - Deploy and manage AI agents in seconds",
     template: "%s | ClawRun",
   },
   description:

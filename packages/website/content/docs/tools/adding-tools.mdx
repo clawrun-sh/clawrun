@@ -1,0 +1,107 @@
+---
+title: Adding Tools
+description: How to add a new tool to ClawRun.
+---
+
+Adding a tool requires implementing the `Tool` interface from `@clawrun/agent` and registering it in the agent's `getAvailableTools()` method. Tools are code-level additions, not runtime-configurable.
+
+## The Tool interface
+
+Every tool implements this interface:
+
+```typescript
+interface Tool {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly version?: string;
+  readonly installDomains: string[];
+  readonly checkCommand: { cmd: string; args: string[] };
+  readonly installCommands: ToolInstallStep[];
+  isInstalled(sandbox: SandboxHandle): Promise<boolean>;
+  install(sandbox: SandboxHandle): Promise<void>;
+}
+```
+
+| Field             | Purpose                                                                        |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `id`              | Unique identifier stored in `clawrun.json`                                     |
+| `installDomains`  | Hostnames the tool needs during installation (for network policy allowlisting) |
+| `checkCommand`    | Command to verify the tool is installed (exit 0 = installed)                   |
+| `installCommands` | Sequential shell steps to download and install the binary                      |
+| `isInstalled()`   | Async check run against the sandbox before install                             |
+| `install()`       | Runs the install steps on the sandbox                                          |
+
+## Using the release helpers
+
+For tools distributed as GitHub releases, `@clawrun/agent` provides helpers that generate the install and check commands:
+
+```typescript
+import {
+  githubReleaseUrl,
+  releaseInstallSteps,
+  releaseCheckCommand,
+} from "@clawrun/agent/tools/installer";
+```
+
+- `githubReleaseUrl(repo, version, asset)` builds a download URL
+- `releaseInstallSteps(spec)` generates steps to download, extract, symlink, and clean up
+- `releaseCheckCommand(name, version)` generates a versioned directory check
+
+These handle `.tar.gz`, `.zip`, and raw binary assets. Binaries are placed in `~/.local/opt/{name}-v{version}/bin/` and symlinked to `~/.local/bin/`.
+
+## Example
+
+A minimal tool that installs a binary from a GitHub release:
+
+```typescript
+import type { Tool } from "@clawrun/agent";
+import {
+  githubReleaseUrl,
+  releaseInstallSteps,
+  releaseCheckCommand,
+} from "@clawrun/agent/tools/installer";
+
+const VERSION = "1.0.0";
+
+export class MyTool implements Tool {
+  readonly id = "my-tool";
+  readonly name = "My Tool";
+  readonly description = "Does something useful";
+  readonly version = VERSION;
+  readonly installDomains = ["github.com", "objects.githubusercontent.com"];
+  readonly checkCommand = releaseCheckCommand("my-tool", VERSION);
+  readonly installCommands = releaseInstallSteps({
+    downloadUrl: githubReleaseUrl("org/repo", VERSION, "my-tool-linux-x64.tar.gz"),
+    version: VERSION,
+    binaryPathInArchive: "my-tool",
+    binaryName: "my-tool",
+  });
+
+  async isInstalled(sandbox) {
+    const result = await sandbox.runCommand(this.checkCommand.cmd, this.checkCommand.args);
+    return result.exitCode === 0;
+  }
+
+  async install(sandbox) {
+    for (const step of this.installCommands) {
+      const result = await sandbox.runCommand(step.cmd, step.args);
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed: ${step.cmd} ${step.args.join(" ")}`);
+      }
+    }
+  }
+}
+```
+
+## Registering the tool
+
+Add the tool to your agent's `getAvailableTools()` method so the deploy CLI can present it as an option:
+
+```typescript
+getAvailableTools(): Tool[] {
+  return [new AgentBrowserTool(), new GhCliTool(), new MyTool()];
+}
+```
+
+Selected tools are stored as IDs in `clawrun.json` under `agent.tools`. At sandbox startup, only tools in this list are passed to the sidecar for installation.

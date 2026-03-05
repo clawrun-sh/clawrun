@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
   GitBranch,
   Terminal,
@@ -23,7 +24,7 @@ import { Logo } from "@/components/logo";
 import { cloudProviders } from "@/components/icons/cloud-providers";
 import { useIsMobile } from "@/lib/hooks";
 
-const AGENTS = ["OpenClaw", "ZeroClaw", "AutoGPT", "BabyAGI", "MetaGPT", "AgentSwarm"];
+const AGENTS = ["ZeroClaw", "OpenClaw", "NanoClaw"];
 const LLMS = ["OpenAI", "Anthropic", "Google", "Mistral", "Llama"];
 
 const FEATS = [
@@ -275,9 +276,10 @@ export function Architecture() {
         visible={visible}
         baseDelay={0}
       >
-        <div
+        <Link
+          href="/docs/getting-started/quickstart"
           className={cn(
-            "relative flex flex-col items-center border px-5 py-5 transition-all duration-500 sm:px-8 sm:py-6",
+            "relative flex flex-col items-center border px-5 py-5 no-underline transition-all duration-500 sm:px-8 sm:py-6",
             m ? "w-full max-w-[280px]" : "w-[420px]",
             hov === "c" ? "border-primary bg-primary/[0.04]" : "border-border-strong bg-surface",
           )}
@@ -306,7 +308,7 @@ export function Architecture() {
               </div>
             ))}
           </div>
-        </div>
+        </Link>
       </AnnotatedRow>
 
       <Connector height={ch} />
@@ -326,8 +328,9 @@ export function Architecture() {
         visible={visible}
         baseDelay={300}
       >
-        <div
-          className="relative overflow-hidden"
+        <Link
+          href="/docs/sandbox"
+          className="relative block overflow-hidden no-underline"
           style={{ width: m ? 240 : 420 }}
           onMouseEnter={() => setHov("s")}
           onMouseLeave={() => setHov(null)}
@@ -418,7 +421,7 @@ export function Architecture() {
               </span>
             </div>
           </div>
-        </div>
+        </Link>
       </AnnotatedRow>
 
       <Connector height={ch} />

@@ -87,7 +87,7 @@ export function Footer() {
               <span className="font-mono text-sm font-semibold text-heading">ClawRun</span>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Deploy and manage AI agents in secure sandboxes.
+              Deploy and manage AI agents in seconds.
             </p>
           </div>
 

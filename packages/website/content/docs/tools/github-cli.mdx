@@ -1,0 +1,24 @@
+---
+title: GitHub CLI
+description: GitHub CLI for managing repos, issues, and PRs from inside the sandbox.
+---
+
+The official [GitHub CLI](https://github.com/cli/cli) (`gh`) for managing repositories, issues, and pull requests from inside the sandbox.
+
+| Property | Value             |
+| -------- | ----------------- |
+| ID       | `gh-cli`          |
+| Version  | `2.65.0`          |
+| Binary   | `~/.local/bin/gh` |
+
+## Installation
+
+Downloaded directly from GitHub releases as a `.tar.gz` archive. No additional post-install steps required.
+
+**Required network domains:**
+
+- `github.com`
+- `objects.githubusercontent.com`
+- `api.github.com`
+
+If your sandbox uses a restricted [network policy](/docs/getting-started/configuration), the deploy CLI will prompt you to add these domains to the allowlist.
