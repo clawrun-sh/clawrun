@@ -1,0 +1,62 @@
+---
+title: Custom Presets
+description: Create your own preset with a different agent or provider.
+---
+
+## Creating a preset
+
+To create a custom preset, add a directory under `presets/` with a `preset.json` and any workspace `.md` files:
+
+```
+presets/my-preset/
+├── preset.json
+├── SOUL.md          # optional — override the agent personality
+├── AGENTS.md        # optional — override operating instructions
+└── vercel.json      # optional — Vercel deployment config
+```
+
+### preset.json
+
+```json
+{
+  "id": "my-preset",
+  "name": "My Custom Preset",
+  "agent": "zeroclaw",
+  "provider": "vercel",
+  "description": "A customized agent setup"
+}
+```
+
+## Customizing workspace files
+
+Any `.md` file in your preset directory overrides the matching base template from `@clawrun/agent`. For example, adding a `SOUL.md` replaces the default agent personality.
+
+See [workspace file resolution](/docs/presets/overview#workspace-files) for the full merge order.
+
+### Common files to override
+
+| File | What it controls |
+|------|-----------------|
+| `SOUL.md` | Agent personality, communication style, boundaries |
+| `AGENTS.md` | Operating instructions, session startup, safety rules |
+| `TOOLS.md` | Tool reference and local notes |
+
+## User overrides at deploy time
+
+When running `clawrun deploy`, you can point to a custom directory. Any `.md` files in that directory that match known template names will override both the base and preset layers. Unrelated `.md` files are ignored.
+
+## Using a custom agent
+
+To use a different agent implementation:
+
+1. Create a package implementing the `Agent` interface from `@clawrun/agent`
+2. Self-register it with the agent registry
+3. Reference it by name in your preset's `agent` field
+
+```json
+{
+  "agent": "my-agent"
+}
+```
+
+See the [Providers](/docs/sandbox/providers) page for how to use a different sandbox provider.

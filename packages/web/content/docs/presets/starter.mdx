@@ -1,0 +1,51 @@
+---
+title: Starter Preset
+description: The default ClawRun preset, pairing ZeroClaw with Vercel Sandbox.
+---
+
+## Overview
+
+The **Starter** preset is the default choice when deploying with ClawRun. It pairs the ZeroClaw agent with the Vercel Sandbox provider.
+
+## What's included
+
+```json
+{
+  "id": "starter",
+  "name": "Starter",
+  "agent": "zeroclaw",
+  "provider": "vercel",
+  "description": "An AI agent with full provider and channel support"
+}
+```
+
+### ZeroClaw agent
+
+[ZeroClaw](https://github.com/nichochar/zeroclaw) is a fully autonomous AI agent with:
+
+- **Built-in tools** including web search, code execution, file management, and browser
+- **Memory** backed by SQLite, Markdown, or no-memory backends
+- **Autonomy levels** configurable from supervised to fully autonomous
+- **Cron support** for scheduled tasks via native cron jobs
+
+### Vercel Sandbox provider
+
+Firecracker microVMs with sub-second cold start, filesystem snapshots, and configurable network policies.
+
+### Workspace files
+
+The starter preset includes three `.md` files that override the base templates:
+
+| File | Purpose |
+|------|---------|
+| `AGENTS.md` | Operating instructions — session startup routine, memory system, safety rules, tool usage |
+| `SOUL.md` | Agent personality — communication style, boundaries, continuity guidance |
+| `TOOLS.md` | Tool reference — local notes and built-in tool descriptions |
+
+These are merged with the [base templates](/docs/presets/overview#workspace-files) from `@clawrun/agent` (which provide `BOOTSTRAP.md`, `IDENTITY.md`, `USER.md`, and others). The preset's versions take priority when filenames overlap.
+
+## Channel support
+
+The starter preset supports all 9 channel adapters out of the box:
+
+Telegram, Discord, Slack, WhatsApp, DingTalk, Lark, LinQ, Matrix, QQ

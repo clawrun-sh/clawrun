@@ -1,0 +1,95 @@
+---
+title: Overview
+description: What presets are and how they work in ClawRun.
+---
+
+## What is a preset?
+
+A preset is a declarative configuration bundle that defines which agent and provider to use, along with any workspace files to seed into the deployed instance. Presets contain no code — just configuration and markdown files.
+
+A preset is a directory under `presets/` with a `preset.json` and optional `.md` files alongside it:
+
+```
+presets/starter/
+├── preset.json
+├── AGENTS.md
+├── SOUL.md
+├── TOOLS.md
+└── vercel.json
+```
+
+## Usage
+
+The `clawrun deploy` command accepts a preset name or a folder path as its first argument:
+
+Use a built-in preset by name:
+
+```bash
+clawrun deploy starter
+```
+
+Point to a custom folder — if it contains a `preset.json`, that preset is loaded. Any `.md` files in the folder that match known template names override the base and preset layers:
+
+```bash
+clawrun deploy ./my-agent
+```
+
+With no argument, the starter preset is used by default:
+
+```bash
+clawrun deploy
+```
+
+### Example: customizing a few files
+
+Say you want to give the agent a different personality and your own tool notes, but keep everything else from the starter preset. Create a folder with just the files you want to override:
+
+```
+my-agent/
+├── SOUL.md    # your custom personality
+└── TOOLS.md   # your SSH hosts, API endpoints, etc.
+```
+
+Then deploy with that folder:
+
+```bash
+clawrun deploy ./my-agent
+```
+
+ClawRun merges your files with the defaults. Your `SOUL.md` and `TOOLS.md` take priority, while `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, `USER.md`, and the rest are filled in automatically from the starter preset and base templates. You don't need to provide a full set of files — just the ones you want to change.
+
+If the folder also contains a `preset.json`, it's used as the preset instead of the default starter. Otherwise the starter preset is used and your folder only provides workspace file overrides. Unrelated `.md` files in the folder (like `README.md`) are ignored.
+
+## preset.json
+
+The core of every preset:
+
+```json
+{
+  "id": "starter",
+  "name": "Starter",
+  "agent": "zeroclaw",
+  "provider": "vercel",
+  "description": "An AI agent with full provider and channel support"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique identifier, matches the directory name |
+| `name` | Human-readable display name |
+| `agent` | Which agent implementation to use |
+| `provider` | Which sandbox provider to use |
+| `description` | Shown during `clawrun deploy` selection |
+
+## Workspace files
+
+Any `.md` files in the preset directory are seeded into the agent's workspace inside the sandbox. These are the agent's operating instructions, personality, and reference docs.
+
+Workspace files are resolved in three layers, where later layers override earlier ones:
+
+1. **Base templates** from `@clawrun/agent` — default files like `BOOTSTRAP.md`, `IDENTITY.md`, `USER.md`
+2. **Preset files** — `.md` files alongside `preset.json` (e.g., the starter preset overrides `AGENTS.md`, `SOUL.md`, and `TOOLS.md`)
+3. **User custom directory** — if provided during `clawrun deploy`, overrides any matching template by filename
+
+Only `.md` files with names matching known templates from layers 1 or 2 are picked up from the custom directory — unrelated files are ignored.
