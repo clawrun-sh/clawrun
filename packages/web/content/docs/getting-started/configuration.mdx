@@ -1,0 +1,182 @@
+---
+title: Configuration
+description: Configure your ClawRun instance with clawrun.json.
+icon: Settings
+---
+
+## clawrun.json
+
+Every ClawRun instance is configured through a `clawrun.json` file. This file is generated automatically by [`clawrun deploy`](/docs/cli/deploy) and bundled into the deployed app. You don't need to create it manually.
+
+The file lives at `~/.clawrun/<instance-name>/clawrun.json`.
+
+## instance
+
+Identity and deployment metadata for the instance.
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Instance identifier, used in the CLI and dashboard.',
+      type: 'string',
+      default: '"default"',
+    },
+    preset: {
+      description: 'The preset used to scaffold this instance.',
+      type: 'string',
+    },
+    provider: {
+      description: 'Sandbox provider.',
+      type: 'string',
+      required: true,
+    },
+    deployedUrl: {
+      description: 'Public URL of the deployed orchestrator app.',
+      type: 'string',
+    },
+    sandboxRoot: {
+      description: 'Root directory path inside the sandbox where agent files are mounted.',
+      type: 'string',
+      default: '".clawrun"',
+    },
+  }}
+/>
+
+## agent
+
+Agent selection and configuration.
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Agent implementation name.',
+      type: 'string',
+      required: true,
+    },
+    config: {
+      description: 'Path to the agent config file, relative to the sandbox root.',
+      type: 'string',
+      default: '"agent/config.toml"',
+    },
+    bundlePaths: {
+      description: 'Paths to agent binaries to bundle into the deployment.',
+      type: 'string[]',
+      default: '[]',
+    },
+    configPaths: {
+      description: 'Paths to agent config files to bundle.',
+      type: 'string[]',
+      default: '[]',
+    },
+    tools: {
+      description: 'Tool IDs to install inside the sandbox at startup.',
+      type: 'string[]',
+      default: '[]',
+    },
+  }}
+/>
+
+## sandbox
+
+Controls sandbox lifecycle, resource allocation, and network access.
+
+<TypeTable
+  type={{
+    activeDuration: {
+      description: 'How long the sandbox stays alive after the last activity.',
+      type: 'number (seconds)',
+      default: '600',
+    },
+    cronKeepAliveWindow: {
+      description: 'Time window before a cron job to keep the sandbox alive instead of snapshotting.',
+      type: 'number (seconds)',
+      default: '900',
+    },
+    cronWakeLeadTime: {
+      description: 'How early to wake the sandbox before a scheduled cron job.',
+      type: 'number (seconds)',
+      default: '60',
+    },
+  }}
+/>
+
+### resources
+
+<TypeTable
+  type={{
+    vcpus: {
+      description: 'Number of CPU cores allocated to the sandbox.',
+      type: 'number',
+      default: '2',
+    },
+    memory: {
+      description: 'RAM in MB. If not set, calculated automatically as vcpus x 2048.',
+      type: 'number',
+      default: 'vcpus x 2048',
+    },
+  }}
+/>
+
+### networkPolicy
+
+Controls what the agent can access from inside the sandbox. Three modes are supported:
+
+- **`"allow-all"`** Unrestricted network access (default).
+- **`"deny-all"`** No outbound network access.
+- **Restricted.** Allowlist specific domains and subnets:
+
+```json
+{
+  "allow": ["api.openai.com", "api.anthropic.com"],
+  "subnets": {
+    "allow": ["192.168.0.0/16"],
+    "deny": ["10.0.0.0/8"]
+  }
+}
+```
+
+When using restricted mode, `clawrun deploy` automatically adds required domains based on your LLM provider, messaging channels, and selected tools.
+
+## secrets
+
+All secrets are generated automatically during [`clawrun deploy`](/docs/cli/deploy) and deployed as environment variables. They are stripped from the bundled `clawrun.json` and never committed to source control.
+
+<TypeTable
+  type={{
+    cronSecret: {
+      description: 'Authenticates cron endpoint requests.',
+      type: 'string',
+      required: true,
+    },
+    jwtSecret: {
+      description: 'Signs and verifies JWT tokens for auth.',
+      type: 'string',
+      required: true,
+    },
+    sandboxSecret: {
+      description: 'Authenticates sidecar heartbeat requests. Passed to the sandbox via the CLAWRUN_HB_SECRET environment variable.',
+      type: 'string',
+      required: true,
+    },
+    webhookSecrets: {
+      description: 'Per-channel webhook secrets, keyed by channel ID (e.g., "telegram", "discord").',
+      type: 'Record<string, string>',
+    },
+  }}
+/>
+
+## state
+
+ClawRun uses Redis for persisting sandbox state across [sleep/wake cycles](/docs/sandbox/snapshot-resume).
+
+<TypeTable
+  type={{
+    redisUrl: {
+      description: 'Redis connection string for the state store.',
+      type: 'string',
+      required: true,
+    },
+  }}
+/>
+
+During deploy, the CLI provisions an Upstash KV store or connects to an existing one.

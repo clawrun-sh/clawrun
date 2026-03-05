@@ -1,0 +1,85 @@
+---
+title: Quickstart
+description: Deploy your first AI agent with ClawRun in under a minute.
+icon: Rocket
+---
+
+## Prerequisites
+
+- Node.js 20 or later
+- A [Vercel](https://vercel.com) account (for sandbox hosting)
+- An LLM API key ([OpenRouter](https://openrouter.ai), [Anthropic](https://console.anthropic.com), [OpenAI](https://platform.openai.com), [Google](https://aistudio.google.com), [Groq](https://console.groq.com), [Mistral](https://console.mistral.ai), or [DeepSeek](https://platform.deepseek.com))
+
+## Deploy your first agent
+
+<Steps>
+<Step>
+### Install the CLI
+
+<PackageCommand cmd="npm install -g clawrun" />
+</Step>
+
+<Step>
+### Run the deploy command
+
+```bash
+clawrun deploy
+```
+
+The interactive wizard will walk you through:
+
+- **LLM provider.** Select your provider and enter your API key.
+- **Channels.** Enable messaging channels (Telegram, Discord, Slack, WhatsApp, and more).
+- **Tools.** Choose which tools to install inside the sandbox.
+- **Network policy.** Unrestricted or restricted (allowlist specific domains).
+- **State store.** Connect an existing Redis/Upstash store or provision a new one.
+
+ClawRun then scaffolds a Next.js orchestrator app, deploys it to Vercel, creates the first sandbox, and starts your agent.
+</Step>
+
+<Step>
+### Chat with your agent
+
+Once deployed, the CLI automatically opens an interactive chat session. You can also send a one-off message anytime:
+
+```bash
+clawrun agent my-instance -m "What can you do?"
+```
+
+Or start an interactive session:
+
+```bash
+clawrun agent my-instance
+```
+</Step>
+
+<Step>
+### Open the web dashboard
+
+Every instance comes with a web-based chat interface. Open it with:
+
+```bash
+clawrun web my-instance
+```
+
+This generates a short-lived auth link and opens it in your browser.
+</Step>
+</Steps>
+
+## What just happened?
+
+Behind the scenes, `clawrun deploy` did the following:
+
+1. **Scaffolded an orchestrator.** A Next.js app with API handlers for webhooks, chat, sandbox lifecycle, and cron-based wake.
+2. **Deployed to Vercel.** The orchestrator runs as serverless functions on Vercel.
+3. **Created a Firecracker microVM.** A [Vercel Sandbox](/docs/sandbox/providers) with your configured network policy.
+4. **Provisioned the agent.** Installed [ZeroClaw](/docs/getting-started/providers-and-agents) and your selected tools inside the sandbox.
+5. **Started the sidecar.** A supervisor process inside the sandbox that manages the agent daemon, reports heartbeats, and exposes a health endpoint.
+
+The sandbox stays alive as long as there's activity. When idle, it [snapshots and sleeps](/docs/sandbox/snapshot-resume). The next message or scheduled task wakes it back up.
+
+## Next steps
+
+- [Configuration](/docs/getting-started/configuration). Customize sandbox duration, network policy, and more.
+- [Providers & Agents](/docs/getting-started/providers-and-agents). Understand the pluggable architecture.
+- [CLI reference](/docs/cli/deploy). Full deploy command options.

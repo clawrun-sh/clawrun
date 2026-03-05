@@ -7,6 +7,8 @@ import { Mermaid } from "@/components/docs/mermaid";
 import { ArchitectureDiagram } from "@/components/docs/architecture-diagram";
 import { PackageCommand } from "@/components/docs/package-command";
 import { ClickableCodeBlock } from "@/components/docs/code-block";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { TypeTable } from "fumadocs-ui/components/type-table";
 
 export default async function Page(props: { params: Promise<{ slug?: string[] }> }) {
   const params = await props.params;
@@ -20,7 +22,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents, pre: ClickableCodeBlock, ProvidersTable, Mermaid, ArchitectureDiagram, PackageCommand }} />
+        <MDX components={{ ...defaultMdxComponents, pre: ClickableCodeBlock, ProvidersTable, Mermaid, ArchitectureDiagram, PackageCommand, Steps, Step, TypeTable }} />
       </DocsBody>
     </DocsPage>
   );

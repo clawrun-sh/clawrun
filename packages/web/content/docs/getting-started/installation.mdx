@@ -1,0 +1,42 @@
+---
+title: Installation
+description: System requirements, package managers, and environment setup for working with ClawRun.
+icon: Download
+---
+
+## System requirements
+
+- **Node.js** 20 or later
+- A [Vercel](https://vercel.com) account (for sandbox hosting)
+
+The Vercel CLI is required for deployment but will be installed automatically by `clawrun deploy` if it's not already on your system.
+
+## Install the CLI
+
+<PackageCommand cmd="npm install -g clawrun" />
+
+Verify the installation:
+
+```bash
+clawrun --version
+```
+
+## Instance directory
+
+ClawRun stores all instance data under `~/.clawrun/`. Each instance gets its own subdirectory with agent configuration, secrets, and deploy artifacts.
+
+You can override the default location by setting the `CLAWRUN_HOME` environment variable:
+
+```bash
+export CLAWRUN_HOME=/path/to/custom/dir
+```
+
+## Updating
+
+To update to the latest version:
+
+<PackageCommand cmd="npm install -g clawrun@latest" />
+
+## Next steps
+
+Once installed, head to the [Quickstart](/docs/getting-started/quickstart) to deploy your first agent.

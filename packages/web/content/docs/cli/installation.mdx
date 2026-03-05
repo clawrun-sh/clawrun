@@ -9,23 +9,11 @@ description: System requirements, package managers, and environment setup for th
 
 The [`deploy`](/docs/cli/deploy) command will also check for the [Vercel CLI](https://vercel.com/docs/cli) and attempt to install it automatically if missing. If you prefer to install it manually:
 
-```bash
-npm install -g vercel
-```
+<PackageCommand cmd="npm install -g vercel" />
 
 ## Package managers
 
-npm:
-
-```bash
-npm install -g clawrun
-```
-
-pnpm:
-
-```bash
-pnpm add -g clawrun
-```
+<PackageCommand cmd="npm install -g clawrun" />
 
 Verify the installation:
 
@@ -43,6 +31,4 @@ export CLAWRUN_HOME=/path/to/custom/dir
 
 ## Updating
 
-```bash
-npm update -g clawrun
-```
+<PackageCommand cmd="npm install -g clawrun@latest" />
