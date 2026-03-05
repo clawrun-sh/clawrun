@@ -1,37 +1,98 @@
 ---
 title: Introduction
-description: ClawRun is a hosting and lifecycle layer for open-source AI agents. Deploy into secure sandboxes with one command.
+description: ClawRun is an open-source hosting and lifecycle layer for AI agents. Deploy any agent into secure sandboxes with one command.
+icon: BookOpen
 ---
+
+## Why ClawRun?
+
+AI agents can browse the web, write code, execute shell commands, and manage files. That power is exactly why you can't just hand them the keys to your server. They need to run in an isolated environment where you control what they can access, which domains they can reach, and what secrets they can see.
+
+At the same time, agents need infrastructure that most teams don't want to build: persistent sandboxes, lifecycle management, snapshot/resume across sleep cycles, webhook routing from messaging channels, and secret segregation between the orchestrator and the agent. Building all of that yourself is weeks of work before your agent does anything useful.
+
+ClawRun handles both problems. It gives every agent its own secure, isolated sandbox with configurable network policies, and manages the full lifecycle around it. You bring the agent. ClawRun gives it a secure home.
 
 ## What is ClawRun?
 
-ClawRun is a hosting and lifecycle layer for open-source AI agents. It deploys agents into secure Firecracker microVMs and manages their full lifecycle:
+ClawRun is an open-source hosting and lifecycle layer for AI agents. Think of it as a **translation layer** between any agent and any cloud provider. It deploys agents into isolated [Firecracker microVMs](https://firecracker-microvm.github.io/) and manages their full [lifecycle](/docs/sandbox/lifecycle): startup, keep-alive, [snapshot/resume](/docs/sandbox/snapshot-resume), and wake-on-message.
 
-- **Startup**: provision a sandbox, install the agent, start the daemon
-- **Keep-alive**: heartbeat monitoring, TTL extension based on activity
-- **Snapshot/Resume**: automatic snapshotting on idle, instant resume on new messages
-- **Wake-on-message**: webhook-driven wake from any connected channel
+**ClawRun is not an agent.** It hosts agents. [ZeroClaw](https://github.com/nichochar/zeroclaw) is the default today, with [OpenClaw and NanoClaw](/docs/getting-started/providers-and-agents) coming soon. The `Agent` interface is fully pluggable, so you can swap in your own agent without changing any infrastructure code.
 
-ClawRun does not build its own agent. It hosts existing ones. [ZeroClaw](https://github.com/nichochar/zeroclaw) is the default agent; the pluggable `Agent` interface makes it easy to swap in your own.
+**ClawRun is not locked to a provider.** Vercel is the default provider today. [Cloudflare, Fly.io, and Netlify](/docs/getting-started/providers-and-agents) are on the roadmap. The `SandboxProvider` interface means your agent code stays the same regardless of where it runs.
 
 ## How it works
 
-ClawRun follows a **persistent sandbox** model. The agent daemon runs continuously inside a sandbox. ClawRun manages the sandbox lifecycle around it, extending TTL when active, snapshotting when idle, and waking on incoming messages.
+<ArchitectureDiagram />
 
-The agent runs **inside** the sandbox, not in the serverless function. The function is the orchestrator. The sandbox is where the agent lives.
+1. A message arrives via webhook ([Telegram, Discord, Slack](/docs/getting-started/providers-and-agents#messaging-channels), or any of the 6 wake-hook-enabled channels)
+2. If the sandbox is sleeping, ClawRun [wakes it from the latest snapshot](/docs/sandbox/snapshot-resume)
+3. The message is forwarded to the agent daemon running inside the sandbox
+4. The agent processes the message, using its built-in tools as needed
+5. When idle, ClawRun snapshots the filesystem and puts the sandbox to sleep
+6. The next message (or cron schedule) wakes it right back up
 
-## Key Concepts
+The agent runs **inside** the sandbox. The orchestrator runs **outside**. This separation means agent code never touches your secrets, admin endpoints, or infrastructure. And because ClawRun sits between the agent and the provider, you can switch either side independently. Move from ZeroClaw to OpenClaw, or from Vercel to Cloudflare, without rewriting your setup.
 
-| Concept | Description |
-|---------|-------------|
-| **Agent** | The AI agent running inside the sandbox (e.g., ZeroClaw) |
-| **Sandbox** | An isolated microVM managed by a provider (e.g., Vercel Sandbox) |
-| **Sidecar** | A supervisor process inside the sandbox that manages the agent daemon |
-| **Channel** | A messaging platform connected via webhooks (Telegram, Discord, Slack, etc.) |
-| **Preset** | A declarative configuration bundle (agent + provider + defaults) |
+## Core principles
+
+### Security by default
+
+Every agent runs in its own [Firecracker microVM](https://firecracker-microvm.github.io/) with hardware-level isolation. You define the firewall rules: allow all network access, allowlist specific domains the agent can reach, or block specific subnets. This is configured per-instance during [`clawrun deploy`](/docs/cli/deploy), so each agent gets exactly the network access it needs and nothing more.
+
+Secrets are segregated by role. The agent only receives a sandbox-scoped secret for heartbeats. It never sees the JWT signing key, admin tokens, or webhook secrets. Webhook verification uses constant-time comparison to prevent timing attacks.
+
+### One command to deploy
+
+```bash
+npm install -g clawrun && clawrun deploy
+```
+
+The [CLI](/docs/cli) walks you through everything: picking a [preset](/docs/presets), choosing your [LLM provider](/docs/getting-started/providers-and-agents#llm-providers), connecting [channels](/docs/getting-started/providers-and-agents#messaging-channels), configuring network policy. It scaffolds the app, provisions the sandbox, starts the agent, and opens a chat session. The whole flow takes under a minute.
+
+For CI or scripting, [`clawrun deploy --yes`](/docs/cli/deploy) runs fully non-interactive with sensible defaults.
+
+### Tools out of the box
+
+ClawRun ships with tools that are automatically provisioned inside the sandbox at startup:
+
+- **Browser**: headless Chromium for web browsing and scraping
+- **GitHub CLI**: `gh` for repo, issue, and PR management
+
+The agent itself (ZeroClaw) brings its own tools: web search, code execution, file management, and more. Tools are installed inside the sandbox, not in the build step, so they don't affect your deployment size.
+
+### No lock-in
+
+ClawRun acts as a translation layer between agents and providers. Each concern is abstracted behind a pluggable interface:
+
+| Interface | What it abstracts | Today | Coming soon |
+|-----------|------------------|-------|-------------|
+| [`Agent`](/docs/getting-started/providers-and-agents#agents) | Agent provisioning, messaging, config | ZeroClaw | OpenClaw, NanoClaw |
+| [`SandboxProvider`](/docs/getting-started/providers-and-agents#providers) | Sandbox creation, snapshots, lifecycle | Vercel | Cloudflare, Fly.io, Netlify |
+| [`WakeHookAdapter`](/docs/getting-started/providers-and-agents#messaging-channels) | Webhook registration, verification, parsing | 6 channels | More planned |
+
+Each implementation self-registers via a factory registry. Adding a new agent, provider, or channel means implementing an interface and calling `register()`. No core code changes required. Your agent code stays the same regardless of which provider runs the sandbox.
+
+### State that survives
+
+Agent state is preserved across sleep/wake cycles via [filesystem snapshots](/docs/sandbox/snapshot-resume). Files, databases, conversation history, installed packages: everything is captured when the sandbox sleeps and restored when it wakes.
+
+Orchestration state (sandbox metadata, locks, webhook registrations) lives in Redis, isolated per-instance with key prefixes. If a snapshot is lost, the orchestrator still knows what happened.
+
+### Smart lifecycle management
+
+ClawRun doesn't just start and stop sandboxes. It actively manages their [TTL based on three signals](/docs/sandbox/lifecycle):
+
+- **Grace period**: keep the sandbox alive for the first few minutes after boot
+- **File activity**: extend if the agent is actively modifying files
+- **Cron schedule**: wake before scheduled jobs and keep alive through the window
+
+A built-in dead-man's switch ensures sandboxes can't run forever. If anything goes wrong, the sandbox shuts itself down. Read more about the [sidecar architecture](/docs/sandbox/sidecar) that makes this possible.
 
 ## Next steps
 
-- [Quickstart](/docs/getting-started/quickstart): deploy your first agent in under a minute
-- [CLI Installation](/docs/cli/installation): install the `clawrun` CLI
-- [Use Cases](/docs/use-cases/telegram-bot): connect your agent to Telegram, Discord, or Slack
+<Cards>
+  <Card title="Quickstart" description="Deploy your first agent in under a minute" href="/docs/getting-started/quickstart" />
+  <Card title="Providers & Agents" description="See all supported agents, providers, LLM providers, and channels" href="/docs/getting-started/providers-and-agents" />
+  <Card title="CLI Reference" description="Full command reference for the clawrun CLI" href="/docs/cli" />
+  <Card title="Sandbox Lifecycle" description="How startup, keep-alive, snapshot, and wake work" href="/docs/sandbox/lifecycle" />
+</Cards>

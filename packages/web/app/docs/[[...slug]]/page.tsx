@@ -2,6 +2,9 @@ import { source } from "@/lib/source";
 import { DocsPage, DocsBody, DocsTitle, DocsDescription } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import { ProvidersTable } from "@/components/docs/providers-table";
+import { Mermaid } from "@/components/docs/mermaid";
+import { ArchitectureDiagram } from "@/components/docs/architecture-diagram";
 
 export default async function Page(props: { params: Promise<{ slug?: string[] }> }) {
   const params = await props.params;
@@ -15,7 +18,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents }} />
+        <MDX components={{ ...defaultMdxComponents, ProvidersTable, Mermaid, ArchitectureDiagram }} />
       </DocsBody>
     </DocsPage>
   );
