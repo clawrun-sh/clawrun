@@ -1,0 +1,89 @@
+---
+title: Scheduled Agents
+description: Run AI agents on a schedule with cron-based wake.
+icon: Clock
+---
+
+## Overview
+
+Many agents support scheduled tasks like checking email, syncing data, running reports, or posting updates. The agent is responsible for defining and running these tasks. ClawRun is responsible for making sure the sandbox is awake when they need to run.
+
+## How it works
+
+Scheduling in ClawRun is a collaboration between the agent and the platform.
+
+**The agent owns the schedule.** It defines cron jobs in its own configuration (e.g. ZeroClaw uses its built-in cron system). ClawRun never creates or modifies scheduled tasks. It only reads them.
+
+**ClawRun owns the lifecycle.** While the sandbox is running, ClawRun periodically asks the agent for its cron schedule. It stores the next upcoming run time in the state store (Redis). When the sandbox is sleeping, a periodic heartbeat checks whether a cron job is due soon and wakes the sandbox in time.
+
+### The wake cycle
+
+<CronWakeDiagram />
+
+### Cron discovery
+
+While the sandbox is running, ClawRun calls the agent's cron listing command (e.g. `zeroclaw cron list`) every heartbeat cycle (60 seconds). The agent returns its scheduled jobs with their next run times. ClawRun persists the earliest upcoming time to the state store so it survives sleep/wake cycles.
+
+If the agent has no cron jobs, nothing is stored and the sandbox will only wake on incoming messages or manual start.
+
+### Wake timing
+
+The heartbeat endpoint runs on a schedule configured during deploy. On each tick, it checks whether a cron job is due within the **lead time** (default 60 seconds). If so, it wakes the sandbox from its last snapshot, giving the agent time to boot before the job fires.
+
+On paid Vercel plans, the heartbeat runs every minute for precise scheduling. On hobby plans, it runs daily, so cron timing is less granular.
+
+### Keep-alive window
+
+When the sandbox is already running and a cron job is approaching, ClawRun keeps the sandbox alive instead of snapshotting it. The **keep-alive window** (default 15 minutes) prevents unnecessary sleep/wake cycles when a job is imminent.
+
+For example, if a cron job runs at 9:00 AM and the sandbox is still active at 8:50 AM, ClawRun will hold it awake through the job rather than snapshotting and immediately waking again.
+
+## Configuration
+
+These settings in [`clawrun.json`](/docs/getting-started/configuration#sandbox) control the wake behavior:
+
+<TypeTable
+  type={{
+    cronWakeLeadTime: {
+      description: 'How many seconds before a cron job to wake the sandbox.',
+      type: 'number (seconds)',
+      default: '60',
+    },
+    cronKeepAliveWindow: {
+      description: 'If a cron job is due within this window, keep the sandbox alive instead of snapshotting.',
+      type: 'number (seconds)',
+      default: '900',
+    },
+  }}
+/>
+
+## Lifecycle decisions
+
+Every 60 seconds, the sidecar inside the sandbox sends a heartbeat to ClawRun. The server evaluates three reasons to keep the sandbox alive, in order:
+
+1. **Grace period.** The sandbox was recently created. Always keep alive for the configured active duration.
+2. **File activity.** The agent is actively modifying files in its workspace.
+3. **Cron schedule.** A cron job is due within the keep-alive window.
+
+If none of these apply, ClawRun snapshots the sandbox and puts it to sleep. Wake hooks are registered so messages and cron triggers can bring it back.
+
+## Examples
+
+### Daily summary
+
+An agent configured to "send a daily summary every morning at 9 AM UTC":
+
+- The agent translates that into a cron job in its own config.
+- ClawRun discovers the schedule and stores the next run time.
+- The sandbox sleeps after going idle.
+- At 8:59 AM, the heartbeat detects the job is due within 60 seconds and wakes the sandbox.
+- The agent boots from snapshot and runs the task at 9:00 AM.
+- After the job completes and no extend reasons remain, ClawRun snapshots and sleeps.
+
+### Frequent polling
+
+An agent configured to "check the status API every 30 minutes":
+
+- ClawRun keeps the sandbox alive if the next check is within 15 minutes.
+- If the sandbox sleeps between checks, ClawRun wakes it before the next one.
+- Requires a per-minute heartbeat (paid Vercel plan) for precise timing.

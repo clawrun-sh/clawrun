@@ -1,0 +1,25 @@
+---
+title: Use Cases
+description: Common ways to deploy and use ClawRun agents.
+---
+
+ClawRun agents can be connected to messaging platforms, triggered on a schedule, or used through the web dashboard and CLI.
+
+## Channels
+
+Connect your agent to Telegram, Discord, Slack, WhatsApp, and 11 other messaging platforms. ClawRun handles webhook registration, message verification, and sandbox wake-on-message.
+
+[View all supported channels](/docs/use-cases/channels)
+
+## Scheduled tasks
+
+Run your agent on a schedule using cron expressions. ClawRun wakes the sandbox before the scheduled time, keeps it alive through the task, then snapshots and sleeps.
+
+[Set up scheduled agents](/docs/use-cases/scheduled-agents)
+
+## CLI and web
+
+Every ClawRun instance also supports direct interaction:
+
+- **CLI chat.** Send messages or start interactive sessions with [`clawrun agent`](/docs/cli/agent).
+- **Web dashboard.** Open a browser-based chat interface with [`clawrun web`](/docs/cli/web).

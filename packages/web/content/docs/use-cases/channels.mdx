@@ -1,0 +1,77 @@
+---
+title: Channels
+description: Connect your ClawRun agent to messaging platforms.
+icon: MessageSquare
+---
+
+## Overview
+
+ClawRun agents can be connected to messaging platforms so users can chat with them directly. ClawRun handles message verification, sandbox wake-on-message, and response delivery.
+
+All channels use a webhook endpoint at `/api/v1/webhook/<channel>`. When a message arrives and the sandbox is sleeping, ClawRun wakes it from the last snapshot, forwards the message to the agent, and sends the response back through the platform's API.
+
+## Telegram
+
+Select Telegram during `clawrun deploy` and provide your bot token from [@BotFather](https://t.me/BotFather).
+
+**Setup fields:**
+
+- **Bot token.** The token from BotFather.
+- **Allowed users.** Telegram usernames (without @) or numeric user IDs.
+
+Webhook registration is fully automatic. ClawRun registers the webhook with Telegram's API when the sandbox sleeps and removes it when the sandbox wakes. No manual configuration needed.
+
+## Discord
+
+Select Discord during `clawrun deploy` and provide your bot token from the [Discord Developer Portal](https://discord.com/developers/applications).
+
+**Setup fields:**
+
+- **Bot token.** From the developer portal.
+- **Guild ID.** Restrict to a single server, or leave empty for all (optional).
+- **Allowed users.** Discord user IDs.
+
+ClawRun automatically derives your application ID and public key from the bot token, and manages the interactions endpoint URL. When the sandbox sleeps, ClawRun sets the endpoint to receive wake messages. When the sandbox is running, the agent handles Discord directly. No manual configuration needed.
+
+Your bot needs **Send Messages** and **Read Message History** permissions. Generate an invite URL from the **OAuth2** section with the `bot` scope.
+
+## Slack
+
+Select Slack during `clawrun deploy` and provide your credentials from [api.slack.com/apps](https://api.slack.com/apps).
+
+**Setup fields:**
+
+- **Bot token.** The Bot User OAuth Token (`xoxb-...`).
+- **Signing secret.** From the app's Basic Information page (required for webhook verification).
+- **App-level token.** Enables Socket Mode for real-time events (optional, `xapp-...`).
+- **Channel ID.** Restrict to a single channel (optional).
+- **Allowed users.** Slack member IDs (start with `U`).
+
+Slack requires manual webhook configuration. After deploying, set the **Events API request URL** in your Slack app settings to:
+
+```
+https://<your-deployed-url>/api/v1/webhook/slack
+```
+
+Required bot scopes: `chat:write`, `app_mentions:read`, `im:history`, `im:write`. Subscribe to `app_mention` and `message.im` events.
+
+## Other supported channels
+
+ClawRun supports 15 channels in total. Beyond Telegram, Discord, and Slack, additional channels can be enabled during [`clawrun deploy`](/docs/cli/deploy).
+
+Channels with wake-hook support can wake a sleeping sandbox when a message arrives. Channels marked as "always-on" require you to configure the webhook URL in the platform's dashboard. Once set, the webhook stays active permanently.
+
+| Channel | Wake support |
+|---------|-------------|
+| WhatsApp | Yes (manual webhook setup in Meta dashboard) |
+| Lark / Feishu | Yes (manual webhook setup in Developer Console) |
+| QQ | Yes (manual webhook setup in Developer Console) |
+| iMessage | Agent-side only |
+| Matrix | Agent-side only |
+| Signal | Agent-side only |
+| Linq | Agent-side only |
+| IRC | Agent-side only |
+| DingTalk | Agent-side only |
+| Nostr | Agent-side only |
+| Nextcloud Talk | Agent-side only |
+| Webhook (generic) | Agent-side only |
