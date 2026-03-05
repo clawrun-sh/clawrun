@@ -149,6 +149,7 @@ function PulseRing({ size }: { size: number }) {
         height: size,
         top: "50%",
         left: "50%",
+        transform: "translate(-50%, -50%)",
         animation: "pulse-ring 4s ease-in-out infinite",
       }}
     />
@@ -326,7 +327,7 @@ export function Architecture() {
         baseDelay={300}
       >
         <div
-          className="relative"
+          className="relative overflow-hidden"
           style={{ width: m ? 240 : 420 }}
           onMouseEnter={() => setHov("s")}
           onMouseLeave={() => setHov(null)}
@@ -358,7 +359,7 @@ export function Architecture() {
             }}
           >
             <div
-              className="mb-2 flex w-full items-center justify-between"
+              className="mb-0.5 flex w-full items-center justify-between"
               style={{ paddingInline: m ? 4 : 8 }}
             >
               <Lock size={m ? 10 : 14} className="text-dim" />
@@ -368,7 +369,7 @@ export function Architecture() {
             {/* Spinning rings + agent icon */}
             <div
               className="relative flex items-center justify-center"
-              style={{ width: m ? 56 : 72, height: m ? 56 : 72 }}
+              style={{ width: m ? 76 : 96, height: m ? 76 : 96 }}
             >
               <div
                 className="absolute inset-0 rounded-full border border-dashed border-border-strong"
@@ -377,28 +378,31 @@ export function Architecture() {
               <div
                 className="absolute rounded-full border border-border"
                 style={{
-                  inset: m ? 6 : 8,
+                  inset: m ? 8 : 10,
                   animation: "spin-reverse 14s linear infinite",
                 }}
               />
               <div
                 className="absolute flex items-center justify-center"
-                style={{ inset: m ? 14 : 18 }}
+                style={{ inset: m ? 18 : 22 }}
               >
                 <div
                   className="bg-gradient-to-br from-primary/55 to-primary/[0.18]"
                   style={{
-                    width: m ? 22 : 28,
-                    height: m ? 22 : 28,
+                    width: m ? 34 : 44,
+                    height: m ? 34 : 44,
                     transform: "rotate(45deg)",
                     borderRadius: 2,
                   }}
                 />
               </div>
-              <PulseRing size={m ? 68 : 88} />
+              <PulseRing size={m ? 88 : 112} />
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
-                <Cpu size={m ? 12 : 16} className="mb-0.5 text-primary" aria-hidden="true" />
-                <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-primary md:text-[11px]">
+                <Cpu size={m ? 10 : 14} className="text-primary" aria-hidden="true" />
+                <span
+                  className="text-[8px] font-semibold uppercase tracking-[0.15em] text-primary md:text-[10px]"
+                  style={{ lineHeight: 1 }}
+                >
                   Agent
                 </span>
               </div>

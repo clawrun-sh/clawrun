@@ -23,8 +23,8 @@ const footerLinks = {
     },
   ],
   Community: [
-    { href: "https://discord.gg/clawrun", label: "Discord", external: true },
-    { href: "https://x.com/clawrun", label: "Twitter", external: true },
+    { href: "https://discord.gg/Bm5P5Md2MY", label: "Discord", external: true },
+    { href: "https://x.com/clawruns", label: "Twitter", external: true },
   ],
 };
 
@@ -35,8 +35,8 @@ const docsFooterLinks = [
     label: "GitHub",
     external: true,
   },
-  { href: "https://discord.gg/clawrun", label: "Discord", external: true },
-  { href: "https://x.com/clawrun", label: "Twitter", external: true },
+  { href: "https://discord.gg/Bm5P5Md2MY", label: "Discord", external: true },
+  { href: "https://x.com/clawruns", label: "Twitter", external: true },
 ];
 
 export function Footer() {
