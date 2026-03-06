@@ -1,10 +1,11 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { createSandboxClient } from "../sandbox/index.js";
-import { resolveRunningId } from "../sandbox/resolve.js";
-import { readConfig } from "../instance/index.js";
+import { instanceDeployDir, getPlatformProvider } from "@clawrun/sdk";
 import { instance } from "../args/instance.js";
+import { connectInstance } from "../connect-instance.js";
+import { resolveRunningId } from "../sandbox/resolve.js";
+import { connectToSandbox } from "../sandbox/connect.js";
 
 export const connect = command({
   name: "connect",
@@ -14,28 +15,28 @@ export const connect = command({
     instance,
   },
   async handler({ instance: instanceName }) {
-    const config = readConfig(instanceName);
-    if (!config) {
-      clack.log.error(`Could not read config for "${instanceName}".`);
-      process.exit(1);
-    }
-
-    const { deployedUrl } = config.instance;
-    const { jwtSecret } = config.secrets;
-    if (!deployedUrl || !jwtSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
       process.exit(1);
     }
 
-    const client = createSandboxClient(instanceName, config);
-
     const s = clack.spinner();
     s.start(`Connecting to ${instanceName}...`);
-    const sandboxId = await resolveRunningId(client, deployedUrl, jwtSecret, s);
+    const sandboxId = await resolveRunningId(conn.instance, s);
     s.stop(`Connected to sandbox ${chalk.dim(sandboxId)}`);
 
-    await client.connect(sandboxId);
+    const deployDir = instanceDeployDir(instanceName);
+    const platform = getPlatformProvider(conn.config.instance.provider);
+    try {
+      await connectToSandbox(sandboxId, deployDir, platform);
+    } catch (err) {
+      clack.log.error(
+        `Failed to connect to sandbox: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
   },
 });

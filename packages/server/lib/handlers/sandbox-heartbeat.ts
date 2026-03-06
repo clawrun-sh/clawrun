@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSandboxAuth } from "@clawrun/auth";
 import { SandboxLifecycleManager } from "@clawrun/runtime";
 import type { ExtendPayload } from "@clawrun/runtime";
+import { sandboxId as toSandboxId } from "@clawrun/provider";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:sandbox-hb");
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
     typeof body.sandboxCreatedAt === "number" ? body.sandboxCreatedAt : undefined;
 
   const payload: ExtendPayload = {
-    sandboxId,
+    sandboxId: toSandboxId(sandboxId as string),
     lastChangedAt,
     sandboxCreatedAt,
     root,

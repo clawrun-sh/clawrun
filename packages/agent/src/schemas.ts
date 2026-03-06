@@ -37,6 +37,7 @@ export const channelInfoSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   setupFields: z.array(channelSetupFieldSchema).min(1),
+  apiDomains: z.array(z.string()).default([]),
 });
 
 // --- Combined setup data ---

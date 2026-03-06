@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import "@clawrun/agent-zeroclaw/register";
 import "@clawrun/provider-vercel/register";
+import "@clawrun/provider-vercel/register-platform";
 import { run, setDefaultHelpFormatter } from "cmd-ts";
 // cmd-ts lacks `exports` in package.json, so the batteries/ subpath
 // doesn't resolve under Node ESM. Import from the explicit dist path.

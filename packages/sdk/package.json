@@ -1,0 +1,52 @@
+{
+  "name": "@clawrun/sdk",
+  "version": "0.1.0",
+  "description": "Programmatic API for ClawRun — deploy and manage agent instances",
+  "license": "Apache-2.0",
+  "author": "Afshin Mehrabani",
+  "homepage": "https://clawrun.sh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clawrun-sh/clawrun.git",
+    "directory": "packages/sdk"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "format:check": "prettier --check src",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "@clawrun/agent": "workspace:*",
+    "@clawrun/auth": "workspace:*",
+    "@clawrun/channel": "workspace:*",
+    "@clawrun/logger": "workspace:*",
+    "@clawrun/provider": "workspace:*",
+    "@clawrun/runtime": "workspace:*",
+    "@clawrun/server": "workspace:*",
+    "ai": "^6.0.0",
+    "eventsource-parser": "^3.0.6",
+    "execa": "^9.5.0",
+    "human-id": "^4.1.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@clawrun/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

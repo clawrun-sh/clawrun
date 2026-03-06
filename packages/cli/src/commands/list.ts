@@ -1,9 +1,9 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { listInstances, readConfig } from "../instance/index.js";
-import { createSandboxClient } from "../sandbox/index.js";
-import type { SandboxEntry } from "../sandbox/types.js";
+import { listInstances } from "@clawrun/sdk";
+import type { SandboxEntry } from "@clawrun/sdk";
+import { connectInstance } from "../connect-instance.js";
 
 function timeAgo(ms: number): string {
   const seconds = Math.floor((Date.now() - ms) / 1000);
@@ -56,10 +56,9 @@ export const list = command({
     const sandboxes = await Promise.all(
       instances.map(async (inst): Promise<SandboxEntry | null> => {
         try {
-          const config = readConfig(inst.name);
-          if (!config) return null;
-          const client = createSandboxClient(inst.name, config);
-          const sbxList = await client.list();
+          const conn = connectInstance(inst.name);
+          if (!conn) return null;
+          const sbxList = await conn.instance.sandbox.list();
           // Return the first running sandbox, or the most recent one
           return (
             sbxList.find((s) => s.status === "running") ??

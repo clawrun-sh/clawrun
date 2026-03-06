@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { GracePeriodReason, FileActivityReason, CronScheduleReason } from "./extend-reasons.js";
+import { sandboxId } from "@clawrun/provider";
 
 const basePayload = {
-  sandboxId: "sbx-1",
+  sandboxId: sandboxId("sbx-1"),
   lastChangedAt: 0,
   root: "/agent",
   daemonStatus: "running" as const,

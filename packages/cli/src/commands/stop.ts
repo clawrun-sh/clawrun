@@ -1,10 +1,9 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { readConfig } from "../instance/index.js";
 import { instance } from "../args/instance.js";
 import { yes } from "../args/yes.js";
-import { createApiClient } from "../api.js";
+import { connectInstance } from "../connect-instance.js";
 
 export const stop = command({
   name: "stop",
@@ -14,15 +13,8 @@ export const stop = command({
     yes,
   },
   async handler({ instance: instanceName, yes: skipConfirm }) {
-    const config = readConfig(instanceName);
-    if (!config) {
-      clack.log.error(`Could not read config for "${instanceName}".`);
-      process.exit(1);
-    }
-
-    const { deployedUrl } = config.instance;
-    const { jwtSecret } = config.secrets;
-    if (!deployedUrl || !jwtSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
@@ -45,17 +37,7 @@ export const stop = command({
     spinner.start("Stopping sandbox...");
 
     try {
-      const api = createApiClient(deployedUrl, jwtSecret);
-      const res = await api.post("/api/v1/sandbox/stop");
-
-      const body = await res.text();
-
-      if (!res.ok) {
-        spinner.stop(chalk.red(`Stop failed (HTTP ${res.status}): ${body}`));
-        process.exit(1);
-      }
-
-      const result = JSON.parse(body) as Record<string, unknown>;
+      const result = await conn.instance.stop();
 
       if (result.status === "stopped" && result.sandboxId) {
         spinner.stop(chalk.green(`Sandbox stopped (${result.sandboxId}). Snapshot saved.`));
@@ -64,8 +46,6 @@ export const stop = command({
       } else if (result.status === "failed") {
         spinner.stop(chalk.red(`Stop failed: ${result.error}`));
         process.exit(1);
-      } else {
-        spinner.stop(chalk.yellow(`Unexpected result: ${JSON.stringify(result)}`));
       }
     } catch (err) {
       spinner.stop(

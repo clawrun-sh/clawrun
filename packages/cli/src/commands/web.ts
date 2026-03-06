@@ -2,9 +2,8 @@ import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import { execFile } from "node:child_process";
-import { readConfig } from "../instance/index.js";
-import { signInviteToken } from "@clawrun/auth";
 import { instance } from "../args/instance.js";
+import { connectInstance } from "../connect-instance.js";
 
 /** Open a URL in the default browser (cross-platform). */
 function openBrowser(url: string): void {
@@ -20,23 +19,26 @@ export const web = command({
     instance,
   },
   async handler({ instance: instanceName }) {
-    const config = readConfig(instanceName);
-    if (!config) {
-      clack.log.error(`Could not read config for "${instanceName}".`);
-      process.exit(1);
-    }
-
-    const { deployedUrl } = config.instance;
-    const { jwtSecret } = config.secrets;
-    if (!deployedUrl || !jwtSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
       process.exit(1);
     }
 
-    const jwt = await signInviteToken(jwtSecret);
-    const url = `${deployedUrl}/auth/accept?token=${jwt}`;
+    const s = clack.spinner();
+    s.start("Generating invite link...");
+    let url: string;
+    try {
+      const result = await conn.instance.createInvite();
+      url = result.url;
+      s.stop("Invite link generated");
+    } catch (err) {
+      s.stop(chalk.red("Failed to generate invite link"));
+      clack.log.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
 
     clack.log.success("Opening chat in browser...");
     clack.log.info(chalk.dim("Link expires in 10 minutes. Session lasts 8 hours."));

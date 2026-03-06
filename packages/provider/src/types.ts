@@ -1,3 +1,23 @@
+// --- Provider ID ---
+
+export const PROVIDER_IDS = ["vercel"] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
+// --- Branded ID types ---
+
+declare const __brand: unique symbol;
+type Brand<T, B extends string> = T & { readonly [__brand]: B };
+
+export type SandboxId = Brand<string, "SandboxId">;
+export type SnapshotId = Brand<string, "SnapshotId">;
+
+export function sandboxId(id: string): SandboxId {
+  return id as SandboxId;
+}
+export function snapshotId(id: string): SnapshotId {
+  return id as SnapshotId;
+}
+
 // --- Provider options ---
 
 export interface ProviderOptions {
@@ -37,7 +57,7 @@ export interface CommandResult {
 // --- Sandbox instance ---
 
 export interface ManagedSandbox {
-  readonly id: string;
+  readonly id: SandboxId;
   readonly status: string;
   /** Current timeout in ms (includes extensions). */
   readonly timeout: number;
@@ -57,13 +77,13 @@ export interface ManagedSandbox {
 }
 
 export interface SnapshotRef {
-  readonly id: string;
+  readonly id: SnapshotId;
 }
 
 // --- Sandbox listing info ---
 
 export interface SandboxInfo {
-  id: string;
+  id: SandboxId;
   status: string;
   createdAt: number;
   startedAt?: number;
@@ -71,15 +91,15 @@ export interface SandboxInfo {
   timeout: number;
   memory: number;
   vcpus: number;
-  sourceSnapshotId?: string;
+  sourceSnapshotId?: SnapshotId;
 }
 
 // --- Snapshot listing info ---
 
 export interface SnapshotInfo {
-  id: string;
+  id: SnapshotId;
   createdAt: number;
-  sandboxId?: string;
+  sandboxId?: SandboxId;
 }
 
 // --- Provider ---
@@ -87,16 +107,16 @@ export interface SnapshotInfo {
 export interface CreateSandboxOptions {
   timeout: number;
   ports?: number[];
-  snapshotId?: string;
+  snapshotId?: SnapshotId;
   resources?: { vcpus: number };
   networkPolicy?: NetworkPolicy;
 }
 
 export interface SandboxProvider {
   create(opts: CreateSandboxOptions): Promise<ManagedSandbox>;
-  get(id: string): Promise<ManagedSandbox>;
+  get(id: SandboxId): Promise<ManagedSandbox>;
   list(): Promise<SandboxInfo[]>;
 
   listSnapshots(): Promise<SnapshotInfo[]>;
-  deleteSnapshot(id: string): Promise<void>;
+  deleteSnapshot(id: SnapshotId): Promise<void>;
 }

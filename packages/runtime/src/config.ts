@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cloudClawConfigSchema, type ClawRunConfig } from "./schema.js";
+import type { ProviderId } from "@clawrun/provider";
 
 export interface RuntimeConfig {
-  instance: { name: string; provider: string; baseUrl?: string; sandboxRoot: string };
+  instance: { name: string; provider: ProviderId; baseUrl?: string; sandboxRoot: string };
   agent: {
     name: string;
     config: string;

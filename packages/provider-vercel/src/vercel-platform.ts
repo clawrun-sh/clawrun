@@ -1,17 +1,43 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import chalk from "chalk";
-import * as clack from "@clack/prompts";
-import { execa } from "execa";
 import type {
   LogsOptions,
   PlatformLimits,
   PlatformProvider,
   PlatformTier,
+  PlatformStep,
+  ProgressCallback,
   ProjectHandle,
+  ProviderId,
   StateStoreEntry,
   StateStoreResult,
-} from "./types.js";
+} from "@clawrun/provider";
+
+// ---------------------------------------------------------------------------
+// Lazy import — execa is CLI/SDK-only; must not be statically resolved by
+// Next.js bundler (instrumentation.ts is analysed for both Node and Edge).
+// ---------------------------------------------------------------------------
+
+interface RunResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+async function run(
+  cmd: string,
+  args: string[],
+  opts?: Record<string, unknown>,
+): Promise<RunResult> {
+  const { execa } = await import("execa");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = (await execa(cmd, args, opts as any)) as any;
+  return {
+    stdout: String(result.stdout ?? ""),
+    stderr: String(result.stderr ?? ""),
+    exitCode: (result.exitCode as number) ?? 0,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,6 +50,20 @@ const STATE_VAR_PREFIXES = ["KV_REST_API_", "KV_URL", "KV_REST_URL"];
 
 /** Products that can serve as a KV state store. */
 const KV_PRODUCTS = ["redis", "kv", "upstash"];
+
+/**
+ * Default vercel.json — written on first deploy, patched on redeploy.
+ */
+const DEFAULT_VERCEL_JSON = {
+  framework: "nextjs",
+  regions: ["iad1"],
+  crons: [{ path: "/api/v1/heartbeat", schedule: "* * * * *" }],
+  functions: {
+    "app/api/v1/**/*.ts": {
+      maxDuration: 60,
+    },
+  },
+};
 
 const VERCEL_TIER_DEFAULTS: Record<PlatformTier, PlatformLimits> = {
   hobby: {
@@ -83,54 +123,47 @@ function isKvProduct(product: string): boolean {
 // ---------------------------------------------------------------------------
 
 export class VercelPlatformProvider implements PlatformProvider {
-  readonly id = "vercel";
+  readonly id = "vercel" satisfies ProviderId;
   readonly name = "Vercel";
 
   // ---- Prerequisites ----------------------------------------------------
 
-  async checkPrerequisites(): Promise<void> {
+  async checkPrerequisites(onProgress?: ProgressCallback<PlatformStep>): Promise<void> {
     // Node version
     const nodeVersion = process.versions.node;
     const major = parseInt(nodeVersion.split(".")[0], 10);
     if (major < 20) {
-      clack.log.error(`Node.js >= 20 is required. You have v${nodeVersion}.`);
-      process.exit(1);
+      throw new Error(`Node.js >= 20 is required. You have v${nodeVersion}.`);
     }
-    clack.log.step(`Node.js v${nodeVersion}`);
+    onProgress?.({ step: "check-node", message: `Node.js v${nodeVersion}` });
 
     // Vercel CLI
-    const vercelSpinner = clack.spinner();
-    vercelSpinner.start("Checking Vercel CLI");
+    onProgress?.({ step: "check-cli", message: "Checking Vercel CLI..." });
     try {
-      const { stdout } = await execa("vercel", ["--version"]);
-      vercelSpinner.stop(`Vercel CLI ${stdout.trim()}`);
+      const { stdout } = await run("vercel", ["--version"]);
+      onProgress?.({ step: "check-cli", message: `Vercel CLI ${stdout.trim()}` });
     } catch {
-      vercelSpinner.stop("Vercel CLI not found");
-      clack.log.step("Installing Vercel CLI...");
+      onProgress?.({ step: "install-cli", message: "Vercel CLI not found. Installing..." });
       try {
-        await execa("npm", ["install", "-g", "vercel"], { stdio: "inherit" });
-        clack.log.success("Vercel CLI installed.");
+        await run("npm", ["install", "-g", "vercel"], { stdio: "pipe" });
+        onProgress?.({ step: "install-cli", message: "Vercel CLI installed." });
       } catch {
-        clack.log.error("Failed to install Vercel CLI. Install manually: npm i -g vercel");
-        process.exit(1);
+        throw new Error("Failed to install Vercel CLI. Install manually: npm i -g vercel");
       }
     }
 
     // Vercel auth
-    const authSpinner = clack.spinner();
-    authSpinner.start("Checking Vercel authentication");
+    onProgress?.({ step: "check-auth", message: "Checking Vercel authentication..." });
     try {
-      const { stdout } = await execa("vercel", ["whoami"]);
-      authSpinner.stop(`Logged in as ${chalk.bold(stdout.trim())}`);
+      const { stdout } = await run("vercel", ["whoami"]);
+      onProgress?.({ step: "check-auth", message: `Logged in as ${stdout.trim()}` });
     } catch {
-      authSpinner.stop("Not logged in to Vercel");
-      clack.log.step("Starting Vercel login...");
+      onProgress?.({ step: "login", message: "Not logged in to Vercel. Starting login..." });
       try {
-        await execa("vercel", ["login"], { stdio: "inherit" });
-        clack.log.success("Vercel login successful.");
+        await run("vercel", ["login"], { stdio: "inherit" });
+        onProgress?.({ step: "login", message: "Vercel login successful." });
       } catch {
-        clack.log.error("Vercel login failed. Run 'vercel login' manually.");
-        process.exit(1);
+        throw new Error("Vercel login failed. Run 'vercel login' manually.");
       }
     }
   }
@@ -142,14 +175,14 @@ export class VercelPlatformProvider implements PlatformProvider {
       const currentTeam = await this.getCurrentTeam();
 
       if (currentTeam) {
-        const { stdout } = await execa("vercel", ["api", `/v2/teams/${currentTeam.id}`, "--raw"]);
+        const { stdout } = await run("vercel", ["api", `/v2/teams/${currentTeam.id}`, "--raw"]);
         const data = JSON.parse(stdout) as {
           billing?: { plan?: string };
         };
         return planToTier(data.billing?.plan);
       }
 
-      const { stdout } = await execa("vercel", ["api", "/v2/user", "--raw"]);
+      const { stdout } = await run("vercel", ["api", "/v2/user", "--raw"]);
       const data = JSON.parse(stdout) as {
         user?: { billing?: { plan?: string } };
       };
@@ -169,11 +202,13 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   // ---- Project lifecycle ------------------------------------------------
 
-  async createProject(name: string): Promise<ProjectHandle> {
-    const s = clack.spinner();
-    s.start(`Creating Vercel project "${name}"...`);
+  async createProject(
+    name: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<ProjectHandle> {
+    onProgress?.({ step: "create-project", message: `Creating Vercel project "${name}"...` });
 
-    const { stdout } = await execa("vercel", [
+    const { stdout } = await run("vercel", [
       "api",
       "/v9/projects",
       "-X",
@@ -188,16 +223,19 @@ export class VercelPlatformProvider implements PlatformProvider {
     };
 
     if (!project.id || !project.accountId) {
-      s.stop(chalk.red("Failed"));
       throw new Error("Vercel API returned an unexpected response (missing id or accountId).");
     }
 
-    s.stop(chalk.green(`Vercel project created: ${name}`));
-    return { provider: "vercel", projectId: project.id, orgId: project.accountId };
+    onProgress?.({ step: "create-project", message: `Vercel project created: ${name}` });
+    return {
+      provider: "vercel" satisfies ProviderId,
+      projectId: project.id,
+      orgId: project.accountId,
+    };
   }
 
   async deleteProject(handle: ProjectHandle): Promise<void> {
-    await execa("vercel", [
+    await run("vercel", [
       "api",
       `/v9/projects/${handle.projectId}?teamId=${handle.orgId}`,
       "-X",
@@ -214,7 +252,11 @@ export class VercelPlatformProvider implements PlatformProvider {
         orgId?: string;
       };
       if (data.projectId && data.orgId) {
-        return { provider: "vercel", projectId: data.projectId, orgId: data.orgId };
+        return {
+          provider: "vercel" satisfies ProviderId,
+          projectId: data.projectId,
+          orgId: data.orgId,
+        };
       }
     } catch {
       // .vercel/project.json may not exist yet
@@ -235,7 +277,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   async listStateStores(): Promise<StateStoreEntry[]> {
     try {
-      const { stdout } = await execa("vercel", ["integration", "list", "--all", "--format=json"]);
+      const { stdout } = await run("vercel", ["integration", "list", "--all", "--format=json"]);
       const parsed = JSON.parse(stdout) as { resources?: StateStoreEntry[] };
       return (parsed.resources ?? []).filter(
         (r) => r.status === "available" && isKvProduct(r.product),
@@ -249,12 +291,15 @@ export class VercelPlatformProvider implements PlatformProvider {
     linkedDir: string,
     store: StateStoreEntry,
     projectId: string,
+    onProgress?: ProgressCallback<PlatformStep>,
   ): Promise<StateStoreResult> {
-    const spinner = clack.spinner();
-    spinner.start(`Connecting store "${store.name}" to project`);
+    onProgress?.({
+      step: "connect-state-store",
+      message: `Connecting store "${store.name}" to project...`,
+    });
 
     try {
-      await execa(
+      await run(
         "vercel",
         [
           "api",
@@ -267,68 +312,92 @@ export class VercelPlatformProvider implements PlatformProvider {
         { cwd: linkedDir },
       );
 
-      spinner.stop(`Connected "${store.name}" to project.`);
+      onProgress?.({
+        step: "connect-state-store",
+        message: `Connected "${store.name}" to project.`,
+      });
     } catch (err) {
-      spinner.stop(`Failed to connect store.`);
-      clack.log.error(err instanceof Error ? err.message : String(err));
+      onProgress?.({
+        step: "connect-state-store",
+        message: "Failed to connect store.",
+        level: "warning",
+      });
       return { success: false, vars: {} };
     }
 
-    return this.pullStateVars(linkedDir);
+    return this.pullStateVars(linkedDir, onProgress);
   }
 
-  async provisionStateStore(linkedDir: string): Promise<StateStoreResult> {
-    clack.log.step("Creating new state store...");
+  async provisionStateStore(
+    linkedDir: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<StateStoreResult> {
+    onProgress?.({ step: "provision-state-store", message: "Creating new state store..." });
 
     // Check if KV_REST_API_URL is already on this project (already connected)
     try {
-      const { stdout } = await execa("vercel", ["env", "ls"], {
+      const { stdout } = await run("vercel", ["env", "ls"], {
         cwd: linkedDir,
       });
       if (stdout.includes("KV_REST_API_URL")) {
-        clack.log.info("State store already connected to this project.");
-        return this.pullStateVars(linkedDir);
+        onProgress?.({
+          step: "provision-state-store",
+          message: "State store already connected to this project.",
+        });
+        return this.pullStateVars(linkedDir, onProgress);
       }
     } catch {
       // ignore — proceed with provisioning
     }
 
-    const addResult = await execa("vercel", ["integration", "add", "upstash/upstash-kv"], {
+    const addResult = await run("vercel", ["integration", "add", "upstash/upstash-kv"], {
       cwd: linkedDir,
       stdio: "inherit",
       reject: false,
     });
 
     if (addResult.exitCode !== 0) {
-      clack.log.warn("State store setup cancelled.");
+      onProgress?.({
+        step: "provision-state-store",
+        message: "State store setup cancelled.",
+        level: "warning",
+      });
       return { success: false, vars: {} };
     }
 
     // Exit code was 0 — check if vars actually appeared.
     let found = false;
     try {
-      const { stdout } = await execa("vercel", ["env", "ls"], { cwd: linkedDir });
+      const { stdout } = await run("vercel", ["env", "ls"], { cwd: linkedDir });
       found = stdout.includes("KV_REST_API_URL");
     } catch {
       // ignore
     }
 
     if (!found) {
-      found = await this.waitForStateStoreVars(linkedDir);
+      found = await this.waitForStateStoreVars(linkedDir, onProgress);
     }
 
     if (!found) {
-      clack.log.warn("State store setup cancelled.");
+      onProgress?.({
+        step: "provision-state-store",
+        message: "State store setup cancelled.",
+        level: "warning",
+      });
       return { success: false, vars: {} };
     }
 
-    clack.log.success("State store provisioned.");
-    return this.pullStateVars(linkedDir);
+    onProgress?.({ step: "provision-state-store", message: "State store provisioned." });
+    return this.pullStateVars(linkedDir, onProgress);
   }
 
   // ---- Env vars ---------------------------------------------------------
 
-  async persistEnvVars(dir: string, vars: Record<string, string>): Promise<void> {
+  async persistEnvVars(
+    dir: string,
+    vars: Record<string, string>,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<void> {
     // Vercel Cron requires CRON_SECRET (exact name) to set the Authorization header
     if (vars["CLAWRUN_CRON_SECRET"] && !vars["CRON_SECRET"]) {
       vars = { ...vars, CRON_SECRET: vars["CLAWRUN_CRON_SECRET"] };
@@ -337,15 +406,17 @@ export class VercelPlatformProvider implements PlatformProvider {
     const entries = Object.entries(vars);
     if (entries.length === 0) return;
 
-    const s = clack.spinner();
-    s.start(`Persisting ${entries.length} env vars to project...`);
+    onProgress?.({
+      step: "persist-env-vars",
+      message: `Persisting ${entries.length} env vars to project...`,
+    });
 
     let succeeded = 0;
     const warnings: string[] = [];
     for (const [key, value] of entries) {
       // Remove existing (ignore errors — may not exist yet)
       try {
-        await execa("vercel", ["env", "rm", key, "production", "--yes"], {
+        await run("vercel", ["env", "rm", key, "production", "--yes"], {
           cwd: dir,
         });
       } catch {
@@ -354,7 +425,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
       // Add at project level
       try {
-        await execa("vercel", ["env", "add", key, "production"], {
+        await run("vercel", ["env", "add", key, "production"], {
           cwd: dir,
           input: value,
         });
@@ -364,24 +435,36 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
     }
 
-    s.stop(chalk.green(`${succeeded}/${entries.length} env vars persisted to project.`));
+    onProgress?.({
+      step: "persist-env-vars",
+      message: `${succeeded}/${entries.length} env vars persisted to project.`,
+    });
     for (const key of warnings) {
-      clack.log.warn(`Could not persist ${key} to project.`);
+      onProgress?.({
+        step: "persist-env-vars",
+        message: `Could not persist ${key} to project.`,
+        level: "warning",
+      });
     }
   }
 
   // ---- Platform config --------------------------------------------------
 
-  patchPlatformConfig(dir: string, limits: PlatformLimits): void {
+  patchPlatformConfig(
+    dir: string,
+    limits: PlatformLimits,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): void {
     const vercelJsonPath = join(dir, "vercel.json");
-    if (!existsSync(vercelJsonPath)) return;
 
     try {
-      const content = readFileSync(vercelJsonPath, "utf-8");
-      const config = JSON.parse(content) as {
-        crons?: Array<{ path: string; schedule: string }>;
-        [key: string]: unknown;
-      };
+      // Upsert: create from defaults if missing, then patch
+      let config: { crons?: Array<{ path: string; schedule: string }>; [key: string]: unknown };
+      if (existsSync(vercelJsonPath)) {
+        config = JSON.parse(readFileSync(vercelJsonPath, "utf-8"));
+      } else {
+        config = structuredClone(DEFAULT_VERCEL_JSON);
+      }
 
       if (config.crons) {
         for (const cron of config.crons) {
@@ -392,23 +475,35 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
 
       writeFileSync(vercelJsonPath, JSON.stringify(config, null, 2) + "\n");
-      clack.log.info(`Heartbeat cron set to: ${limits.heartbeatCron}`);
+      onProgress?.({
+        step: "patch-config",
+        message: `Heartbeat cron set to: ${limits.heartbeatCron}`,
+      });
     } catch {
-      clack.log.warn("Could not patch vercel.json cron schedule.");
+      onProgress?.({
+        step: "patch-config",
+        message: "Could not patch vercel.json cron schedule.",
+        level: "warning",
+      });
     }
   }
 
-  async disableDeploymentProtection(dir: string): Promise<void> {
+  async disableDeploymentProtection(
+    dir: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<void> {
     const handle = this.readProjectLink(dir);
     if (!handle) {
-      clack.log.warn(
-        "Could not read Vercel project config — skipping deployment protection config.",
-      );
+      onProgress?.({
+        step: "disable-protection",
+        message: "Could not read Vercel project config — skipping deployment protection config.",
+        level: "warning",
+      });
       return;
     }
 
     try {
-      await execa(
+      await run(
         "vercel",
         [
           "api",
@@ -423,9 +518,16 @@ export class VercelPlatformProvider implements PlatformProvider {
           input: JSON.stringify({ ssoProtection: null }),
         },
       );
-      clack.log.info("Deployment protection disabled (SSO bypass).");
+      onProgress?.({
+        step: "disable-protection",
+        message: "Deployment protection disabled (SSO bypass).",
+      });
     } catch {
-      clack.log.warn("Could not disable deployment protection.");
+      onProgress?.({
+        step: "disable-protection",
+        message: "Could not disable deployment protection.",
+        level: "warning",
+      });
     }
   }
 
@@ -451,32 +553,70 @@ export class VercelPlatformProvider implements PlatformProvider {
     return [sandboxId, "--project", data.projectId, "--scope", data.orgId];
   }
 
+  // ---- Instance setup ---------------------------------------------------
+
+  async installDependencies(
+    dir: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<void> {
+    onProgress?.({ step: "install-deps", message: "Installing dependencies..." });
+    try {
+      await run("npm", ["install"], { cwd: dir, stdio: "pipe" });
+    } catch (err: unknown) {
+      const stderr = (err as { stderr?: string }).stderr ?? "";
+      throw new Error(
+        `npm install failed in ${dir}: ${stderr || (err instanceof Error ? err.message : String(err))}`,
+      );
+    }
+  }
+
+  writeLocalEnv(dir: string, vars: Record<string, string>): void {
+    const content = Object.entries(vars)
+      .map(([key, value]) => {
+        const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+        return `${key}="${escaped}"`;
+      })
+      .join("\n");
+    writeFileSync(join(dir, ".env"), content + "\n");
+  }
+
+  cleanBuildCache(dir: string, cacheDir: string): void {
+    const full = join(dir, cacheDir);
+    if (existsSync(full)) {
+      rmSync(full, { recursive: true, force: true });
+    }
+  }
+
   // ---- Deploy -----------------------------------------------------------
 
-  async deploy(dir: string, envVars: Record<string, string>): Promise<string> {
-    clack.log.step("Deploying to Vercel...");
+  async deploy(
+    dir: string,
+    envVars: Record<string, string>,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<string> {
+    onProgress?.({ step: "deploy", message: "Deploying to Vercel..." });
 
     const envArgs: string[] = [];
     for (const [key, value] of Object.entries(envVars)) {
       envArgs.push("--env", `${key}=${value}`);
     }
 
+    let result: RunResult;
     try {
-      const { stdout } = await execa(
-        "vercel",
-        ["deploy", "--prod", "--yes", "--force", ...envArgs],
-        {
-          cwd: dir,
-          stdio: ["inherit", "pipe", "inherit"],
-        },
-      );
-
-      const deploymentUrl = stdout.trim().split("\n").pop()?.trim() ?? "";
-      return (await this.resolveProductionAlias(deploymentUrl)) ?? deploymentUrl;
-    } catch (error) {
-      clack.log.error(`Deployment failed.${error instanceof Error ? ` ${error.message}` : ""}`);
-      process.exit(1);
+      result = await run("vercel", ["deploy", "--prod", "--yes", "--force", ...envArgs], {
+        cwd: dir,
+        stdio: "pipe",
+      });
+    } catch (err: unknown) {
+      const stderr = (err as { stderr?: string }).stderr ?? "";
+      throw new Error(stderr.trim() || (err instanceof Error ? err.message : String(err)));
     }
+
+    const deploymentUrl = result.stdout.trim().split("\n").pop()?.trim() ?? "";
+    const alias = await this.resolveProductionAlias(deploymentUrl);
+    const finalUrl = alias ?? deploymentUrl;
+    onProgress?.({ step: "deploy", message: `Deployed to ${finalUrl}` });
+    return finalUrl;
   }
 
   // ---- Logs -------------------------------------------------------------
@@ -491,14 +631,14 @@ export class VercelPlatformProvider implements PlatformProvider {
     if (options?.since) args.push("--since", options.since);
     if (options?.level) args.push("--level", options.level);
 
-    await execa("vercel", args, { cwd: dir, stdio: "inherit" });
+    await run("vercel", args, { cwd: dir, stdio: "inherit" });
   }
 
   // ---- Private helpers --------------------------------------------------
 
   private async resolveProductionAlias(deploymentUrl: string): Promise<string | null> {
     try {
-      const { stdout } = await execa("vercel", ["inspect", deploymentUrl, "--format", "json"]);
+      const { stdout } = await run("vercel", ["inspect", deploymentUrl, "--format", "json"]);
       const data = JSON.parse(stdout) as { aliases?: string[] };
       const alias = data.aliases?.[0];
       return alias ? `https://${alias}` : null;
@@ -509,7 +649,7 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   private async getCurrentTeam(): Promise<{ id: string; slug: string } | null> {
     try {
-      const { stdout } = await execa("vercel", ["teams", "ls", "--format", "json"]);
+      const { stdout } = await run("vercel", ["teams", "ls", "--format", "json"]);
       const data = JSON.parse(stdout) as {
         teams: Array<{ id: string; slug: string; current?: boolean }>;
       };
@@ -520,19 +660,24 @@ export class VercelPlatformProvider implements PlatformProvider {
     }
   }
 
-  private async waitForStateStoreVars(linkedDir: string): Promise<boolean> {
+  private async waitForStateStoreVars(
+    linkedDir: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<boolean> {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
 
-    const s = clack.spinner();
-    s.start("Waiting for state store provisioning to complete...");
+    onProgress?.({
+      step: "wait-state-store",
+      message: "Waiting for state store provisioning to complete...",
+    });
 
     while (Date.now() < deadline) {
       try {
-        const { stdout } = await execa("vercel", ["env", "ls"], {
+        const { stdout } = await run("vercel", ["env", "ls"], {
           cwd: linkedDir,
         });
         if (stdout.includes("KV_REST_API_URL")) {
-          s.stop("State store provisioned.");
+          onProgress?.({ step: "wait-state-store", message: "State store provisioned." });
           return true;
         }
       } catch {
@@ -542,18 +687,27 @@ export class VercelPlatformProvider implements PlatformProvider {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    s.stop(chalk.yellow("Timed out waiting for state store."));
+    onProgress?.({
+      step: "wait-state-store",
+      message: "Timed out waiting for state store.",
+      level: "warning",
+    });
     return false;
   }
 
-  private async pullStateVars(linkedDir: string): Promise<StateStoreResult> {
-    const spinner = clack.spinner();
-    spinner.start("Pulling state store environment variables");
+  private async pullStateVars(
+    linkedDir: string,
+    onProgress?: ProgressCallback<PlatformStep>,
+  ): Promise<StateStoreResult> {
+    onProgress?.({
+      step: "pull-state-vars",
+      message: "Pulling state store environment variables...",
+    });
 
     const envTempPath = join(linkedDir, ".env.state.tmp");
 
     try {
-      await execa("vercel", ["env", "pull", envTempPath, "--yes", "--environment=production"], {
+      await run("vercel", ["env", "pull", envTempPath, "--yes", "--environment=production"], {
         cwd: linkedDir,
       });
 
@@ -572,15 +726,26 @@ export class VercelPlatformProvider implements PlatformProvider {
       }
 
       if (!vars["KV_URL"]) {
-        spinner.stop("State store setup incomplete: missing KV_URL.");
+        onProgress?.({
+          step: "pull-state-vars",
+          message: "State store setup incomplete: missing KV_URL.",
+          level: "warning",
+        });
         return { success: false, vars: {} };
       }
 
       const count = Object.keys(vars).length;
-      spinner.stop(`${count} state store env vars retrieved.`);
+      onProgress?.({
+        step: "pull-state-vars",
+        message: `${count} state store env vars retrieved.`,
+      });
       return { success: true, vars };
     } catch {
-      spinner.stop("Could not pull state store env vars.");
+      onProgress?.({
+        step: "pull-state-vars",
+        message: "Could not pull state store env vars.",
+        level: "warning",
+      });
       return { success: false, vars: {} };
     }
   }

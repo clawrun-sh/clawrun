@@ -1,13 +1,15 @@
 import type { SandboxHandle, CommandResult } from "@clawrun/agent";
-import type { SandboxClient } from "./types.js";
+import type { SandboxClient, SandboxEntry } from "@clawrun/sdk";
+
+type SandboxId = SandboxEntry["id"];
 
 /**
- * Wrap a CLI SandboxClient + sandboxId into the Agent's SandboxHandle interface.
- * Adapts the CLI client's string-based exec() to the async CommandResult shape.
+ * Wrap an SDK SandboxClient + sandboxId into the Agent's SandboxHandle interface.
+ * Adapts the SDK client's exec() to the async CommandResult shape.
  */
 export function createSandboxHandle(
   client: SandboxClient,
-  sandboxId: string,
+  sandboxId: SandboxId,
   options?: { timeoutMs?: number },
 ): SandboxHandle {
   const timeoutMs = options?.timeoutMs ?? 150_000;

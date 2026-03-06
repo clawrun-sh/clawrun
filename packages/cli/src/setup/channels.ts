@@ -111,7 +111,7 @@ export async function promptChannels(
     clack.note(configured.join("\n"), "Active channels");
   } else {
     const redeployHint = instanceName
-      ? `Run ${chalk.cyan(`clawrun deploy ${instanceName}`)} to add channels later.`
+      ? `Run ${chalk.cyan(`clawrun deploy --name ${instanceName}`)} to add channels later.`
       : `Re-run deploy to add channels later.`;
     clack.note(
       "The TUI and web chat interface will still be available.\n" + redeployHint,

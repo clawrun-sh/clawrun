@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { SandboxProvider, ManagedSandbox, SandboxInfo } from "@clawrun/provider";
+import type {
+  SandboxProvider,
+  ManagedSandbox,
+  SandboxInfo,
+  SandboxId,
+  SnapshotId,
+} from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
 import type { Agent, CronInfo } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
@@ -76,13 +82,13 @@ function readBundledCloudclawJson(): string {
 
 export interface SandboxResult {
   status: "running" | "stopped" | "failed";
-  sandboxId?: string;
+  sandboxId?: SandboxId;
   error?: string;
   nextWakeAt?: string;
 }
 
 export interface ExtendPayload {
-  sandboxId: string;
+  sandboxId: SandboxId;
   /** Epoch ms of the last observed file change in the agent workspace. */
   lastChangedAt: number;
   /** Epoch ms when the extend loop started (approx sandbox creation time). */
@@ -103,7 +109,7 @@ export interface ExtendResult {
 
 export interface SandboxStatus {
   running: boolean;
-  sandboxId?: string;
+  sandboxId?: SandboxId;
   status?: string;
   startedAt?: Date;
 }
@@ -173,7 +179,7 @@ export class SandboxLifecycleManager {
    * (stopping a sandbox without a snapshot destroys its state).
    */
   private async snapshotAndStop(
-    sandboxId: string,
+    sandboxId: SandboxId,
     retries = 3,
     retryDelayMs = 2_000,
   ): Promise<string | null> {
@@ -613,7 +619,7 @@ export class SandboxLifecycleManager {
   private async startNewLocked(opts?: { skipTeardownWakeHooks?: boolean }): Promise<SandboxResult> {
     try {
       let sandbox: ManagedSandbox | null = null;
-      let snapshotId: string | undefined;
+      let snapshotId: SnapshotId | undefined;
 
       const networkPolicy = getRuntimeConfig().sandbox.networkPolicy;
 

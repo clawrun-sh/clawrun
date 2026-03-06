@@ -47,7 +47,7 @@ export function registerPreset(preset: Preset): void {
  *   2. Preset .md files (flat, alongside preset.json)
  *   3. User-provided custom dir (highest priority)
  *
- * Returns a map of filename → absolute path.
+ * Returns a map of filename -> absolute path.
  */
 export function getWorkspaceFiles(presetId: string, customDir?: string): Map<string, string> {
   const files = new Map<string, string>();
@@ -84,3 +84,6 @@ export function getWorkspaceFiles(presetId: string, customDir?: string): Map<str
 
   return files;
 }
+
+export type { Preset } from "./types.js";
+export { presetSchema, PRESET_SCHEMA_URL } from "./types.js";

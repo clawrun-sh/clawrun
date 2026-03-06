@@ -1,33 +1,18 @@
-import { execa } from "execa";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import type { SandboxProvider, ManagedSandbox } from "@clawrun/provider";
-import type { PlatformProvider } from "../platform/types.js";
-import type { SandboxClient, SandboxEntry, ExecResult } from "./types.js";
-
-/** Resolve the `sandbox` CLI binary from our own node_modules. */
-function sandboxBin(): string {
-  const require = createRequire(import.meta.url);
-  const pkgPath = require.resolve("sandbox/package.json");
-  return join(dirname(pkgPath), "bin", "sandbox.mjs");
-}
+import type { SandboxProvider, ManagedSandbox, SandboxId, SnapshotId } from "@clawrun/provider";
+import type { SandboxEntry, ExecResult } from "./types.js";
 
 /**
- * SandboxClient backed by a SandboxProvider.
+ * SDK client for sandbox provider-level operations.
  *
- * All SDK operations go through the provider. The CLI binary is only
- * used for `connect` (interactive shell).
+ * Wraps a SandboxProvider to provide a clean API for listing, stopping,
+ * executing commands, reading files, and managing snapshots.
  */
-export class ProviderSandboxClient implements SandboxClient {
-  private sandboxCache = new Map<string, ManagedSandbox>();
+export class SandboxClient {
+  private sandboxCache = new Map<SandboxId, ManagedSandbox>();
 
-  constructor(
-    private provider: SandboxProvider,
-    private deployDir: string,
-    private platform: PlatformProvider,
-  ) {}
+  constructor(private provider: SandboxProvider) {}
 
-  private async getSandbox(id: string): Promise<ManagedSandbox> {
+  private async getSandbox(id: SandboxId): Promise<ManagedSandbox> {
     let sandbox = this.sandboxCache.get(id);
     if (!sandbox) {
       sandbox = await this.provider.get(id);
@@ -36,6 +21,7 @@ export class ProviderSandboxClient implements SandboxClient {
     return sandbox;
   }
 
+  /** List all sandboxes. */
   async list(): Promise<SandboxEntry[]> {
     const sandboxes = await this.provider.list();
     return sandboxes.map((s) => ({
@@ -47,7 +33,8 @@ export class ProviderSandboxClient implements SandboxClient {
     }));
   }
 
-  async stop(...sandboxIds: string[]): Promise<void> {
+  /** Stop one or more sandboxes. */
+  async stop(...sandboxIds: SandboxId[]): Promise<void> {
     if (sandboxIds.length === 0) return;
     await Promise.all(
       sandboxIds.map(async (id) => {
@@ -57,18 +44,21 @@ export class ProviderSandboxClient implements SandboxClient {
     );
   }
 
-  async listSnapshots(): Promise<string[]> {
+  /** List snapshot IDs. */
+  async listSnapshots(): Promise<SnapshotId[]> {
     const snapshots = await this.provider.listSnapshots();
     return snapshots.map((s) => s.id);
   }
 
-  async deleteSnapshots(...snapshotIds: string[]): Promise<void> {
+  /** Delete one or more snapshots. */
+  async deleteSnapshots(...snapshotIds: SnapshotId[]): Promise<void> {
     if (snapshotIds.length === 0) return;
     await Promise.all(snapshotIds.map((id) => this.provider.deleteSnapshot(id)));
   }
 
+  /** Execute a command inside a running sandbox. */
   async exec(
-    sandboxId: string,
+    sandboxId: SandboxId,
     cmd: string,
     args: string[],
     env?: Record<string, string>,
@@ -94,23 +84,13 @@ export class ProviderSandboxClient implements SandboxClient {
     }
   }
 
-  async readFile(sandboxId: string, path: string): Promise<Buffer | null> {
+  /** Read a file from a running sandbox. Returns null if not found. */
+  async readFile(sandboxId: SandboxId, path: string): Promise<Buffer | null> {
     try {
       const sandbox = await this.getSandbox(sandboxId);
       return await sandbox.readFile(path);
     } catch {
       return null;
     }
-  }
-
-  async connect(sandboxId: string, env?: Record<string, string>): Promise<void> {
-    const connectArgs = this.platform.getConnectArgs(this.deployDir, sandboxId);
-    const args = [sandboxBin(), "connect", ...connectArgs];
-    if (env) {
-      for (const [k, v] of Object.entries(env)) {
-        args.push("-e", `${k}=${v}`);
-      }
-    }
-    await execa("node", args, { stdio: "inherit" });
   }
 }

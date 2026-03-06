@@ -8,13 +8,13 @@ import {
   instanceDir,
   instanceDeployDir,
   instanceAgentDir,
-} from "../instance/index.js";
-import { getPlatformProvider } from "../platform/index.js";
-import { createSandboxClient } from "../sandbox/index.js";
+  getPlatformProvider,
+} from "@clawrun/sdk";
 import { createAgent } from "@clawrun/agent";
 import { initializeAdapters, teardownWakeHooks } from "@clawrun/channel";
 import { instance } from "../args/instance.js";
 import { yes } from "../args/yes.js";
+import { connectInstance } from "../connect-instance.js";
 
 export const destroy = command({
   name: "destroy",
@@ -69,6 +69,8 @@ export const destroy = command({
 
     // Unregister wake hooks (e.g. Telegram webhook) before deleting the project.
     // If left active, the platform keeps delivering messages to a dead URL.
+    const hookSpinner = clack.spinner();
+    hookSpinner.start("Unregistering wake hooks...");
     try {
       const agent = createAgent(config.agent.name);
       const agentDir = instanceAgentDir(name);
@@ -76,10 +78,11 @@ export const destroy = command({
       const webhookSecrets = config.secrets?.webhookSecrets ?? {};
       initializeAdapters(setup?.channels ?? {}, webhookSecrets);
       await teardownWakeHooks();
+      hookSpinner.stop("Wake hooks unregistered");
     } catch {
       // Best-effort — don't block destroy if hooks can't be cleaned up.
       // The platform will stop delivering after enough failures anyway.
-      clack.log.warn("Could not unregister wake hooks (best-effort, continuing).");
+      hookSpinner.stop(chalk.yellow("Could not unregister wake hooks (best-effort, continuing)"));
     }
 
     // Delete platform project (needs project link dir to still exist)
@@ -90,27 +93,18 @@ export const destroy = command({
       clack.log.warn("No project link found — skipping platform cleanup.");
     } else {
       // Stop running sandboxes and delete snapshots before removing the project
+      const sbxSpinner = clack.spinner();
+      sbxSpinner.start("Cleaning up sandboxes and snapshots...");
       try {
-        const client = createSandboxClient(name, config);
-
-        const sandboxes = await client.list();
-        const running = sandboxes.filter((s) => s.status === "running" || s.status === "pending");
-        if (running.length > 0) {
-          const s = clack.spinner();
-          s.start(`Stopping ${running.length} sandbox(es)...`);
-          await client.stop(...running.map((s) => s.id));
-          s.stop(`Stopped ${running.length} sandbox(es).`);
+        const conn = connectInstance(name);
+        if (conn) {
+          await conn.instance.destroySandboxes();
         }
-
-        const snapshots = await client.listSnapshots();
-        if (snapshots.length > 0) {
-          const s = clack.spinner();
-          s.start(`Deleting ${snapshots.length} snapshot(s)...`);
-          await client.deleteSnapshots(...snapshots);
-          s.stop(`Deleted ${snapshots.length} snapshot(s).`);
-        }
+        sbxSpinner.stop("Sandboxes cleaned up");
       } catch {
-        clack.log.warn("Could not clean up sandboxes/snapshots (best-effort, continuing).");
+        sbxSpinner.stop(
+          chalk.yellow("Could not clean up sandboxes/snapshots (best-effort, continuing)"),
+        );
       }
 
       const s = clack.spinner();

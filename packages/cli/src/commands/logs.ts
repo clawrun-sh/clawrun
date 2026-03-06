@@ -1,7 +1,6 @@
 import { command, flag, option, optional, number, string } from "cmd-ts";
 import * as clack from "@clack/prompts";
-import { readConfig, instanceDeployDir } from "../instance/index.js";
-import { getPlatformProvider } from "../platform/index.js";
+import { readConfig, instanceDeployDir, getPlatformProvider } from "@clawrun/sdk";
 import { instance } from "../args/instance.js";
 
 export const logs = command({

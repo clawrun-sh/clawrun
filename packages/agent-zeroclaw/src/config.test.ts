@@ -24,6 +24,7 @@ function makeData(overrides: Partial<AgentSetupData> = {}): AgentSetupData {
 const telegramChannel: ChannelInfo = {
   id: "telegram",
   name: "Telegram",
+  apiDomains: ["api.telegram.org"],
   setupFields: [
     { name: "bot_token", label: "Bot Token", type: "password", required: true },
     { name: "allowed_users", label: "Allowed Users", type: "list", required: false, default: "*" },

@@ -1,9 +1,8 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { readConfig } from "../instance/index.js";
 import { instance } from "../args/instance.js";
-import { createApiClient } from "../api.js";
+import { connectInstance } from "../connect-instance.js";
 
 export const start = command({
   name: "start",
@@ -12,15 +11,8 @@ export const start = command({
     instance,
   },
   async handler({ instance: instanceName }) {
-    const config = readConfig(instanceName);
-    if (!config) {
-      clack.log.error(`Could not read config for "${instanceName}".`);
-      process.exit(1);
-    }
-
-    const { deployedUrl } = config.instance;
-    const { jwtSecret } = config.secrets;
-    if (!deployedUrl || !jwtSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
@@ -31,25 +23,13 @@ export const start = command({
     spinner.start("Starting sandbox...");
 
     try {
-      const api = createApiClient(deployedUrl, jwtSecret);
-      const res = await api.post("/api/v1/sandbox/start");
-
-      const body = await res.text();
-
-      if (!res.ok) {
-        spinner.stop(chalk.red(`Start failed (HTTP ${res.status}): ${body}`));
-        process.exit(1);
-      }
-
-      const result = JSON.parse(body) as Record<string, unknown>;
+      const result = await conn.instance.start();
 
       if (result.status === "running") {
         spinner.stop(chalk.green(`Sandbox running (${result.sandboxId ?? "ok"}).`));
       } else if (result.status === "failed") {
         spinner.stop(chalk.red(`Start failed: ${result.error}`));
         process.exit(1);
-      } else {
-        spinner.stop(chalk.yellow(`Unexpected result: ${JSON.stringify(result)}`));
       }
     } catch (err) {
       spinner.stop(

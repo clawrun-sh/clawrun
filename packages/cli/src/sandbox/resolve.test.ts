@@ -1,12 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SandboxClient, SandboxEntry } from "./types.js";
-
-// --- Mocks ---
-
-const mockPost = vi.fn();
-vi.mock("../api.js", () => ({
-  createApiClient: () => ({ post: mockPost, get: vi.fn() }),
-}));
+import type { ClawRunInstance, SandboxEntry } from "@clawrun/sdk";
 
 // Stub clack spinner to avoid TTY issues in tests
 const mockSpinner = {
@@ -30,7 +23,7 @@ import { getRunningId, resolveRunningId } from "./resolve.js";
 
 function makeSandbox(overrides: Partial<SandboxEntry> = {}): SandboxEntry {
   return {
-    id: "sbx_default",
+    id: "sbx_default" as SandboxEntry["id"],
     status: "stopped",
     createdAt: Date.now(),
     memory: 512,
@@ -39,16 +32,29 @@ function makeSandbox(overrides: Partial<SandboxEntry> = {}): SandboxEntry {
   };
 }
 
-function makeClient(sandboxes: SandboxEntry[]): SandboxClient {
+function makeInstance(sandboxes: SandboxEntry[]): ClawRunInstance {
+  const listFn = vi.fn().mockResolvedValue(sandboxes);
+  const startFn = vi.fn().mockResolvedValue({ status: "running" });
   return {
-    list: vi.fn().mockResolvedValue(sandboxes),
+    sandbox: {
+      list: listFn,
+      stop: vi.fn(),
+      listSnapshots: vi.fn(),
+      deleteSnapshots: vi.fn(),
+      exec: vi.fn(),
+      readFile: vi.fn(),
+    },
+    start: startFn,
     stop: vi.fn(),
-    listSnapshots: vi.fn(),
-    deleteSnapshots: vi.fn(),
-    exec: vi.fn(),
-    readFile: vi.fn(),
-    connect: vi.fn(),
-  };
+    restart: vi.fn(),
+    health: vi.fn(),
+    chat: vi.fn(),
+    sendMessage: vi.fn(),
+    getHistory: vi.fn(),
+    createInvite: vi.fn(),
+    destroySandboxes: vi.fn(),
+    webUrl: "https://example.com",
+  } as unknown as ClawRunInstance;
 }
 
 beforeEach(() => {
@@ -70,32 +76,32 @@ afterEach(() => {
 
 describe("getRunningId", () => {
   it("returns null when no sandboxes exist", async () => {
-    const client = makeClient([]);
-    expect(await getRunningId(client)).toBeNull();
+    const instance = makeInstance([]);
+    expect(await getRunningId(instance)).toBeNull();
   });
 
   it("returns null when all sandboxes are stopped", async () => {
-    const client = makeClient([
-      makeSandbox({ id: "sbx_1", status: "stopped" }),
-      makeSandbox({ id: "sbx_2", status: "stopping" }),
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "stopped" }),
+      makeSandbox({ id: "sbx_2" as SandboxEntry["id"], status: "stopping" }),
     ]);
-    expect(await getRunningId(client)).toBeNull();
+    expect(await getRunningId(instance)).toBeNull();
   });
 
   it("returns the running sandbox id", async () => {
-    const client = makeClient([
-      makeSandbox({ id: "sbx_1", status: "stopped" }),
-      makeSandbox({ id: "sbx_2", status: "running" }),
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "stopped" }),
+      makeSandbox({ id: "sbx_2" as SandboxEntry["id"], status: "running" }),
     ]);
-    expect(await getRunningId(client)).toBe("sbx_2");
+    expect(await getRunningId(instance)).toBe("sbx_2");
   });
 
   it("returns the first running sandbox when multiple are running", async () => {
-    const client = makeClient([
-      makeSandbox({ id: "sbx_1", status: "running" }),
-      makeSandbox({ id: "sbx_2", status: "running" }),
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "running" }),
+      makeSandbox({ id: "sbx_2" as SandboxEntry["id"], status: "running" }),
     ]);
-    expect(await getRunningId(client)).toBe("sbx_1");
+    expect(await getRunningId(instance)).toBe("sbx_1");
   });
 });
 
@@ -103,78 +109,69 @@ describe("getRunningId", () => {
 
 describe("resolveRunningId", () => {
   it("returns immediately when a running sandbox exists", async () => {
-    const client = makeClient([makeSandbox({ id: "sbx_live", status: "running" })]);
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_live" as SandboxEntry["id"], status: "running" }),
+    ]);
 
-    const id = await resolveRunningId(client, "https://example.com", "secret123");
+    const id = await resolveRunningId(instance);
 
     expect(id).toBe("sbx_live");
-    // Should NOT have called the start API
-    expect(mockPost).not.toHaveBeenCalled();
+    // Should NOT have called start
+    expect(instance.start).not.toHaveBeenCalled();
   });
 
-  it("calls /api/v1/sandbox/start (not /restart) when no sandbox is running", async () => {
-    // First list() → no running, then after start → running
-    const client = makeClient([]);
-    (client.list as ReturnType<typeof vi.fn>)
+  it("calls instance.start() when no sandbox is running", async () => {
+    const instance = makeInstance([]);
+    (instance.sandbox.list as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([]) // initial check
-      .mockResolvedValueOnce([makeSandbox({ id: "sbx_woke", status: "running" })]); // after start
+      .mockResolvedValueOnce([
+        makeSandbox({ id: "sbx_woke" as SandboxEntry["id"], status: "running" }),
+      ]); // after start
 
-    mockPost.mockResolvedValue({ ok: true });
-
-    const id = await resolveRunningId(
-      client,
-      "https://example.com",
-      "jwt-secret",
-      mockSpinner as never,
-    );
+    const id = await resolveRunningId(instance, mockSpinner as never);
 
     expect(id).toBe("sbx_woke");
-    expect(mockPost).toHaveBeenCalledWith(
-      "/api/v1/sandbox/start",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
-    // Verify it's /start, not /restart
-    expect(mockPost).not.toHaveBeenCalledWith("/api/v1/sandbox/restart", expect.anything());
+    expect(instance.start).toHaveBeenCalled();
   });
 
   it("uses the caller's spinner instead of creating a new one", async () => {
-    const client = makeClient([]);
-    (client.list as ReturnType<typeof vi.fn>)
+    const instance = makeInstance([]);
+    (instance.sandbox.list as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([makeSandbox({ id: "sbx_1", status: "running" })]);
-    mockPost.mockResolvedValue({ ok: true });
+      .mockResolvedValueOnce([
+        makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "running" }),
+      ]);
 
-    await resolveRunningId(client, "https://example.com", "secret", mockSpinner as never);
+    await resolveRunningId(instance, mockSpinner as never);
 
     // Spinner.message should be called (not start — caller already started it)
     expect(mockSpinner.message).toHaveBeenCalledWith("Starting sandbox...");
   });
 
   it("exits on network error reaching deployment", async () => {
-    const client = makeClient([]);
-    (client.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-    mockPost.mockRejectedValue(new Error("ECONNREFUSED"));
+    const instance = makeInstance([]);
+    (instance.sandbox.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (instance.start as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(
-      resolveRunningId(client, "https://example.com", "secret", mockSpinner as never),
-    ).rejects.toThrow("process.exit called");
+    await expect(resolveRunningId(instance, mockSpinner as never)).rejects.toThrow(
+      "process.exit called",
+    );
 
     expect(mockSpinner.stop).toHaveBeenCalledWith(expect.stringContaining("ECONNREFUSED"));
   });
 
-  it("exits on non-ok HTTP response from start endpoint", async () => {
-    const client = makeClient([]);
-    (client.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-    mockPost.mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: () => Promise.resolve("Unauthorized"),
+  it("exits when start returns failed status", async () => {
+    const instance = makeInstance([]);
+    (instance.sandbox.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (instance.start as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "failed",
+      error: "Unauthorized",
     });
 
-    await expect(
-      resolveRunningId(client, "https://example.com", "secret", mockSpinner as never),
-    ).rejects.toThrow("process.exit called");
+    await expect(resolveRunningId(instance, mockSpinner as never)).rejects.toThrow(
+      "process.exit called",
+    );
 
-    expect(mockSpinner.stop).toHaveBeenCalledWith(expect.stringContaining("401"));
+    expect(mockSpinner.stop).toHaveBeenCalledWith(expect.stringContaining("Unauthorized"));
   });
 });

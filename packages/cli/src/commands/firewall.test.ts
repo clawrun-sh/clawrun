@@ -1,16 +1,50 @@
 import { describe, it, expect } from "vitest";
-import {
-  domainMatchesWildcard,
-  deriveAllowedDomains,
-  PROVIDER_DOMAINS,
-  CHANNEL_DOMAINS,
-} from "./deploy.js";
-import type { PlatformProvider } from "../platform/index.js";
+import { domainMatchesWildcard, deriveAllowedDomains } from "@clawrun/sdk";
+import type { Agent } from "@clawrun/agent";
 
-// Minimal stub — only getInfraDomains() is called by deriveAllowedDomains()
-function stubPlatform(infraDomains: string[]): PlatformProvider {
-  return { getInfraDomains: () => infraDomains } as unknown as PlatformProvider;
-}
+const mockAgent = {
+  getModelsFetchEndpoint: (p: string) => {
+    const endpoints: Record<string, string> = {
+      openai: "https://api.openai.com/v1/models",
+      openrouter: "https://openrouter.ai/api/v1/models",
+      anthropic: "https://api.anthropic.com/v1/models",
+      google: "https://generativelanguage.googleapis.com/v1beta/models",
+      groq: "https://api.groq.com/openai/v1/models",
+      mistral: "https://api.mistral.ai/v1/models",
+      deepseek: "https://api.deepseek.com/v1/models",
+    };
+    const url = endpoints[p.toLowerCase()];
+    if (!url) return null;
+    return { url, authHeader: () => ({}) };
+  },
+  getSupportedChannels: () => [
+    { id: "telegram", name: "Telegram", apiDomains: ["api.telegram.org"], setupFields: [] },
+    {
+      id: "discord",
+      name: "Discord",
+      apiDomains: ["discord.com", "gateway.discord.gg"],
+      setupFields: [],
+    },
+    { id: "slack", name: "Slack", apiDomains: ["slack.com"], setupFields: [] },
+    { id: "whatsapp", name: "WhatsApp", apiDomains: ["graph.facebook.com"], setupFields: [] },
+    { id: "matrix", name: "Matrix", apiDomains: ["matrix.org"], setupFields: [] },
+    { id: "linq", name: "Linq", apiDomains: ["api.linqapp.com"], setupFields: [] },
+    { id: "dingtalk", name: "DingTalk", apiDomains: ["api.dingtalk.com"], setupFields: [] },
+    { id: "qq", name: "QQ Official", apiDomains: ["bots.qq.com"], setupFields: [] },
+    {
+      id: "lark",
+      name: "Lark / Feishu",
+      apiDomains: ["open.feishu.cn", "open.larksuite.com"],
+      setupFields: [],
+    },
+    {
+      id: "nostr",
+      name: "Nostr",
+      apiDomains: ["relay.damus.io", "nos.lol", "relay.primal.net", "relay.snort.social"],
+      setupFields: [],
+    },
+  ],
+} as unknown as Agent;
 
 // ---------------------------------------------------------------------------
 // domainMatchesWildcard
@@ -57,9 +91,8 @@ describe("domainMatchesWildcard", () => {
 // ---------------------------------------------------------------------------
 
 describe("deriveAllowedDomains", () => {
-  it("includes infra domains from platform", () => {
-    const platform = stubPlatform(["*.vercel.app", "*.vercel.sh"]);
-    const result = deriveAllowedDomains(platform);
+  it("includes infra domains", () => {
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app", "*.vercel.sh"]);
 
     expect(result.all).toContain("*.vercel.app");
     expect(result.all).toContain("*.vercel.sh");
@@ -67,8 +100,7 @@ describe("deriveAllowedDomains", () => {
   });
 
   it("adds LLM provider domains when provider is specified", () => {
-    const platform = stubPlatform(["*.vercel.app"]);
-    const result = deriveAllowedDomains(platform, "openrouter");
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app"], "openrouter");
 
     expect(result.all).toContain("openrouter.ai");
     expect(result.groups).toHaveLength(2);
@@ -76,8 +108,10 @@ describe("deriveAllowedDomains", () => {
   });
 
   it("adds channel domains when channels are specified", () => {
-    const platform = stubPlatform(["*.vercel.app"]);
-    const result = deriveAllowedDomains(platform, undefined, ["telegram", "discord"]);
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app"], undefined, [
+      "telegram",
+      "discord",
+    ]);
 
     expect(result.all).toContain("api.telegram.org");
     expect(result.all).toContain("discord.com");
@@ -85,8 +119,7 @@ describe("deriveAllowedDomains", () => {
   });
 
   it("combines provider + channels without duplicates", () => {
-    const platform = stubPlatform(["*.vercel.app"]);
-    const result = deriveAllowedDomains(platform, "anthropic", ["telegram"]);
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app"], "anthropic", ["telegram"]);
 
     expect(result.all).toContain("*.vercel.app");
     expect(result.all).toContain("api.anthropic.com");
@@ -97,8 +130,7 @@ describe("deriveAllowedDomains", () => {
   });
 
   it("ignores unknown provider name gracefully", () => {
-    const platform = stubPlatform(["*.vercel.app"]);
-    const result = deriveAllowedDomains(platform, "unknown-provider");
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app"], "unknown-provider");
 
     // Only infra group
     expect(result.groups).toHaveLength(1);
@@ -106,44 +138,35 @@ describe("deriveAllowedDomains", () => {
   });
 
   it("ignores unknown channel name gracefully", () => {
-    const platform = stubPlatform(["*.vercel.app"]);
-    const result = deriveAllowedDomains(platform, undefined, ["nonexistent"]);
+    const result = deriveAllowedDomains(mockAgent, ["*.vercel.app"], undefined, ["nonexistent"]);
 
     expect(result.groups).toHaveLength(1);
   });
 
-  it("is case-insensitive for provider lookup", () => {
-    const platform = stubPlatform([]);
-    const result = deriveAllowedDomains(platform, "OpenAI");
-
-    expect(result.all).toContain("api.openai.com");
-  });
-
   it("is case-insensitive for channel lookup", () => {
-    const platform = stubPlatform([]);
-    const result = deriveAllowedDomains(platform, undefined, ["Telegram"]);
+    const result = deriveAllowedDomains(mockAgent, [], undefined, ["Telegram"]);
 
     expect(result.all).toContain("api.telegram.org");
   });
 
-  it("every PROVIDER_DOMAINS entry produces correct domains", () => {
-    const platform = stubPlatform([]);
-    for (const [name, domains] of Object.entries(PROVIDER_DOMAINS)) {
-      const result = deriveAllowedDomains(platform, name);
-      for (const d of domains) {
-        expect(result.all).toContain(d);
-      }
-    }
+  it("derives provider domains from agent model endpoint", () => {
+    const result = deriveAllowedDomains(mockAgent, [], "openai");
+    expect(result.all).toContain("api.openai.com");
+
+    const result2 = deriveAllowedDomains(mockAgent, [], "groq");
+    expect(result2.all).toContain("api.groq.com");
+
+    const result3 = deriveAllowedDomains(mockAgent, [], "mistral");
+    expect(result3.all).toContain("api.mistral.ai");
   });
 
-  it("every CHANNEL_DOMAINS entry with domains produces correct domains", () => {
-    const platform = stubPlatform([]);
-    for (const [name, domains] of Object.entries(CHANNEL_DOMAINS)) {
-      if (domains.length === 0) continue;
-      const result = deriveAllowedDomains(platform, undefined, [name]);
-      for (const d of domains) {
-        expect(result.all).toContain(d);
-      }
-    }
+  it("derives channel domains from agent channel info", () => {
+    const result = deriveAllowedDomains(mockAgent, [], undefined, ["lark"]);
+    expect(result.all).toContain("open.feishu.cn");
+    expect(result.all).toContain("open.larksuite.com");
+
+    const result2 = deriveAllowedDomains(mockAgent, [], undefined, ["nostr"]);
+    expect(result2.all).toContain("relay.damus.io");
+    expect(result2.all).toContain("nos.lol");
   });
 });

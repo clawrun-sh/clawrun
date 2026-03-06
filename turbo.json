@@ -12,6 +12,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "!dist/bin/**", ".next/**"]
     },
+    "@clawrun/ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "zeroclaw#build": {
       "dependsOn": ["^build", "build:bin"],
       "outputs": ["dist/**", "!dist/bin/**"]

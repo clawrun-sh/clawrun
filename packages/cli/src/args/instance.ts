@@ -1,7 +1,7 @@
 import { positional, string } from "cmd-ts";
 import type { Type } from "cmd-ts";
 import chalk from "chalk";
-import { instanceExists } from "../instance/index.js";
+import { instanceExists } from "@clawrun/sdk";
 
 const instanceType: Type<string, string> = {
   ...string,

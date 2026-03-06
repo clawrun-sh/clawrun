@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { sandboxId, snapshotId } from "@clawrun/provider";
 
 // --- Mocks ---
 
@@ -165,7 +166,7 @@ describe("SDK call scoping — credentials vs withScope", () => {
     });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
-    await provider.get("sbx_1");
+    await provider.get(sandboxId("sbx_1"));
 
     expect(mockSandboxGet).toHaveBeenCalledWith({
       sandboxId: "sbx_1",
@@ -275,7 +276,7 @@ describe("deleteSnapshot", () => {
     mockSnapshotGet.mockResolvedValue({ delete: mockDelete });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
-    await provider.deleteSnapshot("snap_1");
+    await provider.deleteSnapshot(snapshotId("snap_1"));
 
     expect(mockSnapshotGet).toHaveBeenCalledWith({
       snapshotId: "snap_1",
@@ -296,7 +297,7 @@ describe("deleteSnapshot", () => {
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
     // Should not throw
-    await expect(provider.deleteSnapshot("snap_old")).resolves.toBeUndefined();
+    await expect(provider.deleteSnapshot(snapshotId("snap_old"))).resolves.toBeUndefined();
   });
 
   it("rethrows non-expiry errors", async () => {
@@ -306,6 +307,6 @@ describe("deleteSnapshot", () => {
     mockSnapshotGet.mockRejectedValue(new Error("network error"));
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
-    await expect(provider.deleteSnapshot("snap_1")).rejects.toThrow("network error");
+    await expect(provider.deleteSnapshot(snapshotId("snap_1"))).rejects.toThrow("network error");
   });
 });

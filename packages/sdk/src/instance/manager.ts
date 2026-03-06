@@ -1,14 +1,16 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import chalk from "chalk";
-import * as clack from "@clack/prompts";
 import { execa } from "execa";
 import { createAgent } from "@clawrun/agent";
 import { instanceDir, instancesDir, instanceAgentDir, instanceDeployDir } from "./paths.js";
 import { copyServerApp } from "./templates.js";
 import type { ClawRunConfig } from "./config.js";
 import { readConfig, writeConfig, sanitizeConfig } from "./config.js";
+import type { PlatformProvider, PlatformStep, ProgressCallback } from "@clawrun/provider";
+import type { InstanceStep } from "./steps.js";
+import { getDeployDependencies } from "@clawrun/server/deploy-manifest";
+import { BUILD_CACHE_DIR } from "@clawrun/server/deploy-manifest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +30,7 @@ interface InstancePackageJson {
 }
 
 export function isDevMode(): boolean {
-  // In dev mode, CLI runs from packages/cli/dist/ inside the monorepo.
+  // In dev mode, SDK runs from packages/sdk/dist/ inside the monorepo.
   // Check for packages/server relative to the repo root.
   const repoRoot = resolve(__dirname, "..", "..", "..", "..");
   return existsSync(join(repoRoot, "packages", "server", "package.json"));
@@ -41,6 +43,7 @@ function getMonorepoRoot(): string {
 async function packLocalDeps(
   instancePath: string,
   config: ClawRunConfig,
+  onProgress?: ProgressCallback<InstanceStep>,
 ): Promise<Record<string, string>> {
   const root = getMonorepoRoot();
   const deps: Record<string, string> = {};
@@ -79,7 +82,7 @@ async function packLocalDeps(
   }
 
   for (const pkg of packages) {
-    clack.log.info(chalk.dim(`Packing ${pkg.name}...`));
+    onProgress?.({ step: "pack-deps", message: `Packing ${pkg.name}...` });
     const { stdout } = await execa("pnpm", ["pack", "--pack-destination", instancePath], {
       cwd: pkg.dir,
     });
@@ -92,68 +95,39 @@ async function packLocalDeps(
   return deps;
 }
 
-// Direct dependencies every instance needs for `next build` to succeed.
-// These are transitive deps of @clawrun/server but must be available
-// as top-level deps for Vercel's build step.
-const INSTANCE_PEER_DEPS: Record<string, string> = {
-  next: "^16.0.0",
-  react: "^19.0.0",
-  "react-dom": "^19.0.0",
-  ai: "^6.0.0",
-  "@ai-sdk/react": "^3.0.0",
-  "lucide-react": "^0.500.0",
-  dexie: "^4.0.0",
-  "next-themes": "^0.4.0",
-  shadcn: "^3.8.5",
-  streamdown: "^2.3.0",
-  tailwindcss: "^4.0.0",
-  "tw-animate-css": "^1.4.0",
-  "@tailwindcss/postcss": "^4.0.0",
-  typescript: "^5.7.0",
-  "@types/node": "^22.0.0",
-  "@types/react": "^19.0.0",
-  "@types/react-dom": "^19.0.0",
-};
-
 function buildPackageJson(name: string, deps: Record<string, string>): InstancePackageJson {
   return {
     name,
     private: true,
     dependencies: {
-      ...INSTANCE_PEER_DEPS,
+      ...getDeployDependencies(),
       ...deps,
     },
   };
-}
-
-function writeEnvFile(dir: string, envVars: Record<string, string>): void {
-  const content = Object.entries(envVars)
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
-  writeFileSync(join(dir, ".env"), content + "\n");
 }
 
 export async function createInstance(
   name: string,
   config: ClawRunConfig,
   envVars: Record<string, string>,
-  opts?: { presetDeps?: Record<string, string> },
+  platform: PlatformProvider,
+  opts?: { presetDeps?: Record<string, string>; onProgress?: ProgressCallback<InstanceStep> },
 ): Promise<string> {
   const dir = instanceDir(name);
   const agentDir = instanceAgentDir(name);
   const deployDir = instanceDeployDir(name);
   const devMode = isDevMode();
+  const onProgress = opts?.onProgress;
 
   // Tolerate pre-existing dir (wizard may have already created agent/ subdir)
   if (existsSync(join(dir, "clawrun.json"))) {
     throw new Error(`Instance "${name}" already exists at ${dir}`);
   }
 
-  clack.log.step(
-    `Creating instance "${name}"\n` +
-      chalk.dim(`Path: ${dir}\n`) +
-      chalk.dim(`Mode: ${devMode ? "dev (packed tarballs)" : "production"}`),
-  );
+  onProgress?.({
+    step: "create-instance",
+    message: `Creating instance "${name}" (path: ${dir}, mode: ${devMode ? "dev (packed tarballs)" : "production"})`,
+  });
 
   // Create directories
   mkdirSync(dir, { recursive: true });
@@ -172,8 +146,8 @@ export async function createInstance(
   // Resolve dependencies
   let deps: Record<string, string>;
   if (devMode) {
-    clack.log.step("Packing local packages...");
-    deps = await packLocalDeps(deployDir, config);
+    onProgress?.({ step: "pack-deps", message: "Packing local packages..." });
+    deps = await packLocalDeps(deployDir, config, onProgress);
   } else {
     deps = {
       "@clawrun/agent": "0.1.0",
@@ -193,24 +167,23 @@ export async function createInstance(
   const pkg = buildPackageJson(name, deps);
   writeFileSync(join(deployDir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
-  // Write .env into .deploy/ (derived from config + agent config, for Next.js runtime)
-  writeEnvFile(deployDir, envVars);
+  // Write .env into .deploy/ (derived from config + agent config)
+  platform.writeLocalEnv(deployDir, envVars);
 
   // Copy mirrored files into .deploy/ for Vercel bundling
   copyMirroredFiles(name);
 
   // Install dependencies in .deploy/
-  clack.log.step("Installing dependencies...");
-  await execa("npm", ["install"], {
-    cwd: deployDir,
-    stdio: "inherit",
-  });
+  await platform.installDependencies(
+    deployDir,
+    onProgress as ProgressCallback<PlatformStep> | undefined,
+  );
 
   // Copy server app source into .deploy/
-  clack.log.step("Copying server app...");
-  copyServerApp(deployDir);
+  onProgress?.({ step: "copy-server-app", message: "Copying server app..." });
+  copyServerApp(deployDir, onProgress);
 
-  clack.log.success(`Instance "${name}" created.`);
+  onProgress?.({ step: "create-instance", message: `Instance "${name}" created.` });
   return dir;
 }
 
@@ -359,7 +332,11 @@ export function saveDeployedUrl(name: string, url: string): void {
   writeConfig(name, config);
 }
 
-export async function upgradeInstance(name: string): Promise<void> {
+export async function upgradeInstance(
+  name: string,
+  platform: PlatformProvider,
+  onProgress?: ProgressCallback<InstanceStep>,
+): Promise<void> {
   const dir = instanceDir(name);
   const deployDir = instanceDeployDir(name);
 
@@ -370,7 +347,7 @@ export async function upgradeInstance(name: string): Promise<void> {
   // Ensure .deploy/ exists (migration from old layout)
   mkdirSync(deployDir, { recursive: true });
 
-  clack.log.step(`Upgrading instance "${name}"...`);
+  onProgress?.({ step: "upgrade-instance", message: `Upgrading instance "${name}"...` });
 
   // In dev mode, repack local packages to pick up changes
   if (isDevMode()) {
@@ -378,14 +355,14 @@ export async function upgradeInstance(name: string): Promise<void> {
     if (!config) {
       throw new Error(`No clawrun.json found for instance "${name}"`);
     }
-    clack.log.step("Repacking local packages...");
-    const deps = await packLocalDeps(deployDir, config);
+    onProgress?.({ step: "pack-deps", message: "Repacking local packages..." });
+    const deps = await packLocalDeps(deployDir, config, onProgress);
 
-    // Update package.json with new tarball paths and current peer deps
+    // Update package.json with new tarball paths and current deploy deps
     const pkgPath = join(deployDir, "package.json");
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as InstancePackageJson;
-      Object.assign(pkg.dependencies, INSTANCE_PEER_DEPS, deps);
+      Object.assign(pkg.dependencies, getDeployDependencies(), deps);
       writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
     }
   }
@@ -393,7 +370,7 @@ export async function upgradeInstance(name: string): Promise<void> {
   // Remove node_modules to force fresh install from new tarballs
   const nodeModulesDir = join(deployDir, "node_modules");
   if (existsSync(nodeModulesDir)) {
-    clack.log.info(chalk.dim("Cleaning node_modules..."));
+    onProgress?.({ step: "clean-cache", message: "Cleaning node_modules..." });
     rmSync(nodeModulesDir, { recursive: true, force: true });
   }
 
@@ -403,28 +380,24 @@ export async function upgradeInstance(name: string): Promise<void> {
     rmSync(lockPath);
   }
 
-  // Remove .next build cache so Vercel does a clean build
-  const nextCacheDir = join(deployDir, ".next");
-  if (existsSync(nextCacheDir)) {
-    clack.log.info(chalk.dim("Cleaning .next cache..."));
-    rmSync(nextCacheDir, { recursive: true, force: true });
-  }
+  // Remove build cache so platform does a clean build
+  onProgress?.({ step: "clean-cache", message: "Cleaning build cache..." });
+  platform.cleanBuildCache(deployDir, BUILD_CACHE_DIR);
 
   // Copy mirrored files from instance root into .deploy/
   copyMirroredFiles(name);
 
   // Fresh install
-  clack.log.step("Installing dependencies...");
-  await execa("npm", ["install"], {
-    cwd: deployDir,
-    stdio: "inherit",
-  });
+  await platform.installDependencies(
+    deployDir,
+    onProgress as ProgressCallback<PlatformStep> | undefined,
+  );
 
   // Copy updated server app source
-  clack.log.step("Copying server app...");
-  copyServerApp(deployDir);
+  onProgress?.({ step: "copy-server-app", message: "Copying server app..." });
+  copyServerApp(deployDir, onProgress);
 
-  clack.log.success(`Instance "${name}" upgraded.`);
+  onProgress?.({ step: "upgrade-instance", message: `Instance "${name}" upgraded.` });
 }
 
 export function destroyInstance(name: string): void {
@@ -435,5 +408,4 @@ export function destroyInstance(name: string): void {
   }
 
   rmSync(dir, { recursive: true, force: true });
-  clack.log.success(`Instance "${name}" destroyed.`);
 }

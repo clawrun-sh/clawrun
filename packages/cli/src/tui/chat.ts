@@ -16,8 +16,7 @@ import {
   imageFallback,
 } from "@mariozechner/pi-tui";
 import { randomUUID } from "node:crypto";
-import { signInviteToken } from "@clawrun/auth";
-import { sendChatMessage, type ChatStreamEvent } from "../chat-client.js";
+import type { ClawRunInstance } from "@clawrun/sdk";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -80,8 +79,7 @@ function formatToolArgs(args: Record<string, unknown>): string {
  */
 export async function startChatTUI(
   instanceName: string,
-  deployedUrl: string,
-  secret: string,
+  instance: ClawRunInstance,
   sandboxId: string,
   opts?: { initialMessage?: string },
 ): Promise<void> {
@@ -281,70 +279,38 @@ export async function startChatTUI(
       tui.requestRender();
     }
 
-    const onEvent = (event: ChatStreamEvent) => {
-      switch (event.type) {
-        case "text-delta": {
+    let responseText: string | undefined;
+    let hasError = false;
+    try {
+      const stream = instance.chat(message, { sessionId, signal: loader.signal });
+      for await (const chunk of stream) {
+        if (chunk.type === "text-delta") {
           ensureStreaming();
-          streamText += event.delta ?? "";
+          streamText += chunk.delta ?? "";
           updateStreamContent();
-          break;
-        }
-        case "reasoning-delta": {
+        } else if (chunk.type === "reasoning-delta") {
           ensureStreaming();
-          reasoningText += event.delta ?? "";
+          reasoningText += chunk.delta ?? "";
           updateStreamContent();
-          break;
-        }
-        case "tool-input": {
+        } else if (chunk.type === "tool-input-available") {
           ensureStreaming();
-          const toolLabel = `\`${event.toolName}\` ${event.input ? formatToolArgs(event.input) : ""}`;
+          const toolName = chunk.toolName ?? "tool";
+          const input = chunk.input as Record<string, unknown> | undefined;
+          const toolLabel = `\`${toolName}\` ${input ? formatToolArgs(input) : ""}`;
           toolLines.push(toolLabel);
           updateStreamContent();
-          break;
-        }
-        case "tool-output": {
-          // Tool finished — no visual change needed, result is in final text
-          break;
-        }
-        case "error": {
-          // Error will be handled by the result below
-          break;
+        } else if (chunk.type === "error") {
+          hasError = true;
+          responseText = colors.error(chunk.errorText ?? "Unknown error");
         }
       }
-    };
-
-    let responseText: string | undefined;
-    try {
-      // Sign a fresh JWT for each request so long-lived sessions don't expire
-      const jwt = await signInviteToken(secret);
-      const result = await sendChatMessage(
-        deployedUrl,
-        jwt,
-        message,
-        loader.signal,
-        sessionId,
-        onEvent,
-      );
-      if (result.error) {
-        responseText = colors.error(result.error);
-      } else if (!streaming) {
-        // No streaming events were received — fall back to batch rendering
-        if (result.toolCalls.length > 0) {
-          const tl = result.toolCalls
-            .map((tc) => `\`${tc.name}\` ${formatToolArgs(tc.arguments)}`)
-            .join("\n");
-          responseText = tl + "\n\n" + result.text;
-        } else {
-          responseText = result.text;
-        }
-      }
-      // If streaming happened and no error, streamMd already has the final text
     } catch (err) {
       if (loader.aborted) {
         responseText = colors.dim("(cancelled)");
       } else {
         responseText = colors.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
       }
+      hasError = true;
     }
 
     // Clean up loader (may already be stopped if streaming started)
@@ -360,6 +326,9 @@ export async function startChatTUI(
         chatContainer.removeChild(streamMsg);
       }
       addAgentMessage(responseText);
+    } else if (!streaming && !hasError) {
+      // No streaming events and no error — show empty response
+      addAgentMessage(streamText || colors.dim("(no response)"));
     }
 
     // Restore editor

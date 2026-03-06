@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PROVIDER_IDS } from "@clawrun/provider";
 
 const stateSchema = z.object({
   redisUrl: z.string(),
@@ -17,7 +18,7 @@ export const cloudClawConfigSchema = z.object({
   instance: z.object({
     name: z.string().default("default"),
     preset: z.string().optional(),
-    provider: z.string(),
+    provider: z.enum(PROVIDER_IDS),
     deployedUrl: z.string().optional(),
     sandboxRoot: z.string().default(".clawrun"),
     platformUrlEnvVars: z.array(z.string()).default([]),

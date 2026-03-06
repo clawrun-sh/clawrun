@@ -11,18 +11,6 @@ import {
   getWorkspaceFiles,
   loadPresetFromDir,
   registerPreset,
-} from "../presets/index.js";
-import { getPlatformProvider } from "../platform/index.js";
-import type {
-  PlatformProvider,
-  PlatformTier,
-  PlatformLimits,
-  ProjectHandle,
-  StateStoreEntry,
-} from "../platform/index.js";
-import type { ClawRunConfig } from "@clawrun/runtime";
-import { SANDBOX_DEFAULTS } from "@clawrun/runtime";
-import {
   createInstance,
   instanceExists,
   getInstance,
@@ -36,83 +24,32 @@ import {
   readConfig,
   writeConfig,
   generateSecret,
-} from "../instance/index.js";
+  getPlatformProvider,
+  deriveAllowedDomains,
+  domainMatchesWildcard,
+} from "@clawrun/sdk";
+import type {
+  PlatformProvider,
+  PlatformTier,
+  PlatformLimits,
+  ProjectHandle,
+  StateStoreEntry,
+  ClawRunConfig,
+  DerivedDomains,
+} from "@clawrun/sdk";
+import { SANDBOX_DEFAULTS } from "@clawrun/runtime";
 import { hasWakeHook } from "@clawrun/channel";
 import { createAgent } from "@clawrun/agent";
 import type { Agent } from "@clawrun/agent";
+import { ClawRunClient } from "@clawrun/sdk";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
-import { createApiClient } from "../api.js";
 import { promptProvider, promptChannels } from "../setup/index.js";
 import type { ChannelSetupResult } from "../setup/index.js";
 
-/** Test whether `domain` matches a wildcard `pattern` (e.g. *.example.com, cdn.*.net). */
-export function domainMatchesWildcard(domain: string, pattern: string): boolean {
-  if (pattern === domain) return true;
-  // Convert wildcard pattern to regex: escape dots, replace * with [^.]+ (single label)
-  const re = new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$");
-  return re.test(domain);
-}
-
 function generateInstanceName(): string {
   return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
-}
-
-/** Map known provider/channel names to their API domains. */
-export const PROVIDER_DOMAINS: Record<string, string[]> = {
-  openai: ["api.openai.com"],
-  openrouter: ["openrouter.ai"],
-  anthropic: ["api.anthropic.com"],
-  google: ["generativelanguage.googleapis.com"],
-  groq: ["api.groq.com"],
-  mistral: ["api.mistral.ai"],
-  deepseek: ["api.deepseek.com"],
-};
-
-export const CHANNEL_DOMAINS: Record<string, string[]> = {
-  telegram: ["api.telegram.org"],
-  discord: ["discord.com", "gateway.discord.gg"],
-  slack: ["slack.com"],
-  matrix: ["matrix.org"],
-  whatsapp: ["graph.facebook.com"],
-  linq: ["api.linqapp.com"],
-  nextcloud_talk: [],
-  dingtalk: ["api.dingtalk.com"],
-  qq: ["bots.qq.com"],
-  lark: ["open.feishu.cn", "open.larksuite.com"],
-  nostr: ["relay.damus.io", "nos.lol", "relay.primal.net", "relay.snort.social"],
-};
-
-interface DerivedDomains {
-  /** All domains flat, for the allowlist. */
-  all: string[];
-  /** Labeled groups for display. */
-  groups: Array<{ reason: string; domains: string[] }>;
-}
-
-export function deriveAllowedDomains(
-  platform: PlatformProvider,
-  provider?: string,
-  channelNames?: string[],
-): DerivedDomains {
-  const groups: DerivedDomains["groups"] = [
-    { reason: "Sandbox lifecycle (heartbeat, sidecar)", domains: [...platform.getInfraDomains()] },
-  ];
-  if (provider) {
-    const domains = PROVIDER_DOMAINS[provider.toLowerCase()];
-    if (domains) {
-      groups.push({ reason: `LLM provider (${provider})`, domains: [...domains] });
-    }
-  }
-  for (const ch of channelNames ?? []) {
-    const domains = CHANNEL_DOMAINS[ch.toLowerCase()];
-    if (domains) {
-      groups.push({ reason: `${ch} channel`, domains: [...domains] });
-    }
-  }
-  const all = [...new Set(groups.flatMap((g) => g.domains))];
-  return { all, groups };
 }
 
 type NetworkPolicy = ClawRunConfig["sandbox"]["networkPolicy"];
@@ -330,10 +267,18 @@ async function handleNewInstance(
   const name = instanceName ?? generateInstanceName();
   const platform = getPlatformProvider(preset.provider);
 
-  await platform.checkPrerequisites();
+  const prereqSpinner = clack.spinner();
+  prereqSpinner.start("Checking prerequisites...");
+  await platform.checkPrerequisites((event) => {
+    prereqSpinner.message(event.message);
+  });
+  prereqSpinner.stop("Prerequisites OK");
 
+  const tierSpinner = clack.spinner();
+  tierSpinner.start("Detecting platform tier...");
   const { tier, limits } = await detectTier(platform);
   const tierLabel = tier === "hobby" ? `${platform.name} free plan` : `${platform.name} paid plan`;
+  tierSpinner.stop(`Platform: ${tierLabel}`);
   const activeDurationMins = Math.round(SANDBOX_DEFAULTS.activeDuration / 60);
 
   let noteBody =
@@ -403,7 +348,8 @@ async function handleNewInstance(
   let networkPolicy: NetworkPolicy = "allow-all";
   if (!options.yes) {
     const derived = deriveAllowedDomains(
-      platform,
+      agent,
+      platform.getInfraDomains(),
       providerResult.provider,
       channelSetup.channelNames,
     );
@@ -423,9 +369,13 @@ async function handleNewInstance(
   const sandboxSecret = generateSecret();
 
   let handle: ProjectHandle;
+  const projectSpinner = clack.spinner();
+  projectSpinner.start("Creating platform project...");
   try {
     handle = await platform.createProject(name);
+    projectSpinner.stop(`Project created: ${name}`);
   } catch (err) {
+    projectSpinner.stop(chalk.red("Failed to create project"));
     clack.log.error(
       `Failed to create project: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -441,7 +391,14 @@ async function handleNewInstance(
   let selectedStore: StateStoreEntry | undefined;
 
   if (!options.yes) {
+    const storeSpinner = clack.spinner();
+    storeSpinner.start("Fetching existing state stores...");
     const stores = await platform.listStateStores();
+    storeSpinner.stop(
+      stores.length > 0
+        ? `Found ${stores.length} state store${stores.length > 1 ? "s" : ""}`
+        : "No existing state stores found",
+    );
     if (stores.length > 0) {
       clack.log.info(
         "Your agent needs a state store (Redis) to persist sandbox lifecycle state,\n" +
@@ -508,9 +465,19 @@ async function handleNewInstance(
     ...stateResult.vars,
   };
 
-  await createInstance(name, config, allEnvVars, {
-    presetDeps: agent.getInstallDependencies(),
-  });
+  const instanceSpinner = clack.spinner();
+  instanceSpinner.start("Creating instance...");
+  try {
+    await createInstance(name, config, allEnvVars, platform, {
+      presetDeps: agent.getInstallDependencies(),
+      onProgress: (event) => instanceSpinner.message(event.message),
+    });
+    instanceSpinner.stop("Instance created");
+  } catch (err) {
+    instanceSpinner.stop(chalk.red("Failed to create instance"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
   const deployDir = instanceDeployDir(name);
 
   // Write the project link into .deploy/
@@ -520,24 +487,52 @@ async function handleNewInstance(
   platform.patchPlatformConfig(deployDir, limits);
 
   // Disable deployment protection
-  await platform.disableDeploymentProtection(deployDir);
+  const protectionSpinner = clack.spinner();
+  protectionSpinner.start("Configuring deployment protection...");
+  try {
+    await platform.disableDeploymentProtection(deployDir);
+    protectionSpinner.stop("Deployment protection configured");
+  } catch (err) {
+    protectionSpinner.stop(chalk.yellow("Could not configure deployment protection"));
+    clack.log.warn(err instanceof Error ? err.message : String(err));
+  }
 
   // Persist all env vars to project
-  await platform.persistEnvVars(deployDir, allEnvVars);
+  const envSpinner = clack.spinner();
+  envSpinner.start("Persisting env vars...");
+  try {
+    await platform.persistEnvVars(deployDir, allEnvVars);
+    envSpinner.stop("Env vars persisted");
+  } catch (err) {
+    envSpinner.stop(chalk.red("Failed to persist env vars"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   // Deploy from .deploy/
-  const url = await platform.deploy(deployDir, allEnvVars);
-  saveDeployedUrl(name, url);
-  await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
+  const deploySpinner = clack.spinner();
+  deploySpinner.start("Deploying...");
+  let url: string;
+  try {
+    url = await platform.deploy(deployDir, allEnvVars);
+    saveDeployedUrl(name, url);
+    deploySpinner.message("Persisting deployment URL...");
+    await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
+    deploySpinner.stop(`Deployed to ${chalk.cyan(url)}`);
+  } catch (err) {
+    deploySpinner.stop(chalk.red("Deployment failed"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   // Start sandbox
   if (jwtSecret) {
     const sandboxSpinner = clack.spinner();
     sandboxSpinner.start("Starting sandbox...");
     try {
-      const api = createApiClient(url, jwtSecret);
-      const res = await api.post("/api/v1/sandbox/restart");
-      const result = (await res.json()) as Record<string, unknown>;
+      const sdkClient = new ClawRunClient();
+      const inst = sdkClient.connect(url, jwtSecret);
+      const result = await inst.restart();
       sandboxSpinner.stop(chalk.green(`Sandbox: ${result.status ?? "ok"}`));
     } catch {
       sandboxSpinner.stop(
@@ -573,10 +568,18 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
 
   const platform = getPlatformProvider(existingConfig.instance.provider);
 
-  await platform.checkPrerequisites();
+  const prereqSpinner = clack.spinner();
+  prereqSpinner.start("Checking prerequisites...");
+  await platform.checkPrerequisites((event) => {
+    prereqSpinner.message(event.message);
+  });
+  prereqSpinner.stop("Prerequisites OK");
 
+  const tierSpinner = clack.spinner();
+  tierSpinner.start("Detecting platform tier...");
   const { tier, limits } = await detectTier(platform);
   const tierLabel = tier === "hobby" ? `${platform.name} free plan` : `${platform.name} paid plan`;
+  tierSpinner.stop(`Platform: ${tierLabel}`);
 
   clack.note(
     `Instance:   ${chalk.bold(name)}\n` +
@@ -679,7 +682,12 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       if (policyAction === "restricted") {
         const currentChannels = agent.readSetup(agentConfigDir)?.channels;
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
-        const derived = deriveAllowedDomains(platform, undefined, channelNames);
+        const derived = deriveAllowedDomains(
+          agent,
+          platform.getInfraDomains(),
+          undefined,
+          channelNames,
+        );
         existingConfig.sandbox.networkPolicy = await promptNetworkPolicy(derived);
         existingConfig.sandbox.networkPolicy = await promptToolDomains(
           redeployTools,
@@ -696,7 +704,12 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
         // channels and tools have their domains in the allow-list.
         const currentChannels = agent.readSetup(agentConfigDir)?.channels;
         const channelNames = currentChannels ? Object.keys(currentChannels) : [];
-        const derived = deriveAllowedDomains(platform, undefined, channelNames);
+        const derived = deriveAllowedDomains(
+          agent,
+          platform.getInfraDomains(),
+          undefined,
+          channelNames,
+        );
         const currentAllow = currentPolicy.allow ?? [];
         const missing = derived.all.filter(
           (d) => !currentAllow.some((p) => domainMatchesWildcard(d, p)),
@@ -736,7 +749,16 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   clack.note("Upgrading and deploying to " + platform.name, "Deploy");
 
   // Upgrade instance
-  await upgradeInstance(name);
+  const upgradeSpinner = clack.spinner();
+  upgradeSpinner.start("Upgrading instance...");
+  try {
+    await upgradeInstance(name, platform, (event) => upgradeSpinner.message(event.message));
+    upgradeSpinner.stop("Instance upgraded");
+  } catch (err) {
+    upgradeSpinner.stop(chalk.red("Failed to upgrade instance"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   // Patch platform config in .deploy/
   platform.patchPlatformConfig(deployDir, limits);
@@ -770,12 +792,32 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   const clawrunEnv = toEnvVars(config);
 
   // Persist env vars to .deploy/
-  await platform.persistEnvVars(deployDir, clawrunEnv);
+  const reEnvSpinner = clack.spinner();
+  reEnvSpinner.start("Persisting env vars...");
+  try {
+    await platform.persistEnvVars(deployDir, clawrunEnv);
+    reEnvSpinner.stop("Env vars persisted");
+  } catch (err) {
+    reEnvSpinner.stop(chalk.red("Failed to persist env vars"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   // Deploy from .deploy/
-  const url = await platform.deploy(deployDir, clawrunEnv);
-  saveDeployedUrl(name, url);
-  await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
+  const reDeploySpinner = clack.spinner();
+  reDeploySpinner.start("Deploying...");
+  let url: string;
+  try {
+    url = await platform.deploy(deployDir, clawrunEnv);
+    saveDeployedUrl(name, url);
+    reDeploySpinner.message("Persisting deployment URL...");
+    await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
+    reDeploySpinner.stop(`Deployed to ${chalk.cyan(url)}`);
+  } catch (err) {
+    reDeploySpinner.stop(chalk.red("Deployment failed"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   // Restart sandbox
   const upgradeJwtSecret = clawrunEnv["CLAWRUN_JWT_SECRET"];
@@ -783,9 +825,9 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
     const sandboxSpinner = clack.spinner();
     sandboxSpinner.start("Restarting sandbox...");
     try {
-      const api = createApiClient(url, upgradeJwtSecret);
-      const res = await api.post("/api/v1/sandbox/restart");
-      const result = (await res.json()) as Record<string, unknown>;
+      const sdkClient = new ClawRunClient();
+      const inst = sdkClient.connect(url, upgradeJwtSecret);
+      const result = await inst.restart();
       sandboxSpinner.stop(chalk.green(`Sandbox: ${result.status ?? "ok"}`));
     } catch (err) {
       sandboxSpinner.stop(

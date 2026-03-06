@@ -407,6 +407,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "telegram",
     name: "Telegram",
+    apiDomains: ["api.telegram.org"],
     setupFields: [
       { name: "bot_token", label: "Bot token (from @BotFather)", type: "password", required: true },
       {
@@ -426,6 +427,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "discord",
     name: "Discord",
+    apiDomains: ["discord.com", "gateway.discord.gg"],
     setupFields: [
       {
         name: "bot_token",
@@ -457,6 +459,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "slack",
     name: "Slack",
+    apiDomains: ["slack.com"],
     setupFields: [
       { name: "bot_token", label: "Bot token (xoxb-...)", type: "password", required: true },
       {
@@ -497,6 +500,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "imessage",
     name: "iMessage",
+    apiDomains: [],
     setupFields: [
       {
         name: "allowed_contacts",
@@ -511,6 +515,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "matrix",
     name: "Matrix",
+    apiDomains: ["matrix.org"],
     setupFields: [
       {
         name: "homeserver",
@@ -532,6 +537,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "signal",
     name: "Signal",
+    apiDomains: [],
     setupFields: [
       {
         name: "http_url",
@@ -564,6 +570,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "whatsapp",
     name: "WhatsApp (Cloud API)",
+    apiDomains: ["graph.facebook.com"],
     setupFields: [
       {
         name: "access_token",
@@ -604,6 +611,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "linq",
     name: "Linq",
+    apiDomains: ["api.linqapp.com"],
     setupFields: [
       {
         name: "api_token",
@@ -635,6 +643,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "irc",
     name: "IRC",
+    apiDomains: [],
     setupFields: [
       { name: "server", label: "IRC server (hostname)", type: "text", required: true },
       { name: "port", label: "Port", type: "text", required: false, default: "6697" },
@@ -665,6 +674,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "webhook",
     name: "Webhook",
+    apiDomains: [],
     setupFields: [
       { name: "port", label: "Port", type: "text", required: false, default: "8080" },
       {
@@ -678,6 +688,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "nextcloud_talk",
     name: "Nextcloud Talk",
+    apiDomains: [],
     setupFields: [
       {
         name: "base_url",
@@ -699,6 +710,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "dingtalk",
     name: "DingTalk",
+    apiDomains: ["api.dingtalk.com"],
     setupFields: [
       { name: "client_id", label: "Client ID (AppKey)", type: "text", required: true },
       {
@@ -718,6 +730,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "qq",
     name: "QQ Official",
+    apiDomains: ["bots.qq.com"],
     setupFields: [
       { name: "app_id", label: "App ID", type: "text", required: true },
       { name: "app_secret", label: "App Secret", type: "password", required: true },
@@ -748,6 +761,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "lark",
     name: "Lark / Feishu",
+    apiDomains: ["open.feishu.cn", "open.larksuite.com"],
     setupFields: [
       { name: "app_id", label: "App ID", type: "text", required: true },
       { name: "app_secret", label: "App Secret", type: "password", required: true },
@@ -784,6 +798,7 @@ export const CHANNELS: ChannelInfo[] = [
   {
     id: "nostr",
     name: "Nostr",
+    apiDomains: ["relay.damus.io", "nos.lol", "relay.primal.net", "relay.snort.social"],
     setupFields: [
       {
         name: "private_key",

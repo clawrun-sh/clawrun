@@ -8,6 +8,7 @@ vi.mock("node:fs", () => ({
 
 vi.mock("@clawrun/provider", () => ({
   getProvider: vi.fn(),
+  snapshotId: (id: string) => id,
 }));
 
 vi.mock("../agents/registry.js", () => ({

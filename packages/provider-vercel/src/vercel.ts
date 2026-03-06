@@ -3,24 +3,28 @@ import { Sandbox, Snapshot } from "@vercel/sandbox";
 import { getAuth } from "@vercel/sandbox/dist/auth/file.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  SandboxProvider,
-  ManagedSandbox,
-  SandboxInfo,
-  SnapshotInfo,
-  CreateSandboxOptions,
-  RunCommandOptions,
-  CommandResult,
-  SnapshotRef,
-  NetworkPolicy,
-  ProviderOptions,
+import {
+  sandboxId,
+  snapshotId,
+  type SandboxProvider,
+  type ManagedSandbox,
+  type SandboxId,
+  type SnapshotId,
+  type SandboxInfo,
+  type SnapshotInfo,
+  type CreateSandboxOptions,
+  type RunCommandOptions,
+  type CommandResult,
+  type SnapshotRef,
+  type NetworkPolicy,
+  type ProviderOptions,
 } from "@clawrun/provider";
 
 class VercelManagedSandbox implements ManagedSandbox {
   constructor(private sandbox: Sandbox) {}
 
-  get id(): string {
-    return this.sandbox.sandboxId;
+  get id(): SandboxId {
+    return sandboxId(this.sandbox.sandboxId);
   }
 
   get status(): string {
@@ -64,7 +68,7 @@ class VercelManagedSandbox implements ManagedSandbox {
 
   async snapshot(): Promise<SnapshotRef> {
     const snap = await this.sandbox.snapshot();
-    return { id: snap.snapshotId };
+    return { id: snapshotId(snap.snapshotId) };
   }
 
   extendTimeout(ms: number): Promise<void> {
@@ -153,26 +157,30 @@ export class VercelSandboxProvider implements SandboxProvider {
     return new VercelManagedSandbox(sandbox);
   }
 
-  async get(id: string): Promise<ManagedSandbox> {
+  async get(id: SandboxId): Promise<ManagedSandbox> {
     const sandbox = await this.withScope(() => Sandbox.get({ sandboxId: id, ...this.credentials }));
     return new VercelManagedSandbox(sandbox);
   }
 
   async list(): Promise<SandboxInfo[]> {
     const result = await this.withScope(() => Sandbox.list(this.credentials));
-    return result.json.sandboxes;
+    return result.json.sandboxes.map((s: Record<string, unknown>) => ({
+      ...s,
+      id: sandboxId(s.id as string),
+      sourceSnapshotId: s.sourceSnapshotId ? snapshotId(s.sourceSnapshotId as string) : undefined,
+    })) as SandboxInfo[];
   }
 
   async listSnapshots(): Promise<SnapshotInfo[]> {
     const result = await this.withScope(() => Snapshot.list(this.credentials));
     return result.json.snapshots.map((s: Record<string, unknown>) => ({
-      id: (s.snapshotId ?? s.id) as string,
+      id: snapshotId((s.snapshotId ?? s.id) as string),
       createdAt: (s.createdAt as number) ?? Date.now(),
-      sandboxId: s.sourceSandboxId as string | undefined,
+      sandboxId: s.sourceSandboxId ? sandboxId(s.sourceSandboxId as string) : undefined,
     }));
   }
 
-  async deleteSnapshot(id: string): Promise<void> {
+  async deleteSnapshot(id: SnapshotId): Promise<void> {
     try {
       const snapshot = await this.withScope(() =>
         Snapshot.get({ snapshotId: id, ...this.credentials }),

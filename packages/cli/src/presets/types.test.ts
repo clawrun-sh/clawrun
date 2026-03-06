@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { presetSchema, PRESET_SCHEMA_URL } from "./types.js";
+import { presetSchema, PRESET_SCHEMA_URL } from "@clawrun/sdk";
 
 const validPreset = {
   id: "test",

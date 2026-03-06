@@ -1,40 +1,32 @@
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import type { SandboxClient } from "./types.js";
-import { createApiClient } from "../api.js";
+import type { ClawRunInstance, SandboxEntry } from "@clawrun/sdk";
+
+type SandboxId = SandboxEntry["id"];
 
 /** Find the running sandbox ID, or null. */
-export async function getRunningId(client: SandboxClient): Promise<string | null> {
-  const sandboxes = await client.list();
+export async function getRunningId(instance: ClawRunInstance): Promise<SandboxId | null> {
+  const sandboxes = await instance.sandbox.list();
   const running = sandboxes.find((s) => s.status === "running");
   return running?.id ?? null;
 }
 
 /** Start a sandbox (wake from snapshot if needed), then poll until one is running. */
 async function ensureRunning(
-  client: SandboxClient,
-  deployedUrl: string,
-  jwtSecret: string,
+  instance: ClawRunInstance,
   spinner: ReturnType<typeof clack.spinner>,
-): Promise<string> {
+): Promise<SandboxId> {
   spinner.message("Starting sandbox...");
 
-  const api = createApiClient(deployedUrl, jwtSecret);
-
-  let res: Response;
   try {
-    res = await api.post("/api/v1/sandbox/start", {
-      signal: AbortSignal.timeout(30_000),
-    });
+    const result = await instance.start();
+    if (result.status === "failed") {
+      spinner.stop(chalk.red(`Start failed: ${result.error}`));
+      process.exit(1);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     spinner.stop(chalk.red(`Failed to reach deployment: ${msg}`));
-    process.exit(1);
-  }
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    spinner.stop(chalk.red(`Start failed (HTTP ${res.status}): ${body}`));
     process.exit(1);
   }
 
@@ -45,7 +37,7 @@ async function ensureRunning(
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     try {
-      const id = await getRunningId(client);
+      const id = await getRunningId(instance);
       if (id) return id;
     } catch {
       // Provider API may be temporarily unavailable — keep polling
@@ -57,23 +49,21 @@ async function ensureRunning(
 }
 
 /**
- * Get the running sandbox ID — start one via restart if none found.
+ * Get the running sandbox ID — start one via the SDK if none found.
  * Caller owns the spinner lifecycle.
  */
 export async function resolveRunningId(
-  client: SandboxClient,
-  deployedUrl: string,
-  jwtSecret: string,
+  instance: ClawRunInstance,
   spinner?: ReturnType<typeof clack.spinner>,
-): Promise<string> {
-  const id = await getRunningId(client);
+): Promise<SandboxId> {
+  const id = await getRunningId(instance);
   if (id) return id;
 
   // Create a spinner if the caller didn't provide one
   const s = spinner ?? clack.spinner();
   if (!spinner) s.start("Starting sandbox...");
 
-  const runningId = await ensureRunning(client, deployedUrl, jwtSecret, s);
+  const runningId = await ensureRunning(instance, s);
   if (!spinner) s.stop("Sandbox ready.");
   return runningId;
 }

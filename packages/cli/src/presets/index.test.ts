@@ -47,17 +47,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent-preset");
     expect(files.size).toBe(2);
@@ -81,19 +72,10 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
     // Need to also mock the repoRoot derivation. Since we can't easily control
     // __dirname, we test via the customDir layer instead (layer 3 overriding layer 1).
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     // Use customDir as the override layer
     const files = getWorkspaceFiles("nonexistent", presetDir);
@@ -115,17 +97,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", customDir);
     // BOOTSTRAP.md overridden by custom
@@ -153,17 +126,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", customDir);
     for (const [filename] of files) {
@@ -179,17 +143,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent/path/that/does/not/exist",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("also-nonexistent");
     expect(files.size).toBe(0);
@@ -202,17 +157,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", undefined);
     expect(files.has("SOUL.md")).toBe(true);
@@ -225,17 +171,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", "/does/not/exist");
     // Should still return base files
@@ -264,17 +201,8 @@ describe("getWorkspaceFiles — layer merge logic", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
     const files = getWorkspaceFiles("nonexistent", customDir);
 
     // Total count = base count (8), no new files added from custom
@@ -317,17 +245,8 @@ describe("getWorkspaceFiles — identifying files from custom dir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", customDir);
 
@@ -362,17 +281,8 @@ describe("getWorkspaceFiles — identifying files from custom dir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", rootDir);
 
@@ -399,17 +309,8 @@ describe("getWorkspaceFiles — identifying files from custom dir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: baseDir,
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getWorkspaceFiles } = await import("./index.js");
+    const { getWorkspaceFiles } = await import("@clawrun/sdk");
 
     const files = getWorkspaceFiles("nonexistent", customDir);
 
@@ -434,17 +335,8 @@ describe("loadPresetFromDir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { loadPresetFromDir } = await import("./index.js");
+    const { loadPresetFromDir } = await import("@clawrun/sdk");
     expect(loadPresetFromDir(dir)).toBeUndefined();
   });
 
@@ -461,17 +353,8 @@ describe("loadPresetFromDir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { loadPresetFromDir } = await import("./index.js");
+    const { loadPresetFromDir } = await import("@clawrun/sdk");
     const result = loadPresetFromDir(dir);
     expect(result).toBeDefined();
     expect(result!.id).toBe("custom");
@@ -493,17 +376,8 @@ describe("loadPresetFromDir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { loadPresetFromDir } = await import("./index.js");
+    const { loadPresetFromDir } = await import("@clawrun/sdk");
     const result = loadPresetFromDir(dir);
     expect(result).toBeDefined();
     expect(result!.$schema).toBe("https://clawrun.sh/preset/schema.json");
@@ -520,17 +394,8 @@ describe("loadPresetFromDir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { loadPresetFromDir } = await import("./index.js");
+    const { loadPresetFromDir } = await import("@clawrun/sdk");
     expect(() => loadPresetFromDir(dir)).toThrow();
   });
 
@@ -541,17 +406,8 @@ describe("loadPresetFromDir", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { loadPresetFromDir } = await import("./index.js");
+    const { loadPresetFromDir } = await import("@clawrun/sdk");
     expect(() => loadPresetFromDir(dir)).toThrow();
   });
 });
@@ -565,17 +421,8 @@ describe("preset registry", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "starter desc",
-      },
-    }));
 
-    const { getPreset } = await import("./index.js");
+    const { getPreset } = await import("@clawrun/sdk");
     const preset = getPreset("starter");
     expect(preset).toBeDefined();
     expect(preset!.id).toBe("starter");
@@ -586,17 +433,8 @@ describe("preset registry", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { getPreset } = await import("./index.js");
+    const { getPreset } = await import("@clawrun/sdk");
     expect(getPreset("unknown")).toBeUndefined();
   });
 
@@ -604,23 +442,14 @@ describe("preset registry", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { registerPreset, getPreset } = await import("./index.js");
+    const { registerPreset, getPreset } = await import("@clawrun/sdk");
 
     const custom = {
       id: "custom",
       name: "Custom",
       agent: "nanobot",
-      provider: "aws",
+      provider: "vercel" as const,
       description: "custom preset",
     };
     registerPreset(custom);
@@ -628,24 +457,15 @@ describe("preset registry", () => {
     const result = getPreset("custom");
     expect(result).toBeDefined();
     expect(result!.agent).toBe("nanobot");
-    expect(result!.provider).toBe("aws");
+    expect(result!.provider).toBe("vercel");
   });
 
   it("registerPreset overwrites an existing preset with same id", async () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "original",
-      },
-    }));
 
-    const { registerPreset, getPreset } = await import("./index.js");
+    const { registerPreset, getPreset } = await import("@clawrun/sdk");
 
     registerPreset({
       id: "starter",
@@ -664,17 +484,8 @@ describe("preset registry", () => {
     vi.doMock("@clawrun/agent", () => ({
       baseWorkspaceDir: "/nonexistent",
     }));
-    vi.doMock("./starter.js", () => ({
-      starter: {
-        id: "starter",
-        name: "Starter",
-        agent: "zeroclaw",
-        provider: "vercel",
-        description: "test",
-      },
-    }));
 
-    const { registerPreset, listPresets } = await import("./index.js");
+    const { registerPreset, listPresets } = await import("@clawrun/sdk");
 
     // Initially should have at least "starter"
     const initial = listPresets();
@@ -685,7 +496,7 @@ describe("preset registry", () => {
       id: "second",
       name: "Second",
       agent: "x",
-      provider: "y",
+      provider: "vercel" as const,
       description: "d",
     });
 

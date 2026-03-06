@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createSandboxHandle } from "./handle.js";
-import type { SandboxClient } from "./types.js";
+import type { SandboxClient } from "@clawrun/sdk";
+import { sandboxId } from "@clawrun/sdk";
 
 function mockClient(): SandboxClient {
   return {
@@ -10,14 +11,13 @@ function mockClient(): SandboxClient {
     deleteSnapshots: vi.fn(),
     exec: vi.fn(async () => ({ exitCode: 0, stdout: "output", stderr: "" })),
     readFile: vi.fn(async () => Buffer.from("data")),
-    connect: vi.fn(),
-  };
+  } as unknown as SandboxClient;
 }
 
 describe("createSandboxHandle", () => {
   it("handles string-based runCommand call", async () => {
     const client = mockClient();
-    const handle = createSandboxHandle(client, "sbx-1");
+    const handle = createSandboxHandle(client, sandboxId("sbx-1"));
 
     const result = await handle.runCommand("echo", ["hello"]);
 
@@ -31,7 +31,7 @@ describe("createSandboxHandle", () => {
 
   it("handles object-based runCommand call", async () => {
     const client = mockClient();
-    const handle = createSandboxHandle(client, "sbx-1");
+    const handle = createSandboxHandle(client, sandboxId("sbx-1"));
 
     await handle.runCommand({ cmd: "ls", args: ["-la"], env: { HOME: "/root" } });
 
@@ -46,7 +46,7 @@ describe("createSandboxHandle", () => {
 
   it("uses custom timeout", async () => {
     const client = mockClient();
-    const handle = createSandboxHandle(client, "sbx-1", { timeoutMs: 5000 });
+    const handle = createSandboxHandle(client, sandboxId("sbx-1"), { timeoutMs: 5000 });
 
     await handle.runCommand("pwd");
 
@@ -55,14 +55,14 @@ describe("createSandboxHandle", () => {
 
   it("writeFiles throws not-supported error", async () => {
     const client = mockClient();
-    const handle = createSandboxHandle(client, "sbx-1");
+    const handle = createSandboxHandle(client, sandboxId("sbx-1"));
 
     await expect(handle.writeFiles([])).rejects.toThrow(/not supported/);
   });
 
   it("readFile delegates to client", async () => {
     const client = mockClient();
-    const handle = createSandboxHandle(client, "sbx-1");
+    const handle = createSandboxHandle(client, sandboxId("sbx-1"));
 
     const buf = await handle.readFile("/etc/hosts");
 

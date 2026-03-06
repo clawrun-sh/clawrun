@@ -1,19 +1,15 @@
 import { command, option, optional, string } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { randomUUID } from "node:crypto";
-import { readConfig } from "../instance/index.js";
+import { readConfig } from "@clawrun/sdk";
+import type { ClawRunConfigWithSecrets } from "@clawrun/sdk";
 import { resolveRunningId } from "../sandbox/resolve.js";
-import { createSandboxClient } from "../sandbox/index.js";
-import { signInviteToken } from "@clawrun/auth";
+import { connectInstance } from "../connect-instance.js";
 import { instance } from "../args/instance.js";
 import { startChatTUI } from "../tui/chat.js";
-import { sendChatMessage } from "../chat-client.js";
-import type { ClawRunConfigWithSecrets } from "../instance/config.js";
 
 /**
  * Start an interactive chat REPL with the agent in a deployed instance.
- * Signs a JWT locally and routes messages through /api/v1/chat.
  * Reusable from both the `agent` command and post-deploy flow.
  *
  * @param initialMessage — if provided, sent automatically before the REPL starts
@@ -24,9 +20,8 @@ export async function startAgentChat(
   config: ClawRunConfigWithSecrets,
   opts?: { initialMessage?: string },
 ): Promise<void> {
-  const { deployedUrl } = config.instance;
-  const { jwtSecret } = config.secrets;
-  if (!deployedUrl || !jwtSecret) {
+  const conn = connectInstance(instanceName);
+  if (!conn) {
     clack.log.error(
       `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
     );
@@ -34,10 +29,19 @@ export async function startAgentChat(
   }
 
   // Resolve running sandbox ID (for display in header)
-  const client = createSandboxClient(instanceName, config);
-  const sandboxId = await resolveRunningId(client, deployedUrl, jwtSecret);
+  const s = clack.spinner();
+  s.start("Connecting to sandbox...");
+  let sandboxId: string;
+  try {
+    sandboxId = await resolveRunningId(conn.instance);
+    s.stop(`Connected to sandbox ${chalk.dim(sandboxId)}`);
+  } catch (err) {
+    s.stop(chalk.red("Failed to connect to sandbox"));
+    clack.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
-  await startChatTUI(instanceName, deployedUrl, jwtSecret, sandboxId, {
+  await startChatTUI(instanceName, conn.instance, sandboxId, {
     initialMessage: opts?.initialMessage,
   });
 }
@@ -62,9 +66,8 @@ export const agentCommand = command({
       process.exit(1);
     }
 
-    const { deployedUrl } = config.instance;
-    const { jwtSecret } = config.secrets;
-    if (!deployedUrl || !jwtSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(
         `Instance "${instanceName}" is not fully deployed. Run "clawrun deploy ${instanceName}" first.`,
       );
@@ -76,23 +79,20 @@ export const agentCommand = command({
       const s = clack.spinner();
       s.start("Thinking...");
 
-      const jwt = await signInviteToken(jwtSecret);
-      const result = await sendChatMessage(
-        deployedUrl,
-        jwt,
-        message,
-        AbortSignal.timeout(150_000),
-        randomUUID().replaceAll("-", "_"),
-      );
-
-      if (result.success) {
+      try {
+        const result = await conn.instance.sendMessage(message);
         s.stop("Done");
-        clack.log.success(result.text);
-      } else {
+        const text = result.parts
+          .filter((p) => p.type === "text")
+          .map((p) => (p as { type: "text"; text: string }).text)
+          .join("");
+        clack.log.success(text || "(no response)");
+        process.exit(0);
+      } catch (err) {
         s.stop(chalk.red("Error"));
-        clack.log.error(result.error ?? result.text);
+        clack.log.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
       }
-      process.exit(result.success ? 0 : 1);
     }
 
     // Interactive mode

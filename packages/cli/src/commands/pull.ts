@@ -3,11 +3,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { createSandboxClient } from "../sandbox/index.js";
-import { getRunningId } from "../sandbox/resolve.js";
-import { readConfig, instanceAgentDir } from "../instance/index.js";
+import { readConfig, instanceAgentDir } from "@clawrun/sdk";
 import { createAgent } from "@clawrun/agent";
 import { instance } from "../args/instance.js";
+import { connectInstance } from "../connect-instance.js";
+import { getRunningId } from "../sandbox/resolve.js";
 
 export const pull = command({
   name: "pull",
@@ -22,17 +22,14 @@ export const pull = command({
       process.exit(1);
     }
 
-    const { deployedUrl } = config.instance;
-    const { cronSecret } = config.secrets;
-    if (!deployedUrl || !cronSecret) {
+    const conn = connectInstance(instanceName);
+    if (!conn) {
       clack.log.error(`Instance "${instanceName}" is not fully deployed.`);
       process.exit(1);
     }
 
-    const client = createSandboxClient(instanceName, config);
-
     // Find running sandbox (don't start one — pull requires an existing sandbox)
-    const sandboxId = await getRunningId(client);
+    const sandboxId = await getRunningId(conn.instance);
     if (!sandboxId) {
       clack.log.error(
         "No running sandbox found. Start one first with a message or `clawrun deploy`.",
@@ -41,7 +38,15 @@ export const pull = command({
     }
 
     // Resolve sandbox root
-    const homeResult = await client.exec(sandboxId, "sh", ["-c", "echo $HOME"]);
+    let homeResult;
+    try {
+      homeResult = await conn.instance.sandbox.exec(sandboxId, "sh", ["-c", "echo $HOME"]);
+    } catch (err) {
+      clack.log.error(
+        `Failed to execute command in sandbox: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
     const home = homeResult.stdout.trim();
     if (!home) {
       clack.log.error("Could not determine sandbox $HOME.");
@@ -50,10 +55,18 @@ export const pull = command({
     const remoteAgentDir = `${home}/${config.instance.sandboxRoot}/agent`;
 
     // List all files in the remote agent/ dir recursively
-    const findResult = await client.exec(sandboxId, "sh", [
-      "-c",
-      `find "${remoteAgentDir}" -type f 2>/dev/null`,
-    ]);
+    let findResult;
+    try {
+      findResult = await conn.instance.sandbox.exec(sandboxId, "sh", [
+        "-c",
+        `find "${remoteAgentDir}" -type f 2>/dev/null`,
+      ]);
+    } catch (err) {
+      clack.log.error(
+        `Failed to list files in sandbox: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
 
     if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
       clack.log.warn("No files found in sandbox agent directory.");
@@ -85,7 +98,7 @@ export const pull = command({
 
     for (const relPath of remoteFiles) {
       const remotePath = `${remoteAgentDir}/${relPath}`;
-      const data = await client.readFile(sandboxId, remotePath);
+      const data = await conn.instance.sandbox.readFile(sandboxId, remotePath);
 
       if (data) {
         const localPath = join(agentDir, relPath);

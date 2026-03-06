@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { sandboxId, snapshotId } from "@clawrun/provider";
 import type { ManagedSandbox, SandboxInfo, SandboxProvider, SnapshotInfo } from "@clawrun/provider";
 import type { Agent, CronInfo, DaemonCommand, MonitorConfig } from "@clawrun/agent";
 import type { StateStore } from "../storage/state-types.js";
@@ -29,7 +30,7 @@ let _configOverride: RuntimeConfig = mockRuntimeConfig();
 
 function mockSandboxInfo(overrides?: Partial<SandboxInfo>): SandboxInfo {
   return {
-    id: "sbx-1",
+    id: sandboxId("sbx-1"),
     status: "running",
     createdAt: Date.now() - 60_000,
     startedAt: Date.now() - 60_000,
@@ -42,7 +43,7 @@ function mockSandboxInfo(overrides?: Partial<SandboxInfo>): SandboxInfo {
 
 function mockManagedSandbox(overrides?: Partial<ManagedSandbox>): ManagedSandbox {
   return {
-    id: "sbx-1",
+    id: sandboxId("sbx-1"),
     status: "running",
     timeout: 6_000_000,
     createdAt: Date.now() - 60_000,
@@ -53,7 +54,7 @@ function mockManagedSandbox(overrides?: Partial<ManagedSandbox>): ManagedSandbox
     writeFiles: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(Buffer.from("log output")),
     stop: vi.fn().mockResolvedValue(undefined),
-    snapshot: vi.fn().mockResolvedValue({ id: "snap-new" }),
+    snapshot: vi.fn().mockResolvedValue({ id: snapshotId("snap-new") }),
     extendTimeout: vi.fn().mockResolvedValue(undefined),
     domain: vi.fn().mockReturnValue("https://sbx-1.example.com"),
     ...overrides,
@@ -115,7 +116,7 @@ function mockStateStore(): StateStore {
 
 function mockExtendPayload(overrides?: Partial<ExtendPayload>): ExtendPayload {
   return {
-    sandboxId: "sbx-1",
+    sandboxId: sandboxId("sbx-1"),
     lastChangedAt: Date.now() - 10_000, // 10s ago = recent activity
     sandboxCreatedAt: Date.now() - 60_000,
     root: "/home/user/.clawrun",
@@ -134,6 +135,8 @@ vi.mock("@clawrun/provider", () => ({
   CountBasedRetention: vi.fn().mockImplementation(() => ({
     selectForDeletion: vi.fn().mockReturnValue([]),
   })),
+  sandboxId: (id: string) => id,
+  snapshotId: (id: string) => id,
 }));
 
 vi.mock("../agents/registry.js", () => ({
@@ -240,7 +243,7 @@ function createManager() {
 
 describe("heartbeat()", () => {
   it("returns running sandbox when one exists", async () => {
-    const info = mockSandboxInfo({ id: "sbx-active", status: "running" });
+    const info = mockSandboxInfo({ id: sandboxId("sbx-active"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([info]);
 
     const mgr = createManager();
@@ -251,8 +254,8 @@ describe("heartbeat()", () => {
   });
 
   it("returns newest sandbox when multiple active", async () => {
-    const older = mockSandboxInfo({ id: "sbx-old", status: "running", createdAt: 1000 });
-    const newer = mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 2000 });
+    const older = mockSandboxInfo({ id: sandboxId("sbx-old"), status: "running", createdAt: 1000 });
+    const newer = mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 2000 });
     vi.mocked(_provider.list).mockResolvedValue([older, newer]);
 
     const mgr = createManager();
@@ -270,7 +273,7 @@ describe("heartbeat()", () => {
 
     // startNew needs these
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-woken" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-woken") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -288,7 +291,7 @@ describe("heartbeat()", () => {
     const now = Date.now();
     // No active, but has stopped sandboxes
     const stopped = mockSandboxInfo({
-      id: "sbx-stopped",
+      id: sandboxId("sbx-stopped"),
       status: "stopped",
       stoppedAt: now - 5000,
     });
@@ -308,7 +311,7 @@ describe("heartbeat()", () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_stateStore.get).mockResolvedValue(null);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-first" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-first") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -324,7 +327,11 @@ describe("heartbeat()", () => {
   it("returns stopped with nextWakeAt when sleeping with scheduled cron", async () => {
     const now = Date.now();
     const wakeAt = new Date(now + 600_000).toISOString();
-    const stopped = mockSandboxInfo({ id: "sbx-old", status: "stopped", stoppedAt: now - 5000 });
+    const stopped = mockSandboxInfo({
+      id: sandboxId("sbx-old"),
+      status: "stopped",
+      stoppedAt: now - 5000,
+    });
     vi.mocked(_provider.list).mockResolvedValue([stopped]);
     vi.mocked(_stateStore.get).mockResolvedValue(wakeAt);
 
@@ -337,7 +344,7 @@ describe("heartbeat()", () => {
 
   it("returns stopped when no cron scheduled and not first boot", async () => {
     const stopped = mockSandboxInfo({
-      id: "sbx-old",
+      id: sandboxId("sbx-old"),
       status: "stopped",
       stoppedAt: Date.now() - 5000,
     });
@@ -354,7 +361,7 @@ describe("heartbeat()", () => {
 
 describe("wake()", () => {
   it("returns existing sandbox if one is running", async () => {
-    const info = mockSandboxInfo({ id: "sbx-running", status: "running" });
+    const info = mockSandboxInfo({ id: sandboxId("sbx-running"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([info]);
 
     const mgr = createManager();
@@ -368,7 +375,7 @@ describe("wake()", () => {
   it("starts new sandbox when none active", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-new" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-new") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -437,7 +444,7 @@ describe("handleExtend()", () => {
   });
 
   it("stops sandbox when daemon status is failed", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     // snapshotAndStop calls provider.get again to check status
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
@@ -508,7 +515,7 @@ describe("handleExtend()", () => {
 
   it("stops sandbox when idle exceeds activeDuration", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-idle", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-idle"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     // After snapshot+stop, list returns empty
     vi.mocked(_provider.list).mockResolvedValue([]);
@@ -590,7 +597,7 @@ describe("handleExtend()", () => {
 
   it("registers wake hooks after stopping when no other active sandboxes", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([]); // no other active after stop
     const onStopped = vi.fn().mockResolvedValue(undefined);
@@ -606,11 +613,11 @@ describe("handleExtend()", () => {
 
   it("skips wake hooks when other active sandboxes exist", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     // After stop, another sandbox is active
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-2", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-2"), status: "running" }),
     ]);
     const onStopped = vi.fn().mockResolvedValue(undefined);
     SandboxLifecycleManager.setHooks({ onSandboxStopped: onStopped });
@@ -671,10 +678,10 @@ describe("forceRestart()", () => {
   });
 
   it("snapshots active sandbox then starts new one", async () => {
-    const oldSandbox = mockManagedSandbox({ id: "sbx-old", status: "running" });
-    const newSandbox = mockManagedSandbox({ id: "sbx-new" });
+    const oldSandbox = mockManagedSandbox({ id: sandboxId("sbx-old"), status: "running" });
+    const newSandbox = mockManagedSandbox({ id: sandboxId("sbx-new") });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-old", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-old"), status: "running" }),
     ]);
     vi.mocked(_provider.get).mockResolvedValue(oldSandbox);
     // create is called for the new sandbox
@@ -694,18 +701,20 @@ describe("forceRestart()", () => {
   });
 
   it("stops extra sandboxes when multiple active", async () => {
-    const newest = mockManagedSandbox({ id: "sbx-new", status: "running" });
-    const oldest = mockManagedSandbox({ id: "sbx-old", status: "running" });
+    const newest = mockManagedSandbox({ id: sandboxId("sbx-new"), status: "running" });
+    const oldest = mockManagedSandbox({ id: sandboxId("sbx-old"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 2000 }),
-      mockSandboxInfo({ id: "sbx-old", status: "running", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-old"), status: "running", createdAt: 1000 }),
     ]);
     // get returns the right sandbox based on id
     vi.mocked(_provider.get).mockImplementation(async (id: string) => {
       if (id === "sbx-new") return newest;
       return oldest;
     });
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-fresh" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-fresh") }),
+    );
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -723,7 +732,7 @@ describe("forceRestart()", () => {
     const sandbox = mockManagedSandbox({ status: "running" });
     vi.mocked(sandbox.snapshot).mockRejectedValue(new Error("Disk full"));
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
 
@@ -758,9 +767,9 @@ describe("gracefulStop()", () => {
   });
 
   it("snapshots+stops newest active sandbox", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
@@ -776,11 +785,11 @@ describe("gracefulStop()", () => {
   });
 
   it("stops extra sandboxes beyond the newest", async () => {
-    const newest = mockManagedSandbox({ id: "sbx-new", status: "running" });
-    const extra = mockManagedSandbox({ id: "sbx-extra", status: "running" });
+    const newest = mockManagedSandbox({ id: sandboxId("sbx-new"), status: "running" });
+    const extra = mockManagedSandbox({ id: sandboxId("sbx-extra"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 2000 }),
-      mockSandboxInfo({ id: "sbx-extra", status: "running", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-extra"), status: "running", createdAt: 1000 }),
     ]);
     vi.mocked(_provider.get).mockImplementation(async (id: string) => {
       if (id === "sbx-new") return newest;
@@ -800,7 +809,7 @@ describe("gracefulStop()", () => {
     const sandbox = mockManagedSandbox({ status: "running" });
     vi.mocked(sandbox.snapshot).mockRejectedValue(new Error("Disk full"));
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
 
@@ -812,9 +821,9 @@ describe("gracefulStop()", () => {
   });
 
   it("returns stopped with error when wake hooks fail", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
@@ -832,7 +841,12 @@ describe("gracefulStop()", () => {
 describe("getStatus()", () => {
   it("returns running with sandbox info", async () => {
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running", startedAt: 1000, createdAt: 900 }),
+      mockSandboxInfo({
+        id: sandboxId("sbx-1"),
+        status: "running",
+        startedAt: 1000,
+        createdAt: 900,
+      }),
     ]);
 
     const mgr = createManager();
@@ -844,8 +858,8 @@ describe("getStatus()", () => {
 
   it("returns not running with latest sandbox info", async () => {
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-old", status: "stopped", createdAt: 1000 }),
-      mockSandboxInfo({ id: "sbx-older", status: "stopped", createdAt: 500 }),
+      mockSandboxInfo({ id: sandboxId("sbx-old"), status: "stopped", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-older"), status: "stopped", createdAt: 500 }),
     ]);
 
     const mgr = createManager();
@@ -870,7 +884,9 @@ describe("startNew() (via wake)", () => {
   it("acquires lock, creates sandbox, releases lock", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-created" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-created") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),
@@ -888,7 +904,9 @@ describe("startNew() (via wake)", () => {
     // First call: no active (triggers startNew). Second call (after wait): active sandbox
     vi.mocked(_provider.list)
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([mockSandboxInfo({ id: "sbx-appeared", status: "running" })]);
+      .mockResolvedValueOnce([
+        mockSandboxInfo({ id: sandboxId("sbx-appeared"), status: "running" }),
+      ]);
 
     const mgr = createManager();
     const result = await mgr.wake();
@@ -911,10 +929,12 @@ describe("startNew() (via wake)", () => {
 
 describe("startNewLocked() (via wake)", () => {
   it("resumes from latest snapshot when available", async () => {
-    const snap: SnapshotInfo = { id: "snap-latest", createdAt: Date.now() - 10_000 };
+    const snap: SnapshotInfo = { id: snapshotId("snap-latest"), createdAt: Date.now() - 10_000 };
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([snap]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-resumed" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-resumed") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -924,17 +944,17 @@ describe("startNewLocked() (via wake)", () => {
 
     expect(result.status).toBe("running");
     expect(_provider.create).toHaveBeenCalledWith(
-      expect.objectContaining({ snapshotId: "snap-latest" }),
+      expect.objectContaining({ snapshotId: snapshotId("snap-latest") }),
     );
   });
 
   it("falls through to fresh sandbox when snapshot resume fails", async () => {
-    const snap: SnapshotInfo = { id: "snap-corrupt", createdAt: Date.now() - 10_000 };
+    const snap: SnapshotInfo = { id: snapshotId("snap-corrupt"), createdAt: Date.now() - 10_000 };
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([snap]);
     vi.mocked(_provider.create)
       .mockRejectedValueOnce(new Error("Corrupt snapshot"))
-      .mockResolvedValueOnce(mockManagedSandbox({ id: "sbx-fresh" }));
+      .mockResolvedValueOnce(mockManagedSandbox({ id: sandboxId("sbx-fresh") }));
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -949,7 +969,9 @@ describe("startNewLocked() (via wake)", () => {
   it("creates fresh sandbox when no snapshots exist", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-fresh" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-fresh") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -964,7 +986,7 @@ describe("startNewLocked() (via wake)", () => {
   });
 
   it("provisions agent with fromSnapshot: true when resumed", async () => {
-    const snap: SnapshotInfo = { id: "snap-1", createdAt: Date.now() };
+    const snap: SnapshotInfo = { id: snapshotId("snap-1"), createdAt: Date.now() };
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([snap]);
     vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox());
@@ -1109,10 +1131,10 @@ describe("startNewLocked() (via wake)", () => {
 
 describe("snapshotAndStop() / applyRetention()", () => {
   it("returns null (skips snapshot) when sandbox is not running", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "stopped" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "stopped" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }), // list says running
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }), // list says running
     ]);
     SandboxLifecycleManager.setHooks({
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),
@@ -1128,13 +1150,13 @@ describe("snapshotAndStop() / applyRetention()", () => {
   });
 
   it("retries snapshot on first failure, succeeds on second", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(sandbox.snapshot)
       .mockRejectedValueOnce(new Error("Transient error"))
-      .mockResolvedValueOnce({ id: "snap-ok" });
+      .mockResolvedValueOnce({ id: snapshotId("snap-ok") });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     SandboxLifecycleManager.setHooks({
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),
@@ -1148,11 +1170,11 @@ describe("snapshotAndStop() / applyRetention()", () => {
   });
 
   it("keeps sandbox running after all 3 retry failures", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(sandbox.snapshot).mockRejectedValue(new Error("Persistent error"));
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
 
     const mgr = createManager();
@@ -1164,17 +1186,17 @@ describe("snapshotAndStop() / applyRetention()", () => {
   });
 
   it("deletes old snapshots beyond keep count after successful snapshot", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     // After snapshot, retention cleanup finds 4 snapshots (keep 3, delete 1)
     const snapshots: SnapshotInfo[] = [
-      { id: "snap-4", createdAt: 4000 },
-      { id: "snap-3", createdAt: 3000 },
-      { id: "snap-2", createdAt: 2000 },
-      { id: "snap-1", createdAt: 1000 },
+      { id: snapshotId("snap-4"), createdAt: 4000 },
+      { id: snapshotId("snap-3"), createdAt: 3000 },
+      { id: snapshotId("snap-2"), createdAt: 2000 },
+      { id: snapshotId("snap-1"), createdAt: 1000 },
     ];
     vi.mocked(_provider.listSnapshots).mockResolvedValue(snapshots);
 
@@ -1197,10 +1219,10 @@ describe("snapshotAndStop() / applyRetention()", () => {
   });
 
   it("applyRetention failure does not break snapshot flow", async () => {
-    const sandbox = mockManagedSandbox({ id: "sbx-1", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-1"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-1", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-1"), status: "running" }),
     ]);
     // listSnapshots throws during retention cleanup (called after snapshot succeeds)
     vi.mocked(_provider.listSnapshots).mockRejectedValue(new Error("Retention API down"));
@@ -1219,7 +1241,11 @@ describe("snapshotAndStop() / applyRetention()", () => {
 
 describe("isActive() with pending status", () => {
   it("heartbeat treats pending sandbox as active", async () => {
-    const pending = mockSandboxInfo({ id: "sbx-pending", status: "pending", createdAt: 2000 });
+    const pending = mockSandboxInfo({
+      id: sandboxId("sbx-pending"),
+      status: "pending",
+      createdAt: 2000,
+    });
     vi.mocked(_provider.list).mockResolvedValue([pending]);
 
     const mgr = createManager();
@@ -1230,7 +1256,7 @@ describe("isActive() with pending status", () => {
   });
 
   it("wake treats pending sandbox as active — does not create duplicate", async () => {
-    const pending = mockSandboxInfo({ id: "sbx-pending", status: "pending" });
+    const pending = mockSandboxInfo({ id: sandboxId("sbx-pending"), status: "pending" });
     vi.mocked(_provider.list).mockResolvedValue([pending]);
 
     const mgr = createManager();
@@ -1244,12 +1270,12 @@ describe("isActive() with pending status", () => {
 
 describe("stopSandboxes() (via gracefulStop/forceRestart)", () => {
   it("skips sandbox that stopped between list and get (race condition)", async () => {
-    const newest = mockManagedSandbox({ id: "sbx-new", status: "running" });
+    const newest = mockManagedSandbox({ id: sandboxId("sbx-new"), status: "running" });
     // Extra sandbox: list says running, but get returns stopped (race)
-    const staleExtra = mockManagedSandbox({ id: "sbx-extra", status: "stopped" });
+    const staleExtra = mockManagedSandbox({ id: sandboxId("sbx-extra"), status: "stopped" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 2000 }),
-      mockSandboxInfo({ id: "sbx-extra", status: "running", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-extra"), status: "running", createdAt: 1000 }),
     ]);
     vi.mocked(_provider.get).mockImplementation(async (id: string) => {
       if (id === "sbx-new") return newest;
@@ -1267,15 +1293,15 @@ describe("stopSandboxes() (via gracefulStop/forceRestart)", () => {
   });
 
   it("error stopping one sandbox does not prevent stopping others", async () => {
-    const newest = mockManagedSandbox({ id: "sbx-new", status: "running" });
-    const extraA = mockManagedSandbox({ id: "sbx-a", status: "running" });
+    const newest = mockManagedSandbox({ id: sandboxId("sbx-new"), status: "running" });
+    const extraA = mockManagedSandbox({ id: sandboxId("sbx-a"), status: "running" });
     vi.mocked(extraA.stop).mockRejectedValue(new Error("API timeout"));
-    const extraB = mockManagedSandbox({ id: "sbx-b", status: "running" });
+    const extraB = mockManagedSandbox({ id: sandboxId("sbx-b"), status: "running" });
 
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 3000 }),
-      mockSandboxInfo({ id: "sbx-a", status: "running", createdAt: 2000 }),
-      mockSandboxInfo({ id: "sbx-b", status: "running", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 3000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-a"), status: "running", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-b"), status: "running", createdAt: 1000 }),
     ]);
     vi.mocked(_provider.get).mockImplementation(async (id: string) => {
       if (id === "sbx-new") return newest;
@@ -1372,7 +1398,7 @@ describe("handleExtend() cron computation", () => {
 
   it("stopped result carries correct nextWakeAt from computed cron", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-idle", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-idle"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([]);
     // Cron 30 min in future — BEYOND the 15min keep-alive window,
@@ -1401,12 +1427,12 @@ describe("handleExtend() cron computation", () => {
 describe("handleExtend() eventual consistency", () => {
   it("excludes just-stopped sandbox from wake-hook decision", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-stopping", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-stopping"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     // After stop, list still reports the JUST-STOPPED sandbox as running (eventual consistency)
     // plus no other active sandboxes
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-stopping", status: "running" }),
+      mockSandboxInfo({ id: sandboxId("sbx-stopping"), status: "running" }),
     ]);
     const onStopped = vi.fn().mockResolvedValue(undefined);
     SandboxLifecycleManager.setHooks({ onSandboxStopped: onStopped });
@@ -1414,7 +1440,7 @@ describe("handleExtend() eventual consistency", () => {
     const mgr = createManager();
     const result = await mgr.handleExtend(
       mockExtendPayload({
-        sandboxId: "sbx-stopping",
+        sandboxId: sandboxId("sbx-stopping"),
         lastChangedAt: now - 700_000,
         sandboxCreatedAt: now - 700_000,
       }),
@@ -1502,7 +1528,7 @@ describe("startSidecar() health check loop", () => {
   it("daemon reports 'failed' — breaks immediately, returns failed", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-fail" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-fail") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -1530,7 +1556,9 @@ describe("startSidecar() health check loop", () => {
   it("daemon 'starting' then 'running' — succeeds after polling", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-slow" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-slow") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -1603,7 +1631,7 @@ describe("startSidecar() health check loop", () => {
   it("all retries exhausted — reads sidecar log, returns failed with diagnostics", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-stuck" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-stuck") });
     vi.mocked(sandbox.readFile).mockResolvedValue(Buffer.from("ERROR: port 3000 in use"));
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
@@ -1678,7 +1706,9 @@ describe("forceRestart() edge cases", () => {
   it("no active sandboxes — goes straight to startNewLocked", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-fresh" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-fresh") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),
@@ -1698,7 +1728,11 @@ describe("heartbeat() edge cases", () => {
   it("failed sandbox exists (not running, no stoppedAt) — does NOT trigger first boot", async () => {
     // A sandbox exists with status "error" — hasEverRun is false (not running, no stoppedAt),
     // but sandboxes.length > 0, so first-boot check fails
-    const errored = mockSandboxInfo({ id: "sbx-err", status: "error", stoppedAt: undefined });
+    const errored = mockSandboxInfo({
+      id: sandboxId("sbx-err"),
+      status: "error",
+      stoppedAt: undefined,
+    });
     vi.mocked(_provider.list).mockResolvedValue([errored]);
     vi.mocked(_stateStore.get).mockResolvedValue(null);
 
@@ -1714,11 +1748,13 @@ describe("startNewLocked() edge cases", () => {
   it("multiple snapshots — picks latest by createdAt", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([
-      { id: "snap-old", createdAt: 1000 } as SnapshotInfo,
-      { id: "snap-newest", createdAt: 3000 } as SnapshotInfo,
-      { id: "snap-mid", createdAt: 2000 } as SnapshotInfo,
+      { id: snapshotId("snap-old"), createdAt: 1000 } as SnapshotInfo,
+      { id: snapshotId("snap-newest"), createdAt: 3000 } as SnapshotInfo,
+      { id: snapshotId("snap-mid"), createdAt: 2000 } as SnapshotInfo,
     ]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-resumed" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-resumed") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -1728,14 +1764,16 @@ describe("startNewLocked() edge cases", () => {
 
     expect(result.status).toBe("running");
     expect(_provider.create).toHaveBeenCalledWith(
-      expect.objectContaining({ snapshotId: "snap-newest" }),
+      expect.objectContaining({ snapshotId: snapshotId("snap-newest") }),
     );
   });
 
   it("listSnapshots API throws — falls through to fresh sandbox", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockRejectedValue(new Error("Snapshot API unavailable"));
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox({ id: "sbx-fresh" }));
+    vi.mocked(_provider.create).mockResolvedValue(
+      mockManagedSandbox({ id: sandboxId("sbx-fresh") }),
+    );
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
     });
@@ -1768,7 +1806,7 @@ describe("startNewLocked() edge cases", () => {
   it("passes correct native TTL and writes clawrun.json into sandbox", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-provisioned" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-provisioned") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
@@ -1790,12 +1828,12 @@ describe("startNewLocked() edge cases", () => {
 
 describe("stopSandboxes() provider.get failure", () => {
   it("provider.get throws for one sandbox — continues stopping others", async () => {
-    const newest = mockManagedSandbox({ id: "sbx-new", status: "running" });
-    const extraB = mockManagedSandbox({ id: "sbx-b", status: "running" });
+    const newest = mockManagedSandbox({ id: sandboxId("sbx-new"), status: "running" });
+    const extraB = mockManagedSandbox({ id: sandboxId("sbx-b"), status: "running" });
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-new", status: "running", createdAt: 3000 }),
-      mockSandboxInfo({ id: "sbx-gone", status: "running", createdAt: 2000 }),
-      mockSandboxInfo({ id: "sbx-b", status: "running", createdAt: 1000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-new"), status: "running", createdAt: 3000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-gone"), status: "running", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-b"), status: "running", createdAt: 1000 }),
     ]);
     vi.mocked(_provider.get).mockImplementation(async (id: string) => {
       if (id === "sbx-new") return newest;
@@ -1817,7 +1855,7 @@ describe("stopSandboxes() provider.get failure", () => {
 describe("handleExtend() idle stop failures", () => {
   it("idle sandbox snapshot failure — returns error with sandbox kept running", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-idle", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-idle"), status: "running" });
     vi.mocked(sandbox.snapshot).mockRejectedValue(new Error("Disk quota exceeded"));
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
 
@@ -1838,7 +1876,7 @@ describe("handleExtend() idle stop failures", () => {
 
   it("wake hook failure after successful stop — returns error", async () => {
     const now = Date.now();
-    const sandbox = mockManagedSandbox({ id: "sbx-idle", status: "running" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-idle"), status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     vi.mocked(_provider.list).mockResolvedValue([]); // no other active
     SandboxLifecycleManager.setHooks({
@@ -1863,7 +1901,7 @@ describe("handleExtend() idle stop failures", () => {
 describe("getStatus() pending sandbox behavior", () => {
   it("reports pending sandbox as not running (uses raw status, not isActive)", async () => {
     vi.mocked(_provider.list).mockResolvedValue([
-      mockSandboxInfo({ id: "sbx-pending", status: "pending", createdAt: 2000 }),
+      mockSandboxInfo({ id: sandboxId("sbx-pending"), status: "pending", createdAt: 2000 }),
     ]);
 
     const mgr = createManager();
@@ -1881,7 +1919,7 @@ describe("startSidecar() diagnostics and security", () => {
   it("no sidecar log available — error includes '(no log output)'", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-nolog" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-nolog") });
     vi.mocked(sandbox.readFile).mockResolvedValue(null);
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
@@ -1906,7 +1944,7 @@ describe("startSidecar() diagnostics and security", () => {
   it("passes CLAWRUN_HB_SECRET via env option, not in args", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    const sandbox = mockManagedSandbox({ id: "sbx-secure" });
+    const sandbox = mockManagedSandbox({ id: sandboxId("sbx-secure") });
     vi.mocked(_provider.create).mockResolvedValue(sandbox);
     SandboxLifecycleManager.setHooks({
       onSandboxStarted: vi.fn().mockResolvedValue(undefined),
