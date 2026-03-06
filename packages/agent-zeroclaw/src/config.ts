@@ -21,14 +21,19 @@ function coerceTomlValue(value: string): string | number | boolean {
 }
 
 /**
- * ClawRun overrides on top of ZeroClaw's schema defaults.
- * Only fields where we diverge from zeroclaw's defaults.
+ * ClawRun defaults on top of ZeroClaw's schema defaults.
+ * On fresh deploy these are the config values. On redeploy, user edits
+ * in the existing config.toml take priority (existing config wins).
  */
-const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
+const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
   default_temperature: 0.7,
   autonomy: {
     level: "full",
     workspace_only: true,
+    max_actions_per_hour: 500,
+    max_cost_per_day_cents: 5000,
+    require_approval_for_medium_risk: false,
+    block_high_risk_commands: false,
     allowed_commands: [
       // Read-only inspection
       "ls",
@@ -90,19 +95,28 @@ const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
       "unzip",
       // Build
       "make",
+      // Browser automation (agent-browser binary)
+      "agent-browser",
     ],
-    max_actions_per_hour: 500,
-    max_cost_per_day_cents: 5000,
-    require_approval_for_medium_risk: false,
-    block_high_risk_commands: false,
+    // All tools available from all channels (web UI, Telegram, etc.).
+    // ZeroClaw defaults exclude browser/shell for non-CLI channels.
+    non_cli_excluded_tools: [],
+    // ZeroClaw defaults forbid /home, /tmp, /var, etc. — designed for local machines.
+    // In a sandbox (isolated microVM), the workspace is under /home and browser
+    // temp data goes to /tmp, so we clear this.
+    forbidden_paths: [],
   },
   memory: { backend: "sqlite", auto_save: true },
   agent: {
+    // Limit history to prevent context overflow from large tool results
+    // (e.g. browser snapshots can be 60K+ chars per page visit).
+    max_history_messages: 20,
+    max_tool_iterations: 50,
     session: {
       backend: "sqlite",
       strategy: "per-sender",
       ttl_seconds: 86400,
-      max_messages: 100,
+      max_messages: 30,
     },
   },
   browser: {
@@ -111,6 +125,14 @@ const CLAWRUN_OVERRIDES: Partial<ZeroClawConfig> = {
     allowed_domains: ["*"],
     browser_open: "disable",
   },
+  // Lightweight URL fetching — preferred over browser for simple page reads.
+  web_fetch: {
+    enabled: true,
+    allowed_domains: ["*"],
+    max_response_size: 500_000,
+    timeout_secs: 30,
+  },
+  security: { otp: { enabled: false } },
 };
 
 /** Deep merge where config arrays win outright (no union/dedup). */
@@ -141,18 +163,16 @@ export function writeSetupConfig(
     // No existing config — start fresh
   }
 
-  // Deep merge: zeroclaw schema defaults → ClawRun overrides → existing user config → wizard values.
-  // Each layer wins over the previous for conflicting keys.
-  const base = deepmerge(schemaDefaults, CLAWRUN_OVERRIDES, existing) as Partial<ZeroClawConfig>;
-
-  // Wizard values + forced overrides — always applied on top.
-  // security.otp.enabled is forced false (OTP is unusable in daemon mode).
-  const config = deepmerge(base, {
+  // Deep merge chain:
+  //   schemaDefaults → ClawRun defaults → existing user config → wizard values
+  // ClawRun defaults set sane values for the sandbox environment.
+  // Existing user config wins on redeploy (user edits take priority).
+  // Wizard values (provider, model) are always applied last.
+  const config = deepmerge(schemaDefaults, CLAWRUN_DEFAULTS, existing, {
     api_key: data.provider.apiKey,
     default_provider: data.provider.provider,
     default_model: data.provider.model,
     ...(data.provider.apiUrl ? { api_url: data.provider.apiUrl } : {}),
-    security: { otp: { enabled: false } },
   } as Partial<ZeroClawConfig>) as Partial<ZeroClawConfig>;
 
   // Merge channels into channels_config.

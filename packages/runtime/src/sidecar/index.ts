@@ -45,6 +45,20 @@ function main(): void {
       `health=:${config.health.port}`,
   );
 
+  // Merge tool runtime env vars into daemon env (resolve $HOME placeholders)
+  // Also add ~/.local/bin to PATH so the daemon can find tool binaries.
+  if (config.tools && config.tools.length > 0) {
+    const home = process.env.HOME ?? "/root";
+    config.daemon.env.PATH = `${home}/.local/bin:${process.env.PATH ?? ""}`;
+    for (const tool of config.tools) {
+      if (tool.env) {
+        for (const [key, value] of Object.entries(tool.env)) {
+          config.daemon.env[key] = value.replace(/\$HOME/g, home);
+        }
+      }
+    }
+  }
+
   // 1. Health server first — so parent can poll immediately
   startHealthServer(config, state);
 

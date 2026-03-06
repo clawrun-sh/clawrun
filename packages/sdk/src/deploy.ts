@@ -1,4 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { humanId } from "human-id";
@@ -22,6 +30,7 @@ import {
 import { getPreset, listPresets, getWorkspaceFiles } from "./presets/index.js";
 import { ClawRunInstance } from "./instance.js";
 import { DeployError } from "./errors.js";
+import type { Tool } from "@clawrun/agent";
 import type { DeployOptions, DeployResult, DeployStep } from "./types.js";
 import type { InstanceStep } from "./instance/steps.js";
 
@@ -88,6 +97,7 @@ function seedWorkspaceFiles(
   agent: ReturnType<typeof createAgent>,
   customDir?: string,
   onProgress?: ProgressCallback<"seed-workspace">,
+  selectedTools?: Tool[],
 ): void {
   const seedDir = agent.getSeedDirectory();
   if (seedDir === null) return;
@@ -104,6 +114,36 @@ function seedWorkspaceFiles(
       seeded++;
     }
   }
+
+  // Seed skill files from selected tools
+  if (selectedTools) {
+    for (const tool of selectedTools) {
+      if (!tool.skillContent) continue;
+      const skillDir = join(targetDir, "skills", tool.id);
+      const skillPath = join(skillDir, "SKILL.md");
+      if (!existsSync(skillPath)) {
+        mkdirSync(skillDir, { recursive: true });
+        writeFileSync(skillPath, tool.skillContent);
+        seeded++;
+      }
+    }
+  }
+
+  // Seed custom dir skill subdirectories (recursive)
+  if (customDir) {
+    const customSkillsDir = join(customDir, "skills");
+    if (existsSync(customSkillsDir)) {
+      for (const entry of readdirSync(customSkillsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const destDir = join(targetDir, "skills", entry.name);
+        if (!existsSync(destDir)) {
+          cpSync(join(customSkillsDir, entry.name), destDir, { recursive: true });
+          seeded++;
+        }
+      }
+    }
+  }
+
   if (seeded > 0) {
     onProgress?.({
       step: "seed-workspace",
@@ -202,7 +242,16 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
     // 7. Seed workspace files
     progress("seed-workspace", "Seeding workspace files...");
-    seedWorkspaceFiles(presetId, agentConfigDir, agent, options.customWorkspaceDir, subProgress);
+    const toolIds = options.agent.tools ?? agent.getAvailableTools().map((t) => t.id);
+    const selectedTools = agent.getAvailableTools().filter((t) => toolIds.includes(t.id));
+    seedWorkspaceFiles(
+      presetId,
+      agentConfigDir,
+      agent,
+      options.customWorkspaceDir,
+      subProgress,
+      selectedTools,
+    );
 
     // 8. Resolve network policy
     let networkPolicy: NetworkPolicy = options.networkPolicy ?? "allow-all";
@@ -276,9 +325,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     if (!stateResult.success) {
       throw new DeployError("provision-state", "Failed to provision state store.");
     }
-
-    // Resolve tools
-    const toolIds = options.agent.tools ?? agent.getAvailableTools().map((t) => t.id);
 
     // 12. Build config
     progress("build-config", "Building config...");

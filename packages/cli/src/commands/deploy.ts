@@ -1,5 +1,14 @@
 import { command, positional, option, optional, string } from "cmd-ts";
-import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
@@ -205,6 +214,7 @@ function seedWorkspaceFiles(
   agentDir: string,
   agent: Agent,
   customDir?: string,
+  selectedTools?: import("@clawrun/agent").Tool[],
 ): void {
   const seedDir = agent.getSeedDirectory();
   if (seedDir === null) return;
@@ -221,6 +231,36 @@ function seedWorkspaceFiles(
       seeded++;
     }
   }
+
+  // Seed skill files from selected tools
+  if (selectedTools) {
+    for (const tool of selectedTools) {
+      if (!tool.skillContent) continue;
+      const skillDir = join(targetDir, "skills", tool.id);
+      const skillPath = join(skillDir, "SKILL.md");
+      if (!existsSync(skillPath)) {
+        mkdirSync(skillDir, { recursive: true });
+        writeFileSync(skillPath, tool.skillContent);
+        seeded++;
+      }
+    }
+  }
+
+  // Seed custom dir skill subdirectories (recursive)
+  if (customDir) {
+    const customSkillsDir = join(customDir, "skills");
+    if (existsSync(customSkillsDir)) {
+      for (const entry of readdirSync(customSkillsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const destDir = join(targetDir, "skills", entry.name);
+        if (!existsSync(destDir)) {
+          cpSync(join(customSkillsDir, entry.name), destDir, { recursive: true });
+          seeded++;
+        }
+      }
+    }
+  }
+
   if (seeded > 0) {
     clack.log.info(chalk.dim(`  Seeded ${seeded} workspace template file${seeded > 1 ? "s" : ""}`));
   }
@@ -339,7 +379,7 @@ async function handleNewInstance(
   });
 
   // Seed workspace template files into agent dir (only missing files)
-  seedWorkspaceFiles(preset.id, agentConfigDir, agent, options.customWorkspaceDir);
+  seedWorkspaceFiles(preset.id, agentConfigDir, agent, options.customWorkspaceDir, selectedTools);
 
   // ── Infrastructure ───────────────────────────────────────────
   clack.note("Network policy and state store", "Infrastructure");
@@ -591,6 +631,13 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   );
 
   // Offer reconfiguration
+  let redeployTools: import("@clawrun/agent").Tool[] = [];
+  {
+    // Resolve existing tools so we can seed skills even when --yes skips prompts
+    const _agent = createAgent(existingConfig.agent.name);
+    const _currentToolIds = existingConfig.agent.tools ?? [];
+    redeployTools = _agent.getAvailableTools().filter((t) => _currentToolIds.includes(t.id));
+  }
   if (!options.yes) {
     // ── Agent Configuration ──────────────────────────────────────
     clack.note("Reconfigure provider, model, or channels", "Agent Configuration");
@@ -650,7 +697,6 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       initialValue: false,
     });
 
-    let redeployTools: import("@clawrun/agent").Tool[] = [];
     if (!clack.isCancel(reconfigureTools) && reconfigureTools) {
       redeployTools = await promptTools(agent, currentToolIds);
       existingConfig.agent.tools = redeployTools.map((t) => t.id);
@@ -742,7 +788,13 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   // Seed any missing workspace template files (upgrade path)
   if (existingConfig.instance.preset) {
     const agentForSeed = createAgent(existingConfig.agent.name);
-    seedWorkspaceFiles(existingConfig.instance.preset, instanceAgentDir(name), agentForSeed);
+    seedWorkspaceFiles(
+      existingConfig.instance.preset,
+      instanceAgentDir(name),
+      agentForSeed,
+      undefined,
+      redeployTools,
+    );
   }
 
   // ── Deploy ───────────────────────────────────────────────────

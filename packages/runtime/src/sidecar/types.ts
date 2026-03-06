@@ -4,6 +4,8 @@ export interface ToolConfig {
   check: { cmd: string; args: string[] };
   /** Install steps, run sequentially. */
   install: Array<{ cmd: string; args: string[] }>;
+  /** Environment variables needed at runtime. Values may contain $HOME. */
+  env?: Record<string, string>;
 }
 
 export interface SidecarConfig {

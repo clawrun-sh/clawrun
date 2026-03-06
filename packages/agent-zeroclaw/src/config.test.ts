@@ -57,12 +57,10 @@ afterEach(() => {
 // --- tests ---
 
 describe("writeSetupConfig — fresh deploy", () => {
-  it("includes zeroclaw forbidden_paths from schema defaults", () => {
+  it("clears forbidden_paths for sandbox (defaults block /home and /tmp)", () => {
     const config = writeAndParse();
     const autonomy = config.autonomy as TOML.JsonMap;
-    expect(autonomy.forbidden_paths).toEqual(
-      (schemaDefaults.autonomy as Record<string, unknown>).forbidden_paths,
-    );
+    expect(autonomy.forbidden_paths).toEqual([]);
   });
 
   it("overrides autonomy.level to full (zeroclaw default is supervised)", () => {
@@ -76,6 +74,12 @@ describe("writeSetupConfig — fresh deploy", () => {
     const schemaCmds = (schemaDefaults.autonomy as Record<string, unknown>)
       .allowed_commands as string[];
     expect(cmds).not.toEqual(schemaCmds);
+    expect(cmds).toContain("agent-browser");
+  });
+
+  it("clears non_cli_excluded_tools so all tools work from all channels", () => {
+    const config = writeAndParse();
+    expect((config.autonomy as TOML.JsonMap).non_cli_excluded_tools).toEqual([]);
   });
 
   it("overrides browser.enabled to true (zeroclaw default is false)", () => {
@@ -105,9 +109,35 @@ describe("writeSetupConfig — fresh deploy", () => {
   it("includes zeroclaw schema defaults we do not override", () => {
     const config = writeAndParse();
     const agent = config.agent as TOML.JsonMap;
-    expect(agent.max_tool_iterations).toBe(
-      (schemaDefaults.agent as Record<string, unknown>).max_tool_iterations,
+    // parallel_tools is a schema default we don't override
+    expect(agent.parallel_tools).toBe(
+      (schemaDefaults.agent as Record<string, unknown>).parallel_tools,
     );
+  });
+
+  it("overrides max_tool_iterations to 50 (schema default is 20)", () => {
+    const config = writeAndParse();
+    const agent = config.agent as TOML.JsonMap;
+    expect(agent.max_tool_iterations).toBe(50);
+  });
+
+  it("limits max_history_messages to 20 (prevents context overflow from browser snapshots)", () => {
+    const config = writeAndParse();
+    const agent = config.agent as TOML.JsonMap;
+    expect(agent.max_history_messages).toBe(20);
+  });
+
+  it("limits session.max_messages to 30", () => {
+    const config = writeAndParse();
+    const session = (config.agent as TOML.JsonMap).session as TOML.JsonMap;
+    expect(session.max_messages).toBe(30);
+  });
+
+  it("enables web_fetch with wildcard domains", () => {
+    const config = writeAndParse();
+    const webFetch = config.web_fetch as TOML.JsonMap;
+    expect(webFetch.enabled).toBe(true);
+    expect(webFetch.allowed_domains).toEqual(["*"]);
   });
 
   it("omits api_url when not provided", () => {
@@ -124,7 +154,7 @@ describe("writeSetupConfig — fresh deploy", () => {
   });
 });
 
-describe("writeSetupConfig — redeploy", () => {
+describe("writeSetupConfig — redeploy (existing config wins)", () => {
   it("preserves user-customized temperature", () => {
     const initial = writeAndParse();
     writeExisting({ ...initial, default_temperature: 0.9 } as TOML.JsonMap);
@@ -133,28 +163,52 @@ describe("writeSetupConfig — redeploy", () => {
     expect(config.default_temperature).toBe(0.9);
   });
 
-  it("preserves user-customized autonomy.level without losing forbidden_paths", () => {
+  it("preserves user-customized autonomy.level", () => {
     const initial = writeAndParse();
     const autonomy = { ...(initial.autonomy as TOML.JsonMap), level: "supervised" };
     writeExisting({ ...initial, autonomy } as TOML.JsonMap);
 
     const config = writeAndParse();
     expect((config.autonomy as TOML.JsonMap).level).toBe("supervised");
-    expect(Array.isArray((config.autonomy as TOML.JsonMap).forbidden_paths)).toBe(true);
   });
 
-  it("does not merge arrays — user array replaces ours entirely", () => {
+  it("preserves user-customized allowed_commands", () => {
     const initial = writeAndParse();
     const autonomy = { ...(initial.autonomy as TOML.JsonMap), allowed_commands: ["git", "ls"] };
     writeExisting({ ...initial, autonomy } as TOML.JsonMap);
 
     const config = writeAndParse();
-    expect((config.autonomy as TOML.JsonMap).allowed_commands).toEqual(["git", "ls"]);
+    const cmds = (config.autonomy as TOML.JsonMap).allowed_commands as string[];
+    // User edits win — they chose to restrict commands
+    expect(cmds).toEqual(["git", "ls"]);
+  });
+
+  it("preserves user-customized forbidden_paths", () => {
+    const initial = writeAndParse();
+    const autonomy = {
+      ...(initial.autonomy as TOML.JsonMap),
+      forbidden_paths: ["/etc", "/root"],
+    };
+    writeExisting({ ...initial, autonomy } as TOML.JsonMap);
+
+    const config = writeAndParse();
+    expect((config.autonomy as TOML.JsonMap).forbidden_paths).toEqual(["/etc", "/root"]);
+  });
+
+  it("preserves user-customized non_cli_excluded_tools", () => {
+    const initial = writeAndParse();
+    const autonomy = {
+      ...(initial.autonomy as TOML.JsonMap),
+      non_cli_excluded_tools: ["browser", "shell"],
+    };
+    writeExisting({ ...initial, autonomy } as TOML.JsonMap);
+
+    const config = writeAndParse();
+    expect((config.autonomy as TOML.JsonMap).non_cli_excluded_tools).toEqual(["browser", "shell"]);
   });
 
   it("picks up new schema defaults not present in existing config", () => {
     // Simulate old config written before zeroclaw added allow_sensitive_file_reads.
-    // This field is in schemaDefaults.autonomy but NOT in CLAWRUN_OVERRIDES.
     writeExisting({
       default_temperature: 0.7,
       api_key: "sk-old",
@@ -172,30 +226,30 @@ describe("writeSetupConfig — redeploy", () => {
 
     const config = writeAndParse();
     const autonomy = config.autonomy as TOML.JsonMap;
-    // allow_sensitive_file_reads comes from schemaDefaults only — not in CLAWRUN_OVERRIDES
+    // allow_sensitive_file_reads comes from schemaDefaults — fills gaps in existing config
     expect(autonomy.allow_sensitive_file_reads).toBe(
       (schemaDefaults.autonomy as Record<string, unknown>).allow_sensitive_file_reads,
     );
   });
 
-  it("otp stays forced false even if user set it to true", () => {
+  it("preserves user-customized otp setting", () => {
     const initial = writeAndParse();
-    // Structured edit — no fragile string replace
     const security = initial.security as TOML.JsonMap;
     const otp = { ...(security.otp as TOML.JsonMap), enabled: true };
     writeExisting({ ...initial, security: { ...security, otp } } as TOML.JsonMap);
 
     const config = writeAndParse();
-    expect(((config.security as TOML.JsonMap).otp as TOML.JsonMap).enabled).toBe(false);
+    // User edits win
+    expect(((config.security as TOML.JsonMap).otp as TOML.JsonMap).enabled).toBe(true);
   });
 
-  it("preserves user edits to sections we do not override", () => {
+  it("preserves user edits to agent section", () => {
     const initial = writeAndParse();
-    const agent = { ...(initial.agent as TOML.JsonMap), max_tool_iterations: 50 };
+    const agent = { ...(initial.agent as TOML.JsonMap), max_tool_iterations: 100 };
     writeExisting({ ...initial, agent } as TOML.JsonMap);
 
     const config = writeAndParse();
-    expect((config.agent as TOML.JsonMap).max_tool_iterations).toBe(50);
+    expect((config.agent as TOML.JsonMap).max_tool_iterations).toBe(100);
   });
 });
 

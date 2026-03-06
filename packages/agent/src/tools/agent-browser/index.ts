@@ -1,6 +1,11 @@
-import type { Tool } from "../tools.js";
-import type { SandboxHandle } from "../types.js";
-import { githubReleaseUrl, releaseInstallSteps, releaseCheckCommand } from "./installer.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Tool } from "../../tools.js";
+import type { SandboxHandle } from "../../types.js";
+import { githubReleaseUrl, releaseInstallSteps, releaseCheckCommand } from "../installer.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const AB_VERSION = "0.16.3";
 
@@ -31,9 +36,24 @@ export class AgentBrowserTool implements Tool {
   readonly checkCommand = releaseCheckCommand("agent-browser", AB_VERSION);
   readonly installCommands = [
     ...releaseInstallSteps(AB_SPEC),
-    // After the binary is in place, download Chromium + system deps
-    { cmd: "sh", args: ["-c", "$HOME/.local/bin/agent-browser install --with-deps"] },
+    // After the binary is in place, download Chromium + system deps.
+    // AGENT_BROWSER_NATIVE=1 makes the binary use its built-in Rust daemon
+    // instead of looking for daemon.js from the npm package.
+    {
+      cmd: "sh",
+      args: ["-c", "AGENT_BROWSER_NATIVE=1 $HOME/.local/bin/agent-browser install --with-deps"],
+    },
   ];
+  // The standalone binary needs native mode to use its built-in Rust daemon
+  // instead of searching for daemon.js (which only ships with the npm package).
+  // MAX_OUTPUT caps snapshot size to prevent context overflow (default is unlimited;
+  // dense pages like HN produce 64K+ chars). 50K is the agent-browser recommended
+  // value — leaves most pages untouched while preventing context flooding.
+  readonly runtimeEnv = {
+    AGENT_BROWSER_NATIVE: "1",
+    AGENT_BROWSER_MAX_OUTPUT: "50000",
+  };
+  readonly skillContent = readFileSync(join(__dirname, "SKILL.md"), "utf-8");
 
   async isInstalled(sandbox: SandboxHandle): Promise<boolean> {
     const check = await sandbox.runCommand(this.checkCommand.cmd, this.checkCommand.args);

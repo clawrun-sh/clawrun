@@ -188,8 +188,23 @@ export async function createInstance(
 }
 
 /**
- * Resolve simple glob patterns (e.g. "workspace/*.md") against a base directory.
- * Supports bare filenames and single-level wildcards like "dir/*.ext".
+ * Recursively collect all files under a directory.
+ */
+function collectFilesRecursive(dir: string, prefix: string, out: string[]): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix + entry.name;
+    if (entry.isDirectory()) {
+      collectFilesRecursive(join(dir, entry.name), rel + "/", out);
+    } else {
+      out.push(rel);
+    }
+  }
+}
+
+/**
+ * Resolve simple glob patterns against a base directory.
+ * Supports bare filenames, single-level wildcards (e.g. "dir/*.ext"),
+ * and recursive double-star globs.
  */
 function resolveGlobPattern(baseDir: string, pattern: string): string[] {
   const files: string[] = [];
@@ -198,6 +213,15 @@ function resolveGlobPattern(baseDir: string, pattern: string): string[] {
     // Plain file
     const fullPath = join(baseDir, pattern);
     if (existsSync(fullPath)) files.push(pattern);
+    return files;
+  }
+
+  // Recursive glob: "dir/**/*"
+  if (pattern.includes("**")) {
+    const prefix = pattern.slice(0, pattern.indexOf("**"));
+    const searchDir = join(baseDir, prefix);
+    if (!existsSync(searchDir)) return files;
+    collectFilesRecursive(searchDir, prefix, files);
     return files;
   }
 

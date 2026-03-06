@@ -5,6 +5,14 @@
  */
 export type NonCliNaturalLanguageApprovalMode = "disabled" | "request_confirm" | "direct";
 /**
+ * Chat context selector for ACK emoji reaction rules.
+ */
+export type AckReactionChatType = "direct" | "group";
+/**
+ * Reaction selection strategy for ACK emoji pools.
+ */
+export type AckReactionStrategy = "random" | "first";
+/**
  * Group-chat reply trigger mode for channels that support mention gating.
  */
 export type GroupReplyMode = "mention_only" | "all_messages";
@@ -28,7 +36,8 @@ export interface Config {
   };
   agents_ipc?: AgentsIpcConfig;
   /**
-   * API key for the selected provider. Overridden by `ZEROCLAW_API_KEY` or `API_KEY` env vars.
+   * API key for the selected provider. Always overridden by `ZEROCLAW_API_KEY` env var.
+   * `API_KEY` env var is only used as fallback when no config key is set.
    */
   api_key?: string | null;
   /**
@@ -54,6 +63,7 @@ export interface Config {
    * Default model temperature (0.0–2.0). Default: `0.7`.
    */
   default_temperature: number;
+  economic?: EconomicConfig;
   /**
    * Embedding routing rules — route `hint:<name>` to specific provider+model combos.
    */
@@ -115,9 +125,37 @@ export interface Config {
  */
 export interface AgentConfig {
   /**
+   * Optional allowlist for primary-agent tool visibility.
+   * When non-empty, only listed tools are exposed to the primary agent.
+   */
+  allowed_tools?: string[];
+  /**
    * When true: bootstrap_max_chars=6000, rag_chunk_limit=2. Use for 13B or smaller models.
    */
   compact_context?: boolean;
+  /**
+   * Optional denylist for primary-agent tool visibility.
+   * Applied after `allowed_tools`.
+   */
+  denied_tools?: string[];
+  /**
+   * Loop detection: consecutive failure streak threshold.
+   * Triggers when the same tool fails this many times in a row.
+   * Set to `0` to disable. Default: `3`.
+   */
+  loop_detection_failure_streak?: number;
+  /**
+   * Loop detection: no-progress repeat threshold.
+   * Triggers when the same tool+args produces identical output this many times.
+   * Set to `0` to disable. Default: `3`.
+   */
+  loop_detection_no_progress_threshold?: number;
+  /**
+   * Loop detection: ping-pong cycle threshold.
+   * Detects A→B→A→B alternating patterns with no progress.
+   * Value is number of full cycles (A-B = 1 cycle). Set to `0` to disable. Default: `2`.
+   */
+  loop_detection_ping_pong_cycles?: number;
   /**
    * Maximum conversation history messages retained per session. Default: `50`.
    */
@@ -132,9 +170,140 @@ export interface AgentConfig {
    */
   parallel_tools?: boolean;
   /**
+   * Safety heartbeat injection interval inside `run_tool_call_loop`.
+   * Injects a security-constraint reminder every N tool iterations.
+   * Set to `0` to disable. Default: `5`.
+   * Compatibility/rollback: omit/remove this key to use default (`5`), or set
+   * to `0` for explicit disable.
+   */
+  safety_heartbeat_interval?: number;
+  /**
+   * Safety heartbeat injection interval for interactive sessions.
+   * Injects a security-constraint reminder every N conversation turns.
+   * Set to `0` to disable. Default: `10`.
+   * Compatibility/rollback: omit/remove this key to use default (`10`), or
+   * set to `0` for explicit disable.
+   */
+  safety_heartbeat_turn_interval?: number;
+  session?: AgentSessionConfig;
+  subagents?: SubAgentsConfig;
+  teams?: AgentTeamsConfig;
+  /**
    * Tool dispatch strategy (e.g. `"auto"`). Default: `"auto"`.
    */
   tool_dispatcher?: string;
+  [k: string]: unknown;
+}
+/**
+ * Session persistence configuration (`[agent.session]` section).
+ */
+export interface AgentSessionConfig {
+  /**
+   * Session backend to use. Options: "memory", "sqlite", "none".
+   * Default: "none" (no persistence).
+   * Set to "none" to disable session persistence entirely.
+   */
+  backend?: "memory" | "sqlite" | "none";
+  /**
+   * Maximum number of messages to retain per session.
+   * Default: 50.
+   */
+  max_messages?: number;
+  /**
+   * Strategy for resolving session IDs. Options: "per-sender", "per-channel", "main".
+   * Default: "per-sender" (each user gets a unique session per channel).
+   */
+  strategy?: "per-sender" | "per-channel" | "main";
+  /**
+   * Time-to-live for sessions in seconds.
+   * Default: 3600 (1 hour).
+   */
+  ttl_seconds?: number;
+  [k: string]: unknown;
+}
+/**
+ * Sub-agent runtime controls for background delegation.
+ */
+export interface SubAgentsConfig {
+  /**
+   * Allow automatic sub-agent selection when a specific agent is not given.
+   */
+  auto_activate?: boolean;
+  /**
+   * Enable background sub-agent tools.
+   */
+  enabled?: boolean;
+  /**
+   * Penalty multiplier applied to each currently in-flight task.
+   */
+  inflight_penalty?: number;
+  /**
+   * Sliding window (seconds) used to compute recent load/failure signals.
+   */
+  load_window_secs?: number;
+  /**
+   * Maximum number of concurrently running background sub-agents.
+   */
+  max_concurrent?: number;
+  /**
+   * Poll interval while waiting for a concurrency slot.
+   */
+  queue_poll_ms?: number;
+  /**
+   * When at concurrency limit, wait this long for a slot before failing.
+   * Set to `0` for immediate fail-fast behavior.
+   */
+  queue_wait_ms?: number;
+  /**
+   * Penalty multiplier applied to recent failure count in load window.
+   */
+  recent_failure_penalty?: number;
+  /**
+   * Penalty multiplier applied to recent assignment count in load window.
+   */
+  recent_selection_penalty?: number;
+  /**
+   * Runtime strategy used for automatic sub-agent selection.
+   */
+  strategy?: "semantic" | "adaptive" | "least_loaded";
+  [k: string]: unknown;
+}
+/**
+ * Agent-team runtime controls for synchronous delegation.
+ */
+export interface AgentTeamsConfig {
+  /**
+   * Allow automatic team-agent selection when a specific agent is not given.
+   */
+  auto_activate?: boolean;
+  /**
+   * Enable agent-team delegation tools.
+   */
+  enabled?: boolean;
+  /**
+   * Penalty multiplier applied to each currently in-flight task.
+   */
+  inflight_penalty?: number;
+  /**
+   * Sliding window (seconds) used to compute recent load/failure signals.
+   */
+  load_window_secs?: number;
+  /**
+   * Maximum number of delegate profiles activated as team members.
+   */
+  max_agents?: number;
+  /**
+   * Penalty multiplier applied to recent failure count in load window.
+   */
+  recent_failure_penalty?: number;
+  /**
+   * Penalty multiplier applied to recent assignment count in load window.
+   */
+  recent_selection_penalty?: number;
+  /**
+   * Runtime strategy used for automatic team-agent selection.
+   */
+  strategy?: "semantic" | "adaptive" | "least_loaded";
   [k: string]: unknown;
 }
 /**
@@ -154,6 +323,14 @@ export interface DelegateAgentConfig {
    */
   api_key?: string | null;
   /**
+   * Optional capability tags used by automatic agent selection.
+   */
+  capabilities?: string[];
+  /**
+   * Whether this delegate profile is active for selection/invocation.
+   */
+  enabled?: boolean;
+  /**
    * Max recursion depth for nested delegation
    */
   max_depth?: number;
@@ -165,6 +342,10 @@ export interface DelegateAgentConfig {
    * Model name
    */
   model: string;
+  /**
+   * Priority hint for automatic agent selection (higher wins on ties).
+   */
+  priority?: number;
   /**
    * Provider name (e.g. "ollama", "openrouter", "anthropic")
    */
@@ -202,6 +383,20 @@ export interface AgentsIpcConfig {
  */
 export interface AutonomyConfig {
   /**
+   * Allow `file_read` to access sensitive workspace secrets such as `.env`,
+   * key material, and credential files.
+   *
+   * Default is `false` to reduce accidental secret exposure via tool output.
+   */
+  allow_sensitive_file_reads?: boolean;
+  /**
+   * Allow `file_write` / `file_edit` to modify sensitive workspace secrets
+   * such as `.env`, key material, and credential files.
+   *
+   * Default is `false` to reduce accidental secret corruption/exfiltration.
+   */
+  allow_sensitive_file_writes?: boolean;
+  /**
    * Allowlist of executable names permitted for shell execution.
    */
   allowed_commands: string[];
@@ -223,6 +418,13 @@ export interface AutonomyConfig {
    * Block high-risk shell commands even if allowlisted.
    */
   block_high_risk_commands?: boolean;
+  /**
+   * Context-aware shell command allow/deny rules.
+   *
+   * These rules are evaluated per command segment and can narrow or override
+   * global `allowed_commands` behavior for matching commands.
+   */
+  command_context_rules?: CommandContextRuleConfig[];
   /**
    * Explicit path denylist. Default includes system-critical paths and sensitive dotdirs.
    */
@@ -301,17 +503,93 @@ export interface AutonomyConfig {
   [k: string]: unknown;
 }
 /**
+ * Context-aware command rule for shell commands.
+ *
+ * Rules are evaluated per command segment. Command matching accepts command
+ * names (`curl`), explicit paths (`/usr/bin/curl`), and wildcard (`*`).
+ *
+ * Matching semantics:
+ * - `action = "deny"`: if all constraints match, the segment is rejected.
+ * - `action = "allow"`: if at least one allow rule exists for a command,
+ *   segments must match at least one of those allow rules.
+ * - `action = "require_approval"`: matching segments require explicit
+ *   `approved=true` in supervised mode, even when `shell` is auto-approved.
+ *
+ * Constraints are optional:
+ * - `allowed_domains`: require URL arguments to match these hosts/patterns.
+ * - `allowed_path_prefixes`: require path-like arguments to stay under these prefixes.
+ * - `denied_path_prefixes`: for deny rules, match when any path-like argument
+ *   is under these prefixes; for allow rules, require path arguments not to hit
+ *   these prefixes.
+ */
+export interface CommandContextRuleConfig {
+  /**
+   * Rule action (`allow` | `deny` | `require_approval`). Defaults to `allow`.
+   */
+  action?: "allow" | "deny" | "require_approval";
+  /**
+   * Permit high-risk commands when this allow rule matches.
+   *
+   * The command still requires explicit `approved=true` in supervised mode.
+   */
+  allow_high_risk?: boolean;
+  /**
+   * Allowed host patterns for URL arguments.
+   *
+   * Supports exact hosts (`api.example.com`) and wildcard suffixes (`*.example.com`).
+   */
+  allowed_domains?: string[];
+  /**
+   * Allowed path prefixes for path-like arguments.
+   *
+   * Prefixes may be absolute, `~/...`, or workspace-relative.
+   */
+  allowed_path_prefixes?: string[];
+  /**
+   * Command name/path pattern (`git`, `/usr/bin/curl`, or `*`).
+   */
+  command: string;
+  /**
+   * Denied path prefixes for path-like arguments.
+   *
+   * Prefixes may be absolute, `~/...`, or workspace-relative.
+   */
+  denied_path_prefixes?: string[];
+  [k: string]: unknown;
+}
+/**
  * Browser automation configuration (`[browser]`).
  */
 export interface BrowserConfig {
+  /**
+   * Agent-browser executable path/name
+   */
+  agent_browser_command?: string;
+  /**
+   * Additional arguments passed to agent-browser before each action command
+   */
+  agent_browser_extra_args?: string[];
+  /**
+   * Timeout in milliseconds for each agent-browser command invocation
+   */
+  agent_browser_timeout_ms?: number;
   /**
    * Allowed domains for `browser_open` (exact or subdomain match)
    */
   allowed_domains?: string[];
   /**
+   * Auto backend priority order (only used when backend = "auto")
+   * Supported values: "agent_browser", "rust_native", "computer_use"
+   */
+  auto_backend_priority?: string[];
+  /**
    * Browser automation backend: "agent_browser" | "rust_native" | "computer_use" | "auto"
    */
   backend?: string;
+  /**
+   * Browser for browser_open tool: "disable" | "brave" | "chrome" | "firefox" | "edge" | "msedge" | "default"
+   */
+  browser_open?: string;
   computer_use?: BrowserComputerUseConfig;
   /**
    * Enable `browser_open` tool (opens URLs in the system browser without scraping)
@@ -373,6 +651,15 @@ export interface BrowserComputerUseConfig {
  * Channel configurations: Telegram, Discord, Slack, etc. (`[channels_config]`).
  */
 export interface ChannelsConfig {
+  ack_reaction?: AckReactionChannelsConfig;
+  /**
+   * ACP (Agent Client Protocol) channel configuration.
+   */
+  acp?: AcpConfig | null;
+  /**
+   * BlueBubbles iMessage bridge channel configuration.
+   */
+  bluebubbles?: BlueBubblesConfig | null;
   /**
    * ClawdTalk voice channel configuration.
    */
@@ -397,6 +684,10 @@ export interface ChannelsConfig {
    * Feishu channel configuration.
    */
   feishu?: FeishuConfig | null;
+  /**
+   * GitHub channel configuration.
+   */
+  github?: GitHubConfig | null;
   /**
    * iMessage channel configuration (macOS only).
    */
@@ -430,6 +721,11 @@ export interface ChannelsConfig {
    */
   message_timeout_secs?: number;
   /**
+   * Napcat QQ protocol channel configuration.
+   * Also accepts legacy key `[channels_config.onebot]` for OneBot v11 compatibility.
+   */
+  napcat?: NapcatConfig | null;
+  /**
    * Nextcloud Talk bot channel configuration.
    */
   nextcloud_talk?: NextcloudTalkConfig | null;
@@ -462,6 +758,180 @@ export interface ChannelsConfig {
    * WhatsApp channel configuration (Cloud API or Web mode).
    */
   whatsapp?: WhatsAppConfig | null;
+  [k: string]: unknown;
+}
+/**
+ * ACK emoji reaction policy overrides for channels that support message reactions.
+ *
+ * Use this table to control reaction enable/disable, emoji pools, and conditional rules
+ * without hardcoding behavior in channel implementations.
+ */
+export interface AckReactionChannelsConfig {
+  /**
+   * Discord ACK reaction policy.
+   */
+  discord?: AckReactionConfig | null;
+  /**
+   * Feishu ACK reaction policy.
+   */
+  feishu?: AckReactionConfig | null;
+  /**
+   * Lark ACK reaction policy.
+   */
+  lark?: AckReactionConfig | null;
+  /**
+   * Telegram ACK reaction policy.
+   */
+  telegram?: AckReactionConfig | null;
+  [k: string]: unknown;
+}
+/**
+ * Per-channel ACK emoji reaction policy.
+ */
+export interface AckReactionConfig {
+  /**
+   * Default emoji pool. When empty, channel built-in defaults are used.
+   */
+  emojis?: string[];
+  /**
+   * Global enable switch for ACK reactions on this channel.
+   */
+  enabled?: boolean;
+  /**
+   * Conditional rules evaluated in order.
+   */
+  rules?: AckReactionRuleConfig[];
+  /**
+   * Probabilistic gate in `[0.0, 1.0]` applied to default fallback selection.
+   * Rule-level `sample_rate` overrides this for matched rules.
+   */
+  sample_rate?: number;
+  /**
+   * Reaction selection strategy for ACK emoji pools.
+   */
+  strategy?: "random" | "first";
+  [k: string]: unknown;
+}
+/**
+ * Conditional ACK emoji reaction rule.
+ */
+export interface AckReactionRuleConfig {
+  /**
+   * Rule action (`react` or `suppress`).
+   */
+  action?: "react" | "suppress";
+  /**
+   * Match only for these chat/channel IDs. `*` matches any chat.
+   */
+  chat_ids?: string[];
+  /**
+   * Match only for selected chat types; empty means no chat-type constraint.
+   */
+  chat_types?: AckReactionChatType[];
+  /**
+   * Match only when message contains all keywords (case-insensitive).
+   */
+  contains_all?: string[];
+  /**
+   * Match when message contains any keyword (case-insensitive).
+   */
+  contains_any?: string[];
+  /**
+   * Match only when message contains none of these keywords (case-insensitive).
+   */
+  contains_none?: string[];
+  /**
+   * Emoji pool used when this rule matches.
+   */
+  emojis?: string[];
+  /**
+   * Rule enable switch.
+   */
+  enabled?: boolean;
+  /**
+   * Match only for selected locale tags; supports prefix matching (`zh`, `zh_cn`).
+   */
+  locale_any?: string[];
+  /**
+   * Match only when all regex patterns match message text.
+   */
+  regex_all?: string[];
+  /**
+   * Match when any regex pattern matches message text.
+   */
+  regex_any?: string[];
+  /**
+   * Match only when none of these regex patterns match message text.
+   */
+  regex_none?: string[];
+  /**
+   * Optional probabilistic gate in `[0.0, 1.0]` for this rule.
+   * When omitted, falls back to channel-level `sample_rate`.
+   */
+  sample_rate?: number | null;
+  /**
+   * Match only for these sender IDs. `*` matches any sender.
+   */
+  sender_ids?: string[];
+  /**
+   * Per-rule strategy override (falls back to parent strategy when omitted).
+   */
+  strategy?: AckReactionStrategy | null;
+  [k: string]: unknown;
+}
+/**
+ * ACP (Agent Client Protocol) channel configuration.
+ *
+ * Enables ZeroClaw to act as an ACP client, connecting to an OpenCode ACP server
+ * via `opencode acp` command for JSON-RPC 2.0 communication over stdio.
+ */
+export interface AcpConfig {
+  /**
+   * Allowed user identifiers (empty = deny all, "*" = allow all).
+   */
+  allowed_users?: string[];
+  /**
+   * Additional arguments to pass to `opencode acp`.
+   */
+  extra_args?: string[];
+  /**
+   * OpenCode binary path (default: "opencode").
+   */
+  opencode_path?: string | null;
+  /**
+   * Working directory for OpenCode process.
+   */
+  workdir?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * BlueBubbles iMessage bridge channel configuration.
+ *
+ * BlueBubbles is a self-hosted macOS server that exposes iMessage via a
+ * REST API and webhook push notifications. See <https://bluebubbles.app>.
+ */
+export interface BlueBubblesConfig {
+  /**
+   * Allowed sender handles (phone numbers or Apple IDs). Use `["*"]` to allow all.
+   */
+  allowed_senders?: string[];
+  /**
+   * Sender handles to silently ignore (e.g. suppress echoed outbound messages).
+   */
+  ignore_senders?: string[];
+  /**
+   * BlueBubbles server password.
+   */
+  password: string;
+  /**
+   * BlueBubbles server URL (e.g. `http://192.168.1.100:1234` or an ngrok URL).
+   */
+  server_url: string;
+  /**
+   * Optional shared secret to authenticate inbound webhooks.
+   * If set, incoming requests must include `Authorization: Bearer <secret>`.
+   */
+  webhook_secret?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -584,6 +1054,7 @@ export interface EmailConfig {
    * IMAP server hostname
    */
   imap_host: string;
+  imap_id?: EmailImapIdConfig;
   /**
    * IMAP server port (default: 993 for TLS)
    */
@@ -608,6 +1079,28 @@ export interface EmailConfig {
    * Email username for authentication
    */
   username: string;
+  [k: string]: unknown;
+}
+/**
+ * Optional IMAP ID extension (RFC 2971) client identification.
+ */
+export interface EmailImapIdConfig {
+  /**
+   * Send IMAP `ID` command after login (recommended for some providers such as NetEase).
+   */
+  enabled?: boolean;
+  /**
+   * Client application name
+   */
+  name?: string;
+  /**
+   * Client vendor name
+   */
+  vendor?: string;
+  /**
+   * Client application version
+   */
+  version?: string;
   [k: string]: unknown;
 }
 /**
@@ -655,6 +1148,32 @@ export interface FeishuConfig {
    * Verification token for webhook validation (optional)
    */
   verification_token?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * GitHub channel configuration (webhook receive + issue/PR comment send).
+ */
+export interface GitHubConfig {
+  /**
+   * GitHub token used for outbound API calls.
+   *
+   * Supports fine-grained PAT or installation token with `issues:write` / `pull_requests:write`.
+   */
+  access_token: string;
+  /**
+   * Allowed repositories (`owner/repo`), `owner/*`, or `*`.
+   * Empty list denies all repositories.
+   */
+  allowed_repos?: string[];
+  /**
+   * Optional GitHub API base URL (for GHES).
+   * Defaults to `https://api.github.com` when omitted.
+   */
+  api_base_url?: string | null;
+  /**
+   * Optional webhook secret to verify `X-Hub-Signature-256`.
+   */
+  webhook_secret?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -860,6 +1379,28 @@ export interface MattermostConfig {
   [k: string]: unknown;
 }
 /**
+ * Napcat channel configuration (QQ via OneBot-compatible API)
+ */
+export interface NapcatConfig {
+  /**
+   * Optional access token (Authorization Bearer token)
+   */
+  access_token?: string | null;
+  /**
+   * Allowed user IDs. Empty = deny all, "*" = allow all
+   */
+  allowed_users?: string[];
+  /**
+   * Optional Napcat HTTP API base URL. If omitted, derived from websocket_url.
+   */
+  api_base_url?: string;
+  /**
+   * Napcat WebSocket endpoint (for example `ws://127.0.0.1:3001`)
+   */
+  websocket_url: string;
+  [k: string]: unknown;
+}
+/**
  * Nextcloud Talk bot configuration (webhook receive + OCS send API).
  */
 export interface NextcloudTalkConfig {
@@ -976,8 +1517,14 @@ export interface SlackConfig {
   /**
    * Optional channel ID to restrict the bot to a single channel.
    * Omit (or set `"*"`) to listen across all accessible channels.
+   * Ignored when `channel_ids` is non-empty.
    */
   channel_id?: string | null;
+  /**
+   * Explicit list of channel/DM IDs to listen on simultaneously.
+   * Takes precedence over `channel_id`. Empty = fall back to `channel_id`.
+   */
+  channel_ids?: string[];
   /**
    * Group-chat trigger controls.
    */
@@ -988,6 +1535,11 @@ export interface SlackConfig {
  * Telegram bot channel configuration.
  */
 export interface TelegramConfig {
+  /**
+   * When true, send emoji reaction acknowledgments (⚡️, 👌, 👀, 🔥, 👍) to incoming messages.
+   * When false, no reaction is sent. Default is true.
+   */
+  ack_enabled?: boolean;
   /**
    * Allowed Telegram user IDs or usernames. Empty = deny all.
    */
@@ -1021,9 +1573,13 @@ export interface TelegramConfig {
    */
   mention_only?: boolean;
   /**
+   * Draft progress verbosity for streaming updates.
+   */
+  progress_mode?: "verbose" | "compact" | "off";
+  /**
    * Streaming mode for progressive response delivery via message edits.
    */
-  stream_mode?: "off" | "partial";
+  stream_mode?: "off" | "partial" | "on";
   [k: string]: unknown;
 }
 /**
@@ -1046,6 +1602,16 @@ export interface WatiConfig {
    * Tenant ID for multi-channel setups (optional).
    */
   tenant_id?: string | null;
+  /**
+   * Shared secret for WATI webhook authentication.
+   *
+   * Supports `X-Hub-Signature-256` HMAC verification and Bearer-token fallback.
+   * Can also be set via `ZEROCLAW_WATI_WEBHOOK_SECRET`.
+   * Default: `None` (unset).
+   * Compatibility/migration: additive key for existing deployments; set this
+   * before enabling inbound WATI webhooks. Remove (or set null) to roll back.
+   */
+  webhook_secret?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1173,6 +1739,7 @@ export interface CostConfig {
    * Enable cost tracking (default: false)
    */
   enabled?: boolean;
+  enforcement?: CostEnforcementConfig;
   /**
    * Monthly spending limit in USD (default: 100.00)
    */
@@ -1187,6 +1754,24 @@ export interface CostConfig {
    * Warn when spending reaches this percentage of limit (default: 80)
    */
   warn_at_percent?: number;
+  [k: string]: unknown;
+}
+/**
+ * Runtime budget enforcement policy (`[cost.enforcement]`).
+ */
+export interface CostEnforcementConfig {
+  /**
+   * Enforcement behavior. Default: `warn`.
+   */
+  mode?: "warn" | "route_down" | "block";
+  /**
+   * Extra reserve added to token/cost estimates (percentage, 0-100). Default: `10`.
+   */
+  reserve_percent?: number;
+  /**
+   * Optional fallback model (or `hint:*`) when `mode = "route_down"`.
+   */
+  route_down_model?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1215,6 +1800,44 @@ export interface CronConfig {
    * Maximum number of historical cron run records to retain. Default: `50`.
    */
   max_run_history?: number;
+  [k: string]: unknown;
+}
+/**
+ * Economic agent survival tracking (`[economic]`).
+ * Tracks balance, token costs, work income, and survival status.
+ */
+export interface EconomicConfig {
+  /**
+   * Data directory for economic state persistence (relative to workspace)
+   */
+  data_path?: string | null;
+  /**
+   * Enable economic tracking (default: false)
+   */
+  enabled?: boolean;
+  /**
+   * Starting balance in USD (default: 1000.0)
+   */
+  initial_balance?: number;
+  /**
+   * Minimum evaluation score (0.0-1.0) to receive payment (default: 0.6)
+   */
+  min_evaluation_threshold?: number;
+  token_pricing?: EconomicTokenPricing;
+  [k: string]: unknown;
+}
+/**
+ * Token pricing configuration
+ */
+export interface EconomicTokenPricing {
+  /**
+   * Price per million input tokens (USD)
+   */
+  input_price_per_million?: number;
+  /**
+   * Price per million output tokens (USD)
+   */
+  output_price_per_million?: number;
   [k: string]: unknown;
 }
 /**
@@ -1391,6 +2014,10 @@ export interface HardwareConfig {
  */
 export interface HeartbeatConfig {
   /**
+   * Skip duplicate task text within this cooldown window (minutes). Default: `0` (disabled).
+   */
+  dedupe_window_minutes?: number;
+  /**
    * Enable periodic heartbeat pings. Default: `false`.
    */
   enabled: boolean;
@@ -1398,6 +2025,10 @@ export interface HeartbeatConfig {
    * Interval in minutes between heartbeat pings. Default: `30`.
    */
   interval_minutes: number;
+  /**
+   * Maximum heartbeat tasks to execute per tick. Default: `3`.
+   */
+  max_tasks_per_tick?: number;
   /**
    * Optional fallback task text when `HEARTBEAT.md` has no task entries.
    */
@@ -1428,9 +2059,17 @@ export interface HooksConfig {
 }
 export interface BuiltinHooksConfig {
   /**
+   * Enable the boot-script hook (injects startup/runtime guidance).
+   */
+  boot_script?: boolean;
+  /**
    * Enable the command-logger hook (logs tool calls for auditing).
    */
-  command_logger: boolean;
+  command_logger?: boolean;
+  /**
+   * Enable the session-memory hook (persists session hints between turns).
+   */
+  session_memory?: boolean;
   [k: string]: unknown;
 }
 /**
@@ -1441,6 +2080,18 @@ export interface HttpRequestConfig {
    * Allowed domains for HTTP requests (exact or subdomain match)
    */
   allowed_domains?: string[];
+  /**
+   * Optional named credential profiles for env-backed auth injection.
+   *
+   * Example:
+   * `[http_request.credential_profiles.github]`
+   * `env_var = "GITHUB_TOKEN"`
+   * `header_name = "Authorization"`
+   * `value_prefix = "Bearer "`
+   */
+  credential_profiles?: {
+    [k: string]: HttpRequestCredentialProfile;
+  };
   /**
    * Enable `http_request` tool for API interactions
    */
@@ -1460,6 +2111,26 @@ export interface HttpRequestConfig {
   [k: string]: unknown;
 }
 /**
+ * HTTP request tool configuration (`[http_request]` section).
+ *
+ * Deny-by-default: if `allowed_domains` is empty, all HTTP requests are rejected.
+ */
+export interface HttpRequestCredentialProfile {
+  /**
+   * Environment variable containing the secret/token value
+   */
+  env_var?: string;
+  /**
+   * Header name to inject (for example `Authorization` or `X-API-Key`)
+   */
+  header_name?: string;
+  /**
+   * Optional prefix prepended to the secret (for example `Bearer `)
+   */
+  value_prefix?: string;
+  [k: string]: unknown;
+}
+/**
  * Identity format configuration: OpenClaw or AIEOS (`[identity]`).
  */
 export interface IdentityConfig {
@@ -1471,6 +2142,12 @@ export interface IdentityConfig {
    * Path to AIEOS JSON file (relative to workspace)
    */
   aieos_path?: string | null;
+  /**
+   * Additional workspace files injected for the OpenClaw identity format.
+   *
+   * Paths are resolved relative to the workspace root.
+   */
+  extra_files?: string[];
   /**
    * Identity format: "openclaw" (default) or "aieos"
    */
@@ -1550,10 +2227,10 @@ export interface MemoryConfig {
    */
   auto_save: boolean;
   /**
-   * "sqlite" | "lucid" | "postgres" | "qdrant" | "markdown" | "none" (`none` = explicit no-op memory)
+   * "sqlite" | "sqlite_qdrant_hybrid" | "lucid" | "postgres" | "qdrant" | "markdown" | "none" (`none` = explicit no-op memory)
    *
    * `postgres` requires `[storage.provider.config]` with `db_url` (`dbURL` alias supported).
-   * `qdrant` uses `[memory.qdrant]` config or `QDRANT_URL` env var.
+   * `qdrant` and `sqlite_qdrant_hybrid` use `[memory.qdrant]` config or `QDRANT_URL` env var.
    */
   backend: string;
   /**
@@ -1620,6 +2297,24 @@ export interface MemoryConfig {
    */
   snapshot_on_hygiene?: boolean;
   /**
+   * SQLite journal mode: "wal" (default) or "delete".
+   *
+   * WAL (Write-Ahead Logging) provides better concurrency and is the
+   * recommended default. However, WAL requires shared-memory support
+   * (mmap/shm) which is **not available** on many network and virtual
+   * shared filesystems (NFS, SMB/CIFS, UTM/VirtioFS, VirtualBox shared
+   * folders, etc.), causing `xShmMap` I/O errors at startup.
+   *
+   * Set to `"delete"` when your workspace lives on such a filesystem.
+   *
+   * Example:
+   * ```toml
+   * [memory]
+   * sqlite_journal_mode = "delete"
+   * ```
+   */
+  sqlite_journal_mode?: string;
+  /**
    * For sqlite backend: max seconds to wait when opening the DB (e.g. file locked).
    * None = wait indefinitely (default). Recommended max: 300.
    */
@@ -1632,7 +2327,7 @@ export interface MemoryConfig {
 }
 /**
  * Configuration for Qdrant vector database backend.
- * Only used when `backend = "qdrant"`.
+ * Used when `backend = "qdrant"` or `backend = "sqlite_qdrant_hybrid"`.
  */
 export interface QdrantConfig {
   /**
@@ -1657,9 +2352,29 @@ export interface QdrantConfig {
  */
 export interface ModelProviderConfig {
   /**
+   * Optional profile-scoped API key.
+   */
+  api_key?: string | null;
+  /**
+   * Optional custom authentication header for `custom:` providers
+   * (for example `api-key` for Azure OpenAI).
+   *
+   * Contract:
+   * - Default/omitted (`None`): uses the standard `Authorization: Bearer <token>` header.
+   * - Compatibility: this key is additive and optional; older runtimes that do not support it
+   *   ignore the field while continuing to use Bearer auth behavior.
+   * - Rollback/migration: remove `auth_header` to return to Bearer-only auth if operators
+   *   need to downgrade or revert custom-header behavior.
+   */
+  auth_header?: string | null;
+  /**
    * Optional base URL for OpenAI-compatible endpoints.
    */
   base_url?: string | null;
+  /**
+   * Optional profile-scoped default model.
+   */
+  default_model?: string | null;
   /**
    * Optional provider type/name override (e.g. "openai", "openai-codex", or custom profile id).
    */
@@ -1713,6 +2428,15 @@ export interface ModelRouteConfig {
    * Provider to route to (must match a known provider name)
    */
   provider: string;
+  /**
+   * Optional route-specific transport override for this route.
+   * Supported values: "auto", "websocket", "sse".
+   *
+   * When `model_routes[].transport` is unset, the route inherits `provider.transport`.
+   * If both are unset, runtime defaults are used (`auto` for OpenAI Codex).
+   * Existing configs without this field remain valid.
+   */
+  transport?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1862,6 +2586,21 @@ export interface ProviderConfig {
    * (e.g. OpenAI Codex `/responses` reasoning effort).
    */
   reasoning_level?: string | null;
+  /**
+   * Optional transport override for providers that support multiple transports.
+   * Supported values: "auto", "websocket", "sse".
+   *
+   * Resolution order:
+   * 1) `model_routes[].transport` (route-specific)
+   * 2) env overrides (`PROVIDER_TRANSPORT`, `ZEROCLAW_PROVIDER_TRANSPORT`, `ZEROCLAW_CODEX_TRANSPORT`)
+   * 3) `provider.transport`
+   * 4) runtime default (`auto`, WebSocket-first with SSE fallback for OpenAI Codex)
+   *
+   * Note: env overrides replace configured `provider.transport` when set.
+   *
+   * Existing configs that omit `provider.transport` remain valid and fall back to defaults.
+   */
+  transport?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1959,6 +2698,19 @@ export interface ReliabilityConfig {
    * Max backoff for channel/daemon restarts.
    */
   channel_max_backoff_secs?: number;
+  /**
+   * Optional per-fallback provider API keys keyed by fallback entry name.
+   * This allows distinct credentials for multiple `custom:<url>` endpoints.
+   *
+   * Contract:
+   * - Default/omitted (`{}` via `#[serde(default)]`): no per-entry override is used.
+   * - Compatibility: additive and non-breaking for existing configs that omit this field.
+   * - Rollback/migration: remove this map (or specific entries) to revert to provider/env-based
+   *   credential resolution.
+   */
+  fallback_api_keys?: {
+    [k: string]: string;
+  };
   /**
    * Fallback provider chain (e.g. `["anthropic", "openai"]`).
    */
@@ -2190,8 +2942,13 @@ export interface SecretsConfig {
  */
 export interface SecurityConfig {
   audit?: AuditConfig;
+  /**
+   * Enable per-turn canary tokens to detect system-context exfiltration.
+   */
+  canary_tokens?: boolean;
   estop?: EstopConfig;
   otp?: OtpConfig;
+  outbound_leak_guard?: OutboundLeakGuardConfig;
   perplexity_filter?: PerplexityFilterConfig;
   resources?: ResourceLimitsConfig;
   /**
@@ -2199,6 +2956,21 @@ export interface SecurityConfig {
    */
   roles?: SecurityRoleConfig[];
   sandbox?: SandboxConfig;
+  /**
+   * Enable semantic prompt-injection guard backed by vector similarity.
+   *
+   * This guard is additive to lexical prompt detection and only runs when
+   * `PromptGuard` does not already block the input.
+   */
+  semantic_guard?: boolean;
+  /**
+   * Qdrant collection used by the semantic guard.
+   */
+  semantic_guard_collection?: string;
+  /**
+   * Cosine similarity threshold for semantic-guard detections.
+   */
+  semantic_guard_threshold?: number;
   syscall_anomaly?: SyscallAnomalyConfig;
   url_access?: UrlAccessConfig;
   [k: string]: unknown;
@@ -2286,6 +3058,23 @@ export interface OtpConfig {
    * TOTP time-step in seconds.
    */
   token_ttl_secs?: number;
+}
+/**
+ * Outbound credential leak guard for channel replies.
+ */
+export interface OutboundLeakGuardConfig {
+  /**
+   * Action to take when potential credentials are detected.
+   */
+  action?: "redact" | "block";
+  /**
+   * Enable outbound credential leak scanning for channel responses.
+   */
+  enabled?: boolean;
+  /**
+   * Detection sensitivity (0.0-1.0, higher = more aggressive).
+   */
+  sensitivity?: number;
 }
 /**
  * Lightweight statistical filter for adversarial suffixes (opt-in).
@@ -2450,9 +3239,34 @@ export interface UrlAccessConfig {
    */
   allow_loopback?: boolean;
   /**
+   * Persisted first-visit approvals granted by a human operator.
+   * Supports exact, `*.example.com`, and `*`.
+   */
+  approved_domains?: string[];
+  /**
    * Block private/local IPs and hostnames by default.
    */
   block_private_ip?: boolean;
+  /**
+   * Global trusted domain allowlist shared by all URL-based network tools.
+   * Supports exact, `*.example.com`, and `*`.
+   */
+  domain_allowlist?: string[];
+  /**
+   * Global domain blocklist shared by all URL-based network tools.
+   * Supports exact, `*.example.com`, and `*`. Takes priority over allowlists.
+   */
+  domain_blocklist?: string[];
+  /**
+   * Enforce a global domain allowlist in addition to per-tool allowlists.
+   * When enabled, hosts must match `domain_allowlist`.
+   */
+  enforce_domain_allowlist?: boolean;
+  /**
+   * Require explicit human confirmation before first-time access to an
+   * unseen domain. Confirmed domains are persisted in `approved_domains`.
+   */
+  require_first_visit_approval?: boolean;
 }
 /**
  * Skills loading and community repository behavior (`[skills]`).
@@ -2481,9 +3295,16 @@ export interface SkillsConfig {
   open_skills_enabled?: boolean;
   /**
    * Controls how skills are injected into the system prompt.
-   * `full` preserves legacy behavior. `compact` keeps context small and loads skills on demand.
+   * `compact` (default) keeps context small and loads skills on demand.
+   * `full` preserves legacy behavior as an opt-in.
    */
-  prompt_injection_mode?: "full" | "compact";
+  prompt_injection_mode?: "compact" | "full";
+  /**
+   * Optional allowlist of canonical directory roots for workspace skill symlink targets.
+   * Symlinked workspace skills are rejected unless their resolved targets are under one
+   * of these roots. Accepts absolute paths and `~/` home-relative paths.
+   */
+  trusted_skill_roots?: string[];
   [k: string]: unknown;
 }
 /**
@@ -2539,6 +3360,12 @@ export interface StorageProviderConfig {
  * Voice transcription configuration (Whisper API via Groq).
  */
 export interface TranscriptionConfig {
+  /**
+   * API key used for transcription requests.
+   *
+   * If unset, runtime falls back to `GROQ_API_KEY` for backward compatibility.
+   */
+  api_key?: string | null;
   /**
    * Whisper API endpoint URL.
    */
@@ -2667,7 +3494,8 @@ export interface WebFetchConfig {
    */
   allowed_domains?: string[];
   /**
-   * Optional provider API key (required for provider = "firecrawl")
+   * Optional provider API key (required for provider = "firecrawl" or "tavily").
+   * Multiple keys can be comma-separated for round-robin load balancing.
    */
   api_key?: string | null;
   /**
@@ -2687,7 +3515,7 @@ export interface WebFetchConfig {
    */
   max_response_size?: number;
   /**
-   * Provider: "fast_html2md", "nanohtml2text", or "firecrawl"
+   * Provider: "fast_html2md", "nanohtml2text", "firecrawl", or "tavily"
    */
   provider?: string;
   /**
@@ -2705,7 +3533,8 @@ export interface WebFetchConfig {
  */
 export interface WebSearchConfig {
   /**
-   * Generic provider API key (used by firecrawl and as fallback for brave)
+   * Generic provider API key (used by firecrawl, tavily, and as fallback for brave).
+   * Multiple keys can be comma-separated for round-robin load balancing.
    */
   api_key?: string | null;
   /**
@@ -2717,17 +3546,79 @@ export interface WebSearchConfig {
    */
   brave_api_key?: string | null;
   /**
+   * Optional country filter forwarded to providers that support it (e.g. "US")
+   */
+  country?: string | null;
+  /**
+   * Optional domain filter forwarded to providers that support it
+   */
+  domain_filter?: string[];
+  /**
    * Enable `web_search_tool` for web searches
    */
   enabled?: boolean;
+  /**
+   * Exa API key (used when provider is "exa")
+   */
+  exa_api_key?: string | null;
+  /**
+   * Include textual content payloads for Exa search responses
+   */
+  exa_include_text?: boolean;
+  /**
+   * Exa search type override: "auto" (default), "keyword", or "neural"
+   */
+  exa_search_type?: string;
+  /**
+   * Fallback providers attempted after primary provider fails.
+   * Supported values: duckduckgo (or ddg), brave, firecrawl, tavily, perplexity, exa, jina
+   */
+  fallback_providers?: string[];
+  /**
+   * Jina API key (optional; can raise limits for provider = "jina")
+   */
+  jina_api_key?: string | null;
+  /**
+   * Optional site filters for Jina search provider
+   */
+  jina_site_filters?: string[];
+  /**
+   * Optional language filter forwarded to providers that support it
+   */
+  language_filter?: string[];
   /**
    * Maximum results per search (1-10)
    */
   max_results?: number;
   /**
-   * Search provider: "duckduckgo" (free, no API key) or "brave" (requires API key)
+   * Optional max tokens cap used by provider-specific APIs (for example Perplexity)
+   */
+  max_tokens?: number | null;
+  /**
+   * Optional per-result token cap used by provider-specific APIs
+   */
+  max_tokens_per_page?: number | null;
+  /**
+   * Perplexity API key (used when provider is "perplexity")
+   */
+  perplexity_api_key?: string | null;
+  /**
+   * Search provider: "duckduckgo"/"ddg" (free, no API key), "brave", "firecrawl",
+   * "tavily", "perplexity", "exa", or "jina"
    */
   provider?: string;
+  /**
+   * Optional recency filter forwarded to providers that support it
+   */
+  recency_filter?: string | null;
+  /**
+   * Retry count per provider before falling back to next provider
+   */
+  retries_per_provider?: number;
+  /**
+   * Retry backoff in milliseconds between provider retry attempts
+   */
+  retry_backoff_ms?: number;
   /**
    * Request timeout in seconds
    */

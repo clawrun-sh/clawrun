@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { AgentBrowserTool } from "./agent-browser.js";
-import type { SandboxHandle } from "../types.js";
+import { AgentBrowserTool } from "./index.js";
+import type { SandboxHandle } from "../../types.js";
 
 function mockSandbox(exitCodes: Record<string, number> = {}): SandboxHandle {
   return {
@@ -26,6 +26,19 @@ describe("AgentBrowserTool", () => {
     expect(tool.name).toBe("Agent Browser");
     expect(tool.version).toBe("0.16.3");
     expect(tool.installDomains.length).toBeGreaterThan(0);
+  });
+
+  it("sets AGENT_BROWSER_NATIVE and MAX_OUTPUT in runtimeEnv", () => {
+    expect(tool.runtimeEnv).toEqual({
+      AGENT_BROWSER_NATIVE: "1",
+      AGENT_BROWSER_MAX_OUTPUT: "50000",
+    });
+  });
+
+  it("has skillContent loaded from SKILL.md", () => {
+    expect(tool.skillContent).toBeDefined();
+    expect(tool.skillContent.length).toBeGreaterThan(0);
+    expect(tool.skillContent).toContain("agent-browser");
   });
 
   describe("isInstalled", () => {
@@ -63,7 +76,7 @@ describe("AgentBrowserTool", () => {
       expect(sandbox.runCommand).toHaveBeenCalledTimes(6);
     });
 
-    it("includes chromium install as final step", async () => {
+    it("includes chromium install with native mode as final step", async () => {
       const sandbox = mockSandbox();
 
       await tool.install(sandbox);
@@ -71,12 +84,13 @@ describe("AgentBrowserTool", () => {
       const calls = vi.mocked(sandbox.runCommand).mock.calls;
       const lastCall = calls[calls.length - 1] as unknown as [string, string[]];
       expect(lastCall[0]).toBe("sh");
-      expect(lastCall[1]).toEqual(["-c", "$HOME/.local/bin/agent-browser install --with-deps"]);
+      expect(lastCall[1][1]).toContain("AGENT_BROWSER_NATIVE=1");
+      expect(lastCall[1][1]).toContain("agent-browser install --with-deps");
     });
 
     it("throws on non-zero exit code", async () => {
       const sandbox = mockSandbox({
-        "sh -c $HOME/.local/bin/agent-browser install --with-deps": 1,
+        "sh -c AGENT_BROWSER_NATIVE=1 $HOME/.local/bin/agent-browser install --with-deps": 1,
       });
 
       await expect(tool.install(sandbox)).rejects.toThrow(/Failed/);

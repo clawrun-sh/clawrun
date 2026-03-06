@@ -1,6 +1,11 @@
-import type { Tool } from "../tools.js";
-import type { SandboxHandle } from "../types.js";
-import { githubReleaseUrl, releaseInstallSteps, releaseCheckCommand } from "./installer.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Tool } from "../../tools.js";
+import type { SandboxHandle } from "../../types.js";
+import { githubReleaseUrl, releaseInstallSteps, releaseCheckCommand } from "../installer.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const GH_VERSION = "2.65.0";
 
@@ -23,6 +28,7 @@ export class GhCliTool implements Tool {
   readonly installDomains = ["github.com", "objects.githubusercontent.com", "api.github.com"];
   readonly checkCommand = releaseCheckCommand("gh", GH_VERSION);
   readonly installCommands = releaseInstallSteps(GH_SPEC);
+  readonly skillContent = readFileSync(join(__dirname, "SKILL.md"), "utf-8");
 
   async isInstalled(sandbox: SandboxHandle): Promise<boolean> {
     const result = await sandbox.runCommand(this.checkCommand.cmd, this.checkCommand.args);

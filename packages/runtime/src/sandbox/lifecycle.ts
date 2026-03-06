@@ -725,6 +725,7 @@ export class SandboxLifecycleManager {
               id: t.id,
               check: t.checkCommand,
               install: t.installCommands,
+              env: t.runtimeEnv,
             }))
         : [];
 

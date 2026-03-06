@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ZeroclawSandbox } from "./types.js";
 import { getBinaryPath } from "./binary.js";
@@ -64,6 +64,23 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
       coreFiles.push(...workspaceFiles);
     } catch {
       // No workspace dir — skip
+    }
+
+    // Write skill directories
+    const skillsDir = join(opts.localAgentDir, "workspace", "skills");
+    try {
+      for (const skillName of readdirSync(skillsDir)) {
+        const skillDir = join(skillsDir, skillName);
+        if (!statSync(skillDir).isDirectory()) continue;
+        for (const file of readdirSync(skillDir)) {
+          coreFiles.push({
+            path: `${agentDir}/workspace/skills/${skillName}/${file}`,
+            content: readFileSync(join(skillDir, file)),
+          });
+        }
+      }
+    } catch {
+      // No skills dir — skip
     }
   }
 

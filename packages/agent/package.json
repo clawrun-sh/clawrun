@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc",
+    "build": "tsc && for f in src/tools/*/SKILL.md; do d=\"dist/tools/$(basename $(dirname $f))\"; mkdir -p \"$d\" && cp \"$f\" \"$d/\"; done 2>/dev/null || true",
     "dev": "tsc --watch",
     "lint": "eslint src",
     "test": "vitest run",

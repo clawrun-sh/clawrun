@@ -18,6 +18,10 @@ export interface Tool {
   readonly checkCommand: { cmd: string; args: string[] };
   /** Sequential install steps. */
   readonly installCommands: ToolInstallStep[];
+  /** Environment variables the tool needs at runtime (injected into daemon env). Values may use $HOME as placeholder. */
+  readonly runtimeEnv?: Record<string, string>;
+  /** Optional SKILL.md content. Seeded into workspace/skills/<tool.id>/ when tool is selected. */
+  readonly skillContent?: string;
   isInstalled(sandbox: SandboxHandle): Promise<boolean>;
   install(sandbox: SandboxHandle): Promise<void>;
 }

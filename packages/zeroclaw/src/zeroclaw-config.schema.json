@@ -8,7 +8,9 @@
       "description": "Agent orchestration settings (`[agent]`).",
       "$ref": "#/$defs/AgentConfig",
       "default": {
+        "allowed_tools": [],
         "compact_context": true,
+        "denied_tools": [],
         "loop_detection_failure_streak": 3,
         "loop_detection_no_progress_threshold": 3,
         "loop_detection_ping_pong_cycles": 2,
@@ -395,8 +397,10 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]`).",
       "$ref": "#/$defs/HeartbeatConfig",
       "default": {
+        "dedupe_window_minutes": 0,
         "enabled": false,
         "interval_minutes": 30,
+        "max_tasks_per_tick": 3,
         "message": null,
         "target": null,
         "to": null
@@ -587,6 +591,7 @@
         "api_keys": [],
         "channel_initial_backoff_secs": 2,
         "channel_max_backoff_secs": 60,
+        "fallback_api_keys": {},
         "fallback_providers": [],
         "model_fallbacks": {},
         "provider_backoff_ms": 500,
@@ -681,6 +686,7 @@
           "max_size_mb": 100,
           "sign_events": false
         },
+        "canary_tokens": true,
         "estop": {
           "enabled": false,
           "require_otp_to_resume": true,
@@ -722,6 +728,9 @@
           "enabled": null,
           "firejail_args": []
         },
+        "semantic_guard": false,
+        "semantic_guard_collection": "semantic_guard",
+        "semantic_guard_threshold": 0.82,
         "syscall_anomaly": {
           "alert_cooldown_secs": 20,
           "alert_on_unknown_syscall": true,
@@ -812,7 +821,7 @@
         "clawhub_token": null,
         "open_skills_dir": null,
         "open_skills_enabled": false,
-        "prompt_injection_mode": "full",
+        "prompt_injection_mode": "compact",
         "trusted_skill_roots": []
       }
     },
@@ -1206,10 +1215,26 @@
       "description": "Agent orchestration configuration (`[agent]` section).",
       "type": "object",
       "properties": {
+        "allowed_tools": {
+          "description": "Optional allowlist for primary-agent tool visibility.\nWhen non-empty, only listed tools are exposed to the primary agent.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
         "compact_context": {
           "description": "When true: bootstrap_max_chars=6000, rag_chunk_limit=2. Use for 13B or smaller models.",
           "type": "boolean",
           "default": false
+        },
+        "denied_tools": {
+          "description": "Optional denylist for primary-agent tool visibility.\nApplied after `allowed_tools`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
         },
         "loop_detection_failure_streak": {
           "description": "Loop detection: consecutive failure streak threshold.\nTriggers when the same tool fails this many times in a row.\nSet to `0` to disable. Default: `3`.",
@@ -2245,15 +2270,20 @@
           "description": "Matching context is explicitly denied.",
           "type": "string",
           "const": "deny"
+        },
+        {
+          "description": "Matching context requires interactive approval in supervised mode.\n\nThis does not allow a command by itself; allowlist and deny checks still apply.",
+          "type": "string",
+          "const": "require_approval"
         }
       ]
     },
     "CommandContextRuleConfig": {
-      "description": "Context-aware allow/deny rule for shell commands.\n\nRules are evaluated per command segment. Command matching accepts command\nnames (`curl`), explicit paths (`/usr/bin/curl`), and wildcard (`*`).\n\nMatching semantics:\n- `action = \"deny\"`: if all constraints match, the segment is rejected.\n- `action = \"allow\"`: if at least one allow rule exists for a command,\n  segments must match at least one of those allow rules.\n\nConstraints are optional:\n- `allowed_domains`: require URL arguments to match these hosts/patterns.\n- `allowed_path_prefixes`: require path-like arguments to stay under these prefixes.\n- `denied_path_prefixes`: for deny rules, match when any path-like argument\n  is under these prefixes; for allow rules, require path arguments not to hit\n  these prefixes.",
+      "description": "Context-aware command rule for shell commands.\n\nRules are evaluated per command segment. Command matching accepts command\nnames (`curl`), explicit paths (`/usr/bin/curl`), and wildcard (`*`).\n\nMatching semantics:\n- `action = \"deny\"`: if all constraints match, the segment is rejected.\n- `action = \"allow\"`: if at least one allow rule exists for a command,\n  segments must match at least one of those allow rules.\n- `action = \"require_approval\"`: matching segments require explicit\n  `approved=true` in supervised mode, even when `shell` is auto-approved.\n\nConstraints are optional:\n- `allowed_domains`: require URL arguments to match these hosts/patterns.\n- `allowed_path_prefixes`: require path-like arguments to stay under these prefixes.\n- `denied_path_prefixes`: for deny rules, match when any path-like argument\n  is under these prefixes; for allow rules, require path arguments not to hit\n  these prefixes.",
       "type": "object",
       "properties": {
         "action": {
-          "description": "Rule action (`allow` | `deny`). Defaults to `allow`.",
+          "description": "Rule action (`allow` | `deny` | `require_approval`). Defaults to `allow`.",
           "$ref": "#/$defs/CommandContextRuleAction",
           "default": "allow"
         },
@@ -2776,7 +2806,7 @@
             "enabled": true,
             "name": "zeroclaw",
             "vendor": "zeroclaw-labs",
-            "version": "0.1.7"
+            "version": "0.1.9"
           }
         },
         "imap_port": {
@@ -2837,7 +2867,7 @@
         "version": {
           "description": "Client application version",
           "type": "string",
-          "default": "0.1.7"
+          "default": "0.1.9"
         }
       }
     },
@@ -3208,6 +3238,13 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]` section).",
       "type": "object",
       "properties": {
+        "dedupe_window_minutes": {
+          "description": "Skip duplicate task text within this cooldown window (minutes). Default: `0` (disabled).",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
         "enabled": {
           "description": "Enable periodic heartbeat pings. Default: `false`.",
           "type": "boolean"
@@ -3216,6 +3253,13 @@
           "description": "Interval in minutes between heartbeat pings. Default: `30`.",
           "type": "integer",
           "format": "uint32",
+          "minimum": 0
+        },
+        "max_tasks_per_tick": {
+          "description": "Maximum heartbeat tasks to execute per tick. Default: `3`.",
+          "type": "integer",
+          "format": "uint",
+          "default": 3,
           "minimum": 0
         },
         "message": {
@@ -3891,6 +3935,11 @@
       "properties": {
         "api_key": {
           "description": "Optional profile-scoped API key.",
+          "type": ["string", "null"],
+          "default": null
+        },
+        "auth_header": {
+          "description": "Optional custom authentication header for `custom:` providers\n(for example `api-key` for Azure OpenAI).\n\nContract:\n- Default/omitted (`None`): uses the standard `Authorization: Bearer <token>` header.\n- Compatibility: this key is additive and optional; older runtimes that do not support it\n  ignore the field while continuing to use Bearer auth behavior.\n- Rollback/migration: remove `auth_header` to return to Bearer-only auth if operators\n  need to downgrade or revert custom-header behavior.",
           "type": ["string", "null"],
           "default": null
         },
@@ -4692,6 +4741,14 @@
           "default": 60,
           "minimum": 0
         },
+        "fallback_api_keys": {
+          "description": "Optional per-fallback provider API keys keyed by fallback entry name.\nThis allows distinct credentials for multiple `custom:<url>` endpoints.\n\nContract:\n- Default/omitted (`{}` via `#[serde(default)]`): no per-entry override is used.\n- Compatibility: additive and non-breaking for existing configs that omit this field.\n- Rollback/migration: remove this map (or specific entries) to revert to provider/env-based\n  credential resolution.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
         "fallback_providers": {
           "description": "Fallback provider chain (e.g. `[\"anthropic\", \"openai\"]`).",
           "type": "array",
@@ -5027,6 +5084,11 @@
             "sign_events": false
           }
         },
+        "canary_tokens": {
+          "description": "Enable per-turn canary tokens to detect system-context exfiltration.",
+          "type": "boolean",
+          "default": true
+        },
         "estop": {
           "description": "Emergency-stop state machine configuration.",
           "$ref": "#/$defs/EstopConfig",
@@ -5098,6 +5160,22 @@
             "enabled": null,
             "firejail_args": []
           }
+        },
+        "semantic_guard": {
+          "description": "Enable semantic prompt-injection guard backed by vector similarity.\n\nThis guard is additive to lexical prompt detection and only runs when\n`PromptGuard` does not already block the input.",
+          "type": "boolean",
+          "default": false
+        },
+        "semantic_guard_collection": {
+          "description": "Qdrant collection used by the semantic guard.",
+          "type": "string",
+          "default": "semantic_guard"
+        },
+        "semantic_guard_threshold": {
+          "description": "Cosine similarity threshold for semantic-guard detections.",
+          "type": "number",
+          "format": "double",
+          "default": 0.82
         },
         "syscall_anomaly": {
           "description": "Syscall anomaly detection profile for daemon shell/process execution.",
@@ -5313,9 +5391,9 @@
           "default": false
         },
         "prompt_injection_mode": {
-          "description": "Controls how skills are injected into the system prompt.\n`full` preserves legacy behavior. `compact` keeps context small and loads skills on demand.",
+          "description": "Controls how skills are injected into the system prompt.\n`compact` (default) keeps context small and loads skills on demand.\n`full` preserves legacy behavior as an opt-in.",
           "$ref": "#/$defs/SkillsPromptInjectionMode",
-          "default": "full"
+          "default": "compact"
         },
         "trusted_skill_roots": {
           "description": "Optional allowlist of canonical directory roots for workspace skill symlink targets.\nSymlinked workspace skills are rejected unless their resolved targets are under one\nof these roots. Accepts absolute paths and `~/` home-relative paths.",
@@ -5331,14 +5409,14 @@
       "description": "Skills loading configuration (`[skills]` section).",
       "oneOf": [
         {
-          "description": "Inline full skill instructions and tool metadata into the system prompt.",
-          "type": "string",
-          "const": "full"
-        },
-        {
           "description": "Inline only compact skill metadata (name/description/location) and load details on demand.",
           "type": "string",
           "const": "compact"
+        },
+        {
+          "description": "Inline full skill instructions and tool metadata into the system prompt.",
+          "type": "string",
+          "const": "full"
         }
       ]
     },
@@ -5477,6 +5555,11 @@
           "description": "Update a draft message with every flush interval.",
           "type": "string",
           "const": "partial"
+        },
+        {
+          "description": "Native streaming for channels that support draft updates directly.",
+          "type": "string",
+          "const": "on"
         }
       ]
     },

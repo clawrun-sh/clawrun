@@ -250,7 +250,7 @@ export class ZeroclawAgent implements Agent {
   }
 
   getBundleFiles(): string[] {
-    return ["config.toml", ".secret_key", "workspace/*.md"];
+    return ["config.toml", ".secret_key", "workspace/*.md", "workspace/skills/**/*"];
   }
 
   getSeedDirectory(): string | null {
