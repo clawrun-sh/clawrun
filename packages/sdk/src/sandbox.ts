@@ -65,23 +65,18 @@ export class SandboxClient {
     options?: { timeoutMs?: number },
   ): Promise<ExecResult> {
     const sandbox = await this.getSandbox(sandboxId);
-    try {
-      const timeoutMs = options?.timeoutMs ?? 60_000;
-      const result = await sandbox.runCommand({
-        cmd,
-        args,
-        env,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      return {
-        exitCode: result.exitCode,
-        stdout: await result.stdout(),
-        stderr: await result.stderr(),
-      };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { exitCode: 1, stdout: "", stderr: msg };
-    }
+    const timeoutMs = options?.timeoutMs ?? 60_000;
+    const result = await sandbox.runCommand({
+      cmd,
+      args,
+      env,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return {
+      exitCode: result.exitCode,
+      stdout: await result.stdout(),
+      stderr: await result.stderr(),
+    };
   }
 
   /** Read a file from a running sandbox. Returns null if not found. */

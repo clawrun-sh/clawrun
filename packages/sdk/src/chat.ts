@@ -64,7 +64,8 @@ export function createChatStream(
 
     for await (const chunk of iterate()) {
       if (chunk.type === "error") {
-        errorText = (chunk as { type: "error"; errorText: string }).errorText;
+        const c = chunk as Record<string, unknown>;
+        errorText = typeof c.errorText === "string" ? c.errorText : "Unknown stream error";
         break;
       }
       chunks.push(chunk);

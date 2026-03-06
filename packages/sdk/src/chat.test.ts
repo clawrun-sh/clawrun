@@ -319,6 +319,13 @@ describe("createChatStream", () => {
       }
     });
 
+    it("throws ChatStreamError with fallback message when errorText is missing", async () => {
+      const response = mockSseResponse([JSON.stringify({ type: "error" }), "[DONE]"]);
+      const api = createMockApiClient(response);
+
+      await expect(createChatStream(api, "test").result()).rejects.toThrow("Unknown stream error");
+    });
+
     it("returns empty UIMessage for empty stream", async () => {
       const response = mockSseResponse(["[DONE]"]);
       const api = createMockApiClient(response);

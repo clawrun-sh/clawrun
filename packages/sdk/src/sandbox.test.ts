@@ -143,11 +143,11 @@ describe("SandboxClient", () => {
       );
     });
 
-    it("returns error result on exception", async () => {
-      sandbox1.runCommand = vi.fn().mockRejectedValue(new Error("timeout"));
-      const result = await client.exec(sandboxId("sbx-1"), "slow-cmd", []);
-      expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("timeout");
+    it("propagates infrastructure errors", async () => {
+      sandbox1.runCommand = vi.fn().mockRejectedValue(new Error("sandbox not reachable"));
+      await expect(client.exec(sandboxId("sbx-1"), "slow-cmd", [])).rejects.toThrow(
+        "sandbox not reachable",
+      );
     });
   });
 
