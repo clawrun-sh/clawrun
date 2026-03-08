@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   const payload = await verifyToken(token, secret);
-  if (!payload || payload.sub !== "invite" || payload.scope !== "chat") {
+  if (!payload || payload.sub !== "invite" || payload.scope !== "invite") {
     return NextResponse.redirect(new URL("/auth/expired", req.url));
   }
 

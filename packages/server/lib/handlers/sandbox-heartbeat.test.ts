@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@clawrun/auth", () => ({
-  requireSandboxAuth: vi.fn(() => null),
-}));
-
 vi.mock("@clawrun/runtime", () => ({
   SandboxLifecycleManager: vi.fn(),
 }));
@@ -23,7 +19,6 @@ vi.mock("next/server", () => ({
   },
 }));
 
-import { requireSandboxAuth } from "@clawrun/auth";
 import { SandboxLifecycleManager } from "@clawrun/runtime";
 
 function heartbeatRequest(body: unknown): Request {
@@ -42,7 +37,6 @@ const validPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(requireSandboxAuth).mockReturnValue(null);
 });
 
 describe("sandbox-heartbeat POST", () => {
@@ -50,17 +44,8 @@ describe("sandbox-heartbeat POST", () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    // Re-apply mocks after resetModules
-    vi.mocked(requireSandboxAuth).mockReturnValue(null);
     const mod = await import("./sandbox-heartbeat.js");
     POST = mod.POST;
-  });
-
-  it("rejects when sandbox auth fails", async () => {
-    vi.mocked(requireSandboxAuth).mockReturnValue(new Response("Unauthorized", { status: 401 }));
-    const req = heartbeatRequest(validPayload);
-    const resp = await POST(req);
-    expect(resp.status).toBe(401);
   });
 
   it("returns 400 for invalid JSON body", async () => {

@@ -3,10 +3,6 @@ import type { Agent, SandboxHandle } from "@clawrun/agent";
 import type { RuntimeConfig, SandboxLifecycleManager as SLMType } from "@clawrun/runtime";
 import type { SandboxProvider } from "@clawrun/provider";
 
-vi.mock("../auth/session", () => ({
-  requireSessionOrBearerAuth: vi.fn(async () => null),
-}));
-
 vi.mock("@clawrun/runtime", () => ({
   SandboxLifecycleManager: vi.fn().mockImplementation(() => ({
     getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1" })),
@@ -36,8 +32,6 @@ vi.mock("@clawrun/logger", () => ({
   }),
 }));
 
-import { requireSessionOrBearerAuth } from "../auth/session";
-
 let mockManagedSandbox: Partial<SandboxHandle>;
 let mockAgent: Partial<Agent>;
 
@@ -48,20 +42,19 @@ beforeEach(() => {
     domain: vi.fn(() => "https://sbx.example.com"),
   };
   mockAgent = {
-    fetchHistory: vi.fn(async () => [
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "hi there" },
+    getThread: vi.fn(async () => [
+      { id: "m1", role: "user", parts: [{ type: "text", text: "hello" }] },
+      { id: "m2", role: "assistant", parts: [{ type: "text", text: "hi there" }] },
     ]),
   };
 });
 
-describe("history handler", () => {
+describe("history handler (legacy)", () => {
   let GET: typeof import("./history.js").GET;
 
   beforeEach(async () => {
     vi.resetModules();
 
-    // Re-apply mock values after resetModules
     const runtimeMod = await import("@clawrun/runtime");
     vi.mocked(runtimeMod.getAgent).mockReturnValue(mockAgent as Agent);
     vi.mocked(runtimeMod.getRuntimeConfig).mockReturnValue({
@@ -81,18 +74,7 @@ describe("history handler", () => {
     GET = mod.GET;
   });
 
-  it("rejects unauthenticated requests", async () => {
-    vi.mocked(requireSessionOrBearerAuth).mockResolvedValueOnce(
-      new Response("Unauthorized", { status: 401 }),
-    );
-
-    const req = new Request("http://localhost/api/v1/history?sessionId=s1");
-    const resp = await GET(req);
-
-    expect(resp.status).toBe(401);
-  });
-
-  it("returns empty when sessionId is missing", async () => {
+  it("returns empty when threadId is missing", async () => {
     const req = new Request("http://localhost/api/v1/history");
     const resp = await GET(req);
     const body = await resp.json();
@@ -100,8 +82,8 @@ describe("history handler", () => {
     expect(body.messages).toEqual([]);
   });
 
-  it("returns empty when sessionId is blank", async () => {
-    const req = new Request("http://localhost/api/v1/history?sessionId=%20");
+  it("returns empty when threadId is blank", async () => {
+    const req = new Request("http://localhost/api/v1/history?threadId=%20");
     const resp = await GET(req);
     const body = await resp.json();
 
@@ -114,18 +96,18 @@ describe("history handler", () => {
       getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
     })) as unknown as typeof SLMType);
 
-    const req = new Request("http://localhost/api/v1/history?sessionId=s1");
+    const req = new Request("http://localhost/api/v1/history?threadId=s1");
     const resp = await GET(req);
     const body = await resp.json();
 
     expect(body.messages).toEqual([]);
   });
 
-  it("returns empty when agent lacks fetchHistory", async () => {
+  it("returns empty when agent lacks getThread", async () => {
     const runtimeMod = await import("@clawrun/runtime");
     vi.mocked(runtimeMod.getAgent).mockReturnValue({} as Agent);
 
-    const req = new Request("http://localhost/api/v1/history?sessionId=s1");
+    const req = new Request("http://localhost/api/v1/history?threadId=s1");
     const resp = await GET(req);
     const body = await resp.json();
 
@@ -133,7 +115,7 @@ describe("history handler", () => {
   });
 
   it("returns messages on success", async () => {
-    const req = new Request("http://localhost/api/v1/history?sessionId=s1");
+    const req = new Request("http://localhost/api/v1/history?threadId=s1");
     const resp = await GET(req);
     const body = await resp.json();
 
@@ -142,9 +124,9 @@ describe("history handler", () => {
   });
 
   it("returns empty on error (does not throw)", async () => {
-    vi.mocked(mockAgent.fetchHistory!).mockRejectedValueOnce(new Error("timeout"));
+    vi.mocked(mockAgent.getThread!).mockRejectedValueOnce(new Error("timeout"));
 
-    const req = new Request("http://localhost/api/v1/history?sessionId=s1");
+    const req = new Request("http://localhost/api/v1/history?threadId=s1");
     const resp = await GET(req);
     const body = await resp.json();
 

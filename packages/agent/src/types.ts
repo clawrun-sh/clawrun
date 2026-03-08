@@ -6,6 +6,7 @@ import type {
   AgentSetupData,
 } from "./schemas.js";
 import type { Tool } from "./tools.js";
+import type { UIMessage, UIMessageStreamWriter } from "ai";
 
 export type {
   ProviderInfo,
@@ -65,10 +66,83 @@ export interface AgentResponse {
   toolCalls?: ToolCallInfo[];
 }
 
+/** Summary of a conversation thread, used by the thread listing API. */
+export interface ThreadInfo {
+  id: string;
+  channel: string;
+  preview: string;
+  messageCount: number;
+  lastActivity: string;
+}
+
 export interface CronEntry {
   name?: string;
   schedule?: string;
   nextRunAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard API types — agent-agnostic, returned by optional Agent methods
+// ---------------------------------------------------------------------------
+
+export interface AgentStatus {
+  provider?: string;
+  model?: string;
+  uptime?: number;
+  memoryBackend?: string;
+  channels?: string[];
+  health?: { name: string; status: string; restarts?: number }[];
+}
+
+export interface AgentConfig {
+  format: "toml" | "json" | "yaml" | "text";
+  content: string;
+}
+
+export interface RuntimeToolInfo {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface CliToolInfo {
+  name: string;
+  path?: string;
+  version?: string;
+  category?: string;
+}
+
+export interface CronJob {
+  id: string;
+  name?: string;
+  schedule: string;
+  command: string;
+  nextRun?: string;
+  lastRun?: string;
+  lastStatus?: string;
+  enabled?: boolean;
+}
+
+export interface MemoryEntryInfo {
+  key: string;
+  content: string;
+  category?: string;
+  timestamp?: string;
+}
+
+export interface CostInfo {
+  sessionCost?: number;
+  dailyCost?: number;
+  monthlyCost?: number;
+  totalTokens?: number;
+  requestCount?: number;
+  byModel?: { model: string; cost: number; tokens: number; requests: number; share: number }[];
+}
+
+export interface DiagResult {
+  category: string;
+  message: string;
+  severity: "ok" | "warning" | "error";
 }
 
 export interface CronInfo {
@@ -123,36 +197,39 @@ export interface Agent {
     opts?: {
       env?: Record<string, string>;
       signal?: AbortSignal;
-      sessionId?: string;
+      threadId?: string;
     },
   ): Promise<AgentResponse>;
 
   /**
-   * Stream a message exchange to the given writer using AI SDK stream events.
+   * Stream a message exchange to the given AI SDK writer.
    *
-   * The agent acts as an adapter: it translates its own protocol (WS, CLI, etc.)
-   * into AI SDK UIMessageStream events (text-start, text-delta, text-end,
-   * tool-input-available, tool-output-available, error).
-   *
-   * The writer is structurally compatible with the AI SDK UIMessageStreamWriter.
-   * Agents that don't support streaming can omit this method — the handler will
-   * fall back to sendMessage().
+   * The agent translates its own protocol (WS, CLI, etc.) into AI SDK
+   * UIMessageStream events. Agents that don't support streaming can omit
+   * this method — the handler will fall back to sendMessage().
    */
   streamMessage?(
     sandbox: SandboxHandle,
     root: string,
     message: string,
-    writer: { write(part: unknown): void },
-    opts?: { signal?: AbortSignal; sessionId?: string },
+    writer: UIMessageStreamWriter,
+    opts?: { signal?: AbortSignal; threadId?: string },
   ): Promise<void>;
 
-  /** Fetch conversation history for a session from the agent daemon. */
-  fetchHistory?(
+  /** List all conversation threads across all channels. */
+  listThreads?(
     sandbox: SandboxHandle,
     root: string,
-    sessionId: string,
     opts?: { signal?: AbortSignal },
-  ): Promise<Array<{ role: string; content: string }>>;
+  ): Promise<ThreadInfo[]>;
+
+  /** Get messages for a specific conversation thread as AI SDK UIMessages. */
+  getThread?(
+    sandbox: SandboxHandle,
+    root: string,
+    threadId: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<UIMessage[]>;
 
   getDaemonCommand(
     root: string,
@@ -214,4 +291,84 @@ export interface Agent {
 
   /** Glob patterns (relative to deploy dir) for binary files to bundle. */
   getBinaryBundlePaths(): string[];
+
+  // --- Optional dashboard API methods ---
+
+  getAgentStatus?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<AgentStatus>;
+
+  getConfig?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<AgentConfig>;
+
+  setConfig?(
+    sandbox: SandboxHandle,
+    root: string,
+    content: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void>;
+
+  listRuntimeTools?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ tools: RuntimeToolInfo[]; cliTools: CliToolInfo[] }>;
+
+  listCronJobs?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<CronJob[]>;
+
+  createCronJob?(
+    sandbox: SandboxHandle,
+    root: string,
+    job: { name?: string; schedule: string; command: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<CronJob>;
+
+  deleteCronJob?(
+    sandbox: SandboxHandle,
+    root: string,
+    id: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void>;
+
+  listMemories?(
+    sandbox: SandboxHandle,
+    root: string,
+    query?: { query?: string; category?: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<MemoryEntryInfo[]>;
+
+  createMemory?(
+    sandbox: SandboxHandle,
+    root: string,
+    entry: { key: string; content: string; category?: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<void>;
+
+  deleteMemory?(
+    sandbox: SandboxHandle,
+    root: string,
+    key: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void>;
+
+  getCostInfo?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<CostInfo>;
+
+  runDiagnostics?(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<DiagResult[]>;
 }

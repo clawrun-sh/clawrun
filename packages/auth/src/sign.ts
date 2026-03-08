@@ -4,16 +4,17 @@ import { getKey } from "./key.js";
 import type { TokenPayload } from "./verify.js";
 
 /**
- * Sign a short-lived invite JWT (scope: "chat", sub: "invite").
+ * Sign a short-lived invite JWT (scope: "invite", sub: "invite").
  *
- * Used by the CLI to generate invite links and chat Bearer tokens.
+ * Used by the CLI to generate invite links. The invite token is exchanged
+ * for a session cookie at `/auth/accept`.
  *
  * @param secret  - The signing secret (CLAWRUN_JWT_SECRET).
  * @param ttl     - Expiry as a `jose` time span string (e.g. "10m", "1h").
  *                  Defaults to 10 minutes.
  */
 export async function signInviteToken(secret: string, ttl: string = DEFAULT_TTL): Promise<string> {
-  return new SignJWT({ scope: "chat" } satisfies Pick<TokenPayload, "scope">)
+  return new SignJWT({ scope: "invite" } satisfies Pick<TokenPayload, "scope">)
     .setProtectedHeader({ alg: ALGORITHM, typ: "invite+jwt" })
     .setSubject("invite")
     .setIssuer(ISSUER)
@@ -24,17 +25,17 @@ export async function signInviteToken(secret: string, ttl: string = DEFAULT_TTL)
 }
 
 /**
- * Sign a short-lived admin JWT (scope: "admin", sub: "admin").
+ * Sign a short-lived user JWT (scope: "user", sub: "user").
  *
- * Used by the CLI to call lifecycle endpoints (start, stop, restart).
+ * Used by the SDK and CLI for Bearer auth on all API endpoints.
  *
  * @param secret  - The signing secret (CLAWRUN_JWT_SECRET).
  * @param ttl     - Expiry as a `jose` time span string. Defaults to 10 minutes.
  */
-export async function signAdminToken(secret: string, ttl: string = DEFAULT_TTL): Promise<string> {
-  return new SignJWT({ scope: "admin" } satisfies Pick<TokenPayload, "scope">)
-    .setProtectedHeader({ alg: ALGORITHM, typ: "admin+jwt" })
-    .setSubject("admin")
+export async function signUserToken(secret: string, ttl: string = DEFAULT_TTL): Promise<string> {
+  return new SignJWT({ scope: "user" } satisfies Pick<TokenPayload, "scope">)
+    .setProtectedHeader({ alg: ALGORITHM, typ: "user+jwt" })
+    .setSubject("user")
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
@@ -49,7 +50,7 @@ export async function signAdminToken(secret: string, ttl: string = DEFAULT_TTL):
  * invite token. The session token is stored as an httpOnly cookie.
  */
 export async function signSessionToken(secret: string): Promise<string> {
-  return new SignJWT({ scope: "chat" } satisfies Pick<TokenPayload, "scope">)
+  return new SignJWT({ scope: "user" } satisfies Pick<TokenPayload, "scope">)
     .setProtectedHeader({ alg: ALGORITHM, typ: "session+jwt" })
     .setSubject("session")
     .setIssuer(ISSUER)

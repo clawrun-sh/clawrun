@@ -3,7 +3,6 @@ import type { TextUIPart } from "ai";
 import { getProvider } from "@clawrun/provider";
 import { getAgent, getRuntimeConfig, resolveRoot, SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
-import { requireSessionOrBearerAuth } from "../auth/session";
 
 /** Maximum allowed message length (characters). */
 const MAX_MESSAGE_LENGTH = 32_000;
@@ -14,19 +13,16 @@ const log = createLogger("handler:chat");
 export const maxDuration = 150;
 
 export async function POST(req: Request) {
-  const denied = await requireSessionOrBearerAuth(req);
-  if (denied) return denied;
-
-  let body: { message?: unknown; messages?: unknown; sessionId?: unknown };
+  let body: { message?: unknown; messages?: unknown; threadId?: unknown };
   try {
-    body = (await req.json()) as { message?: unknown; messages?: unknown; sessionId?: unknown };
+    body = (await req.json()) as { message?: unknown; messages?: unknown; threadId?: unknown };
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : undefined;
+  const threadId = typeof body.threadId === "string" ? body.threadId.trim() : undefined;
   log.info(
-    `[chat] sessionId=${sessionId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`,
+    `[chat] threadId=${threadId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`,
   );
 
   // Accept both { message } (CLI) and { messages } (useChat).
@@ -81,13 +77,13 @@ export async function POST(req: Request) {
           if (agent.streamMessage) {
             await agent.streamMessage(sandbox, root, message, writer, {
               signal: AbortSignal.timeout(120_000),
-              sessionId,
+              threadId,
             });
           } else {
             // Batch fallback for agents that don't support streaming
             const resp = await agent.sendMessage(sandbox, root, message, {
               signal: AbortSignal.timeout(120_000),
-              sessionId,
+              threadId,
             });
 
             if (resp.success) {

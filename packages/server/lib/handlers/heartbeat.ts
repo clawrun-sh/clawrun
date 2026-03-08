@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireBearerAuth } from "@clawrun/auth";
 import { SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("handler:heartbeat");
 
-export async function GET(req: Request) {
-  const denied = await requireBearerAuth(req);
-  if (denied) return denied;
-
+export async function GET() {
   try {
     const manager = new SandboxLifecycleManager();
     const result = await manager.heartbeat();

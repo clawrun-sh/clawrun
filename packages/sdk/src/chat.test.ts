@@ -356,18 +356,17 @@ describe("createChatStream", () => {
   });
 
   describe("API client integration", () => {
-    it("passes message, sessionId, and chat scope to rawPost", async () => {
+    it("passes message and threadId to rawPost", async () => {
       const response = mockSseResponse(["[DONE]"]);
       const api = createMockApiClient(response);
 
-      const stream = createChatStream(api, "hello", { sessionId: "sess-1" });
+      const stream = createChatStream(api, "hello", { threadId: "sess-1" });
       await stream.result();
 
       expect(api.rawPost).toHaveBeenCalledWith(
         "/api/v1/chat",
-        { message: "hello", sessionId: "sess-1" },
+        { message: "hello", threadId: "sess-1" },
         undefined,
-        "chat",
       );
     });
 
@@ -383,7 +382,6 @@ describe("createChatStream", () => {
         "/api/v1/chat",
         expect.any(Object),
         controller.signal,
-        "chat",
       );
     });
 

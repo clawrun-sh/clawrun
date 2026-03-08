@@ -23,9 +23,8 @@ export function createChatStream(
     if (!responsePromise) {
       responsePromise = apiClient.rawPost(
         "/api/v1/chat",
-        { message, sessionId: options?.sessionId },
+        { message, threadId: options?.threadId },
         options?.signal,
-        "chat",
       );
     }
     return responsePromise;

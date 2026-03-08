@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireSandboxAuth } from "@clawrun/auth";
 import { SandboxLifecycleManager } from "@clawrun/runtime";
 import type { ExtendPayload } from "@clawrun/runtime";
 import { sandboxId as toSandboxId } from "@clawrun/provider";
@@ -15,9 +14,6 @@ const log = createLogger("handler:sandbox-hb");
  * server-side and decides whether to extend the timeout or snapshot+stop.
  */
 export async function POST(req: Request) {
-  const denied = requireSandboxAuth(req);
-  if (denied) return denied;
-
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;

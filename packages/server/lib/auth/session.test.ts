@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { generateSecret, signInviteToken, signSessionToken, signAdminToken } from "@clawrun/auth";
+import { generateSecret, signInviteToken, signSessionToken, signUserToken } from "@clawrun/auth";
 
 const TEST_SECRET = generateSecret();
 
@@ -16,7 +16,7 @@ describe("verifySessionCookie", () => {
     const cookie = `clawrun-session=${token}`;
     const result = await verifySessionCookie(cookie, TEST_SECRET);
     expect(result).not.toBeNull();
-    expect(result!.scope).toBe("chat");
+    expect(result!.scope).toBe("user");
   });
 
   it("extracts token from cookie string with multiple cookies", async () => {
@@ -37,8 +37,8 @@ describe("verifySessionCookie", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null for non-chat scope token", async () => {
-    const token = await signAdminToken(TEST_SECRET);
+  it("returns null for non-user scope token", async () => {
+    const token = await signInviteToken(TEST_SECRET);
     const cookie = `clawrun-session=${token}`;
     const result = await verifySessionCookie(cookie, TEST_SECRET);
     expect(result).toBeNull();
@@ -66,8 +66,8 @@ describe("requireSessionOrBearerAuth", () => {
     expect(await requireSessionOrBearerAuth(req)).toBeNull();
   });
 
-  it("returns null for valid Bearer token with chat scope", async () => {
-    const token = await signInviteToken(TEST_SECRET);
+  it("returns null for valid Bearer token with user scope", async () => {
+    const token = await signUserToken(TEST_SECRET);
     const req = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -80,8 +80,8 @@ describe("requireSessionOrBearerAuth", () => {
     expect(resp?.status).toBe(401);
   });
 
-  it("returns 401 for Bearer token with admin scope (not chat)", async () => {
-    const token = await signAdminToken(TEST_SECRET);
+  it("returns 401 for Bearer token with invite scope (not user)", async () => {
+    const token = await signInviteToken(TEST_SECRET);
     const req = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -99,7 +99,7 @@ describe("requireSessionOrBearerAuth", () => {
   });
 
   it("falls through to Bearer when cookie is invalid", async () => {
-    const validBearer = await signInviteToken(TEST_SECRET);
+    const validBearer = await signUserToken(TEST_SECRET);
     const req = new Request("http://localhost", {
       headers: {
         Cookie: "clawrun-session=bad-token",

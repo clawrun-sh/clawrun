@@ -64,6 +64,8 @@ export const DEPLOY_TSCONFIG = {
 export const STALE_PATHS = [
   "app/api/auth",
   "app/auth/signin",
+  "app/chat",
+  "app/page.tsx",
   "node-stub.js",
   "middleware.ts",
   "templates",
@@ -73,7 +75,7 @@ export const STALE_PATHS = [
 export const BUILD_CACHE_DIR = ".next";
 
 /** Source directories to copy from server package into deployed instance. */
-export const SOURCE_DIRS = ["app", "lib"];
+export const SOURCE_DIRS = ["app", "lib", "public"];
 
 /** Root config files to copy from server package. */
 export const ROOT_CONFIG_FILES = ["proxy.ts", "next.config.ts", "postcss.config.mjs"];
@@ -88,6 +90,10 @@ export const DEPLOY_ONLY_FILES: Record<string, string> = {
 
 /** CSS path fixups for monorepo → deployed layout transition. */
 export const CSS_FIXUPS: Array<{ pattern: RegExp; replacement: string }> = [
+  {
+    pattern: /@import\s+"\.\.\/\.\.\/ui\/src\/styles\/globals\.css"/g,
+    replacement: '@import "../node_modules/@clawrun/ui/src/styles/globals.css"',
+  },
   {
     pattern: /@source\s+"\.\.\/\.\.\/ui\/src"/g,
     replacement: '@source "../node_modules/@clawrun/ui/src"',

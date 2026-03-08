@@ -9,5 +9,5 @@ export const SESSION_COOKIE = "clawrun-session";
 export const SUB_TO_TYP: Record<string, string> = {
   invite: "invite+jwt",
   session: "session+jwt",
-  admin: "admin+jwt",
+  user: "user+jwt",
 };

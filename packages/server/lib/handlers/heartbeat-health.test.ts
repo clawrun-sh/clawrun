@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@clawrun/auth", () => ({
-  requireBearerAuth: vi.fn(async () => null),
-}));
-
 const mockManager = {
   heartbeat: vi.fn(async () => ({ status: "running", sandboxId: "sbx-1" })),
   getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
@@ -11,7 +7,7 @@ const mockManager = {
 
 vi.mock("@clawrun/runtime", () => ({
   SandboxLifecycleManager: vi.fn().mockImplementation(() => mockManager),
-  getRuntimeConfig: vi.fn(() => ({ agent: { name: "zeroclaw" } })),
+  getRuntimeConfig: vi.fn(() => ({ agent: { name: "zeroclaw" }, instance: { provider: "vercel" } })),
 }));
 
 vi.mock("@clawrun/logger", () => ({
@@ -28,8 +24,6 @@ vi.mock("next/server", () => ({
   },
 }));
 
-import { requireBearerAuth } from "@clawrun/auth";
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -43,15 +37,6 @@ describe("heartbeat handler", () => {
     vi.resetModules();
     const mod = await import("./heartbeat.js");
     GET = mod.GET;
-  });
-
-  it("rejects unauthenticated requests", async () => {
-    vi.mocked(requireBearerAuth).mockResolvedValueOnce(
-      new Response("Unauthorized", { status: 401 }),
-    );
-    const req = new Request("http://localhost/api/v1/heartbeat");
-    const resp = await GET(req);
-    expect(resp.status).toBe(401);
   });
 
   it("returns heartbeat result on success", async () => {
@@ -100,6 +85,7 @@ describe("health handler", () => {
 
     expect(body.status).toBe("ok");
     expect(body.agent).toBe("zeroclaw");
+    expect(body.provider).toBe("vercel");
     expect(body.sandbox.running).toBe(true);
   });
 

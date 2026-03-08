@@ -3,14 +3,14 @@ import { ALGORITHM, ISSUER, AUDIENCE, SUB_TO_TYP } from "./constants.js";
 import { getKey } from "./key.js";
 
 export interface TokenPayload {
-  /** Subject — "invite" | "session" | "admin". */
+  /** Subject — "invite" | "session" | "user". */
   sub: string;
-  /** Scope — "chat" for user access, "admin" for lifecycle operations. */
+  /** Scope — "user" for user/session access, "invite" for invite exchange. */
   scope: string;
 }
 
 /**
- * Verify a JWT token (invite, session, or admin).
+ * Verify a JWT token (invite, session, or user).
  *
  * Returns the decoded payload on success, or null if the token is
  * invalid, expired, or signed with a different secret.

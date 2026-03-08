@@ -23,7 +23,18 @@ import type {
   CuratedModel,
   ChannelInfo,
   AgentSetupData,
+  ThreadInfo,
+  UIMessageStreamWriter,
+  AgentStatus,
+  AgentConfig,
+  RuntimeToolInfo,
+  CliToolInfo,
+  CronJob,
+  MemoryEntryInfo,
+  CostInfo,
+  DiagResult,
 } from "@clawrun/agent";
+import type { UIMessage } from "ai";
 import type { Tool } from "@clawrun/agent";
 import { AgentBrowserTool, GhCliTool } from "@clawrun/agent";
 import { createLogger } from "@clawrun/logger";
@@ -34,7 +45,20 @@ import {
   sendMessageViaCli,
   sendMessageViaDaemon,
   streamMessageViaDaemon,
-  fetchHistoryViaDaemon,
+  listThreadsViaDaemon,
+  getThreadViaDaemon,
+  fetchAgentStatus,
+  fetchAgentConfig,
+  putAgentConfig,
+  fetchRuntimeTools,
+  fetchCronJobs,
+  postCronJob,
+  deleteCronJobVia,
+  fetchMemories,
+  postMemory,
+  deleteMemoryEntry,
+  fetchCostInfo,
+  fetchDiagnostics,
 } from "./messaging.js";
 import { writeSetupConfig, readSetup } from "./config.js";
 import {
@@ -95,13 +119,13 @@ export class ZeroclawAgent implements Agent {
     opts?: {
       env?: Record<string, string>;
       signal?: AbortSignal;
-      sessionId?: string;
+      threadId?: string;
     },
   ): Promise<AgentResponse> {
     // Try daemon WebSocket first (if domain() is available)
     if (typeof sandbox.domain === "function") {
       try {
-        log.info(`sendMessage via daemon WS, sessionId=${opts?.sessionId ?? "(none)"}`);
+        log.info(`sendMessage via daemon WS, threadId=${opts?.threadId ?? "(none)"}`);
         return await sendMessageViaDaemon(sandbox, root, message, opts);
       } catch (err) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -115,7 +139,7 @@ export class ZeroclawAgent implements Agent {
 
     // Fallback: CLI one-shot (no session support)
     log.info(
-      `sendMessage via CLI one-shot (no session support), sessionId=${opts?.sessionId ?? "(none)"}`,
+      `sendMessage via CLI one-shot (no session support), threadId=${opts?.threadId ?? "(none)"}`,
     );
     return sendMessageViaCli(sandbox, root, message, this.env(root), opts);
   }
@@ -124,8 +148,8 @@ export class ZeroclawAgent implements Agent {
     sandbox: SandboxHandle,
     root: string,
     message: string,
-    writer: { write(part: unknown): void },
-    opts?: { signal?: AbortSignal; sessionId?: string },
+    writer: UIMessageStreamWriter,
+    opts?: { signal?: AbortSignal; threadId?: string },
   ): Promise<void> {
     if (typeof sandbox.domain !== "function") {
       // No daemon available — fall back to batch sendMessage and write result
@@ -141,25 +165,31 @@ export class ZeroclawAgent implements Agent {
       return;
     }
 
-    await streamMessageViaDaemon(
-      sandbox,
-      root,
-      message,
-      // Cast to UIMessageStreamWriter — structurally compatible
-      writer as import("ai").UIMessageStreamWriter,
-      opts,
-    );
+    await streamMessageViaDaemon(sandbox, root, message, writer, opts);
   }
 
-  async fetchHistory(
+  async listThreads(
     sandbox: SandboxHandle,
     root: string,
-    sessionId: string,
     opts?: { signal?: AbortSignal },
-  ): Promise<Array<{ role: string; content: string }>> {
+  ): Promise<ThreadInfo[]> {
     if (typeof sandbox.domain !== "function") return [];
     try {
-      return await fetchHistoryViaDaemon(sandbox, root, sessionId, opts);
+      return await listThreadsViaDaemon(sandbox, opts);
+    } catch {
+      return [];
+    }
+  }
+
+  async getThread(
+    sandbox: SandboxHandle,
+    root: string,
+    threadId: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<UIMessage[]> {
+    if (typeof sandbox.domain !== "function") return [];
+    try {
+      return await getThreadViaDaemon(sandbox, threadId, opts);
     } catch {
       return [];
     }
@@ -263,5 +293,135 @@ export class ZeroclawAgent implements Agent {
 
   getBinaryBundlePaths(): string[] {
     return ["node_modules/zeroclaw/dist/bin/**/*"];
+  }
+
+  // --- Dashboard API methods ---
+
+  async getAgentStatus(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<AgentStatus> {
+    if (typeof sandbox.domain !== "function") return {};
+    return fetchAgentStatus(sandbox, opts);
+  }
+
+  async getConfig(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<AgentConfig> {
+    if (typeof sandbox.domain !== "function") {
+      return { format: "toml", content: "" };
+    }
+    return fetchAgentConfig(sandbox, opts);
+  }
+
+  async setConfig(
+    sandbox: SandboxHandle,
+    _root: string,
+    content: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void> {
+    if (typeof sandbox.domain !== "function") {
+      throw new Error("Sandbox domain unavailable");
+    }
+    await putAgentConfig(sandbox, content, opts);
+  }
+
+  async listRuntimeTools(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ tools: RuntimeToolInfo[]; cliTools: CliToolInfo[] }> {
+    if (typeof sandbox.domain !== "function") {
+      return { tools: [], cliTools: [] };
+    }
+    return fetchRuntimeTools(sandbox, opts);
+  }
+
+  async listCronJobs(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<CronJob[]> {
+    if (typeof sandbox.domain !== "function") return [];
+    return fetchCronJobs(sandbox, opts);
+  }
+
+  async createCronJob(
+    sandbox: SandboxHandle,
+    _root: string,
+    job: { name?: string; schedule: string; command: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<CronJob> {
+    if (typeof sandbox.domain !== "function") {
+      throw new Error("Sandbox domain unavailable");
+    }
+    return postCronJob(sandbox, job, opts);
+  }
+
+  async deleteCronJob(
+    sandbox: SandboxHandle,
+    _root: string,
+    id: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void> {
+    if (typeof sandbox.domain !== "function") {
+      throw new Error("Sandbox domain unavailable");
+    }
+    await deleteCronJobVia(sandbox, id, opts);
+  }
+
+  async listMemories(
+    sandbox: SandboxHandle,
+    _root: string,
+    query?: { query?: string; category?: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<MemoryEntryInfo[]> {
+    if (typeof sandbox.domain !== "function") return [];
+    return fetchMemories(sandbox, query, opts);
+  }
+
+  async createMemory(
+    sandbox: SandboxHandle,
+    _root: string,
+    entry: { key: string; content: string; category?: string },
+    opts?: { signal?: AbortSignal },
+  ): Promise<void> {
+    if (typeof sandbox.domain !== "function") {
+      throw new Error("Sandbox domain unavailable");
+    }
+    await postMemory(sandbox, entry, opts);
+  }
+
+  async deleteMemory(
+    sandbox: SandboxHandle,
+    _root: string,
+    key: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<void> {
+    if (typeof sandbox.domain !== "function") {
+      throw new Error("Sandbox domain unavailable");
+    }
+    await deleteMemoryEntry(sandbox, key, opts);
+  }
+
+  async getCostInfo(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<CostInfo> {
+    if (typeof sandbox.domain !== "function") return {};
+    return fetchCostInfo(sandbox, opts);
+  }
+
+  async runDiagnostics(
+    sandbox: SandboxHandle,
+    _root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<DiagResult[]> {
+    if (typeof sandbox.domain !== "function") return [];
+    return fetchDiagnostics(sandbox, opts);
   }
 }

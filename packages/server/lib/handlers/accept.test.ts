@@ -83,7 +83,7 @@ describe("accept handler GET", () => {
   });
 
   it("redirects to /auth/expired when sub is not invite", async () => {
-    vi.mocked(verifyToken).mockResolvedValue({ sub: "admin", scope: "chat" });
+    vi.mocked(verifyToken).mockResolvedValue({ sub: "user", scope: "invite" });
     const { NextRequest } = await import("next/server");
     const req = new NextRequest("http://localhost/auth/accept?token=wrong-sub");
     const resp = await GET(req);
@@ -91,8 +91,8 @@ describe("accept handler GET", () => {
     expect(resp.headers.get("Location")).toContain("/auth/expired");
   });
 
-  it("redirects to /auth/expired when scope is not chat", async () => {
-    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "admin" });
+  it("redirects to /auth/expired when scope is not invite", async () => {
+    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "user" });
     const { NextRequest } = await import("next/server");
     const req = new NextRequest("http://localhost/auth/accept?token=wrong-scope");
     const resp = await GET(req);
@@ -101,7 +101,7 @@ describe("accept handler GET", () => {
   });
 
   it("redirects to /chat with session cookie for valid invite token", async () => {
-    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "chat" });
+    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "invite" });
     const { NextRequest } = await import("next/server");
     const req = new NextRequest("http://localhost/auth/accept?token=valid-invite");
     const resp = await GET(req);
@@ -118,7 +118,7 @@ describe("accept handler GET", () => {
   });
 
   it("sets Referrer-Policy no-referrer on success", async () => {
-    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "chat" });
+    vi.mocked(verifyToken).mockResolvedValue({ sub: "invite", scope: "invite" });
     const { NextRequest } = await import("next/server");
     const req = new NextRequest("http://localhost/auth/accept?token=valid-invite");
     const resp = await GET(req);

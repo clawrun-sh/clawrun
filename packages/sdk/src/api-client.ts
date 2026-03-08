@@ -1,15 +1,5 @@
-import { signAdminToken, signInviteToken } from "@clawrun/auth";
+import { signUserToken } from "@clawrun/auth";
 import { ApiError, NetworkError } from "./errors.js";
-
-/**
- * Token scope determines which JWT signing function is used.
- *
- * - `"admin"` — `signAdminToken` (scope: "admin"). Used for lifecycle
- *   operations: sandbox start/stop/restart. Accepted by `requireBearerAuth`.
- * - `"chat"` — `signInviteToken` (scope: "chat"). Used for chat and history.
- *   Accepted by `requireSessionOrBearerAuth`.
- */
-export type TokenScope = "admin" | "chat";
 
 export interface ApiClientOptions {
   /** Custom fetch implementation. */
@@ -18,7 +8,7 @@ export interface ApiClientOptions {
 
 /**
  * Low-level HTTP client for a deployed ClawRun instance.
- * Signs a fresh JWT for each request using the appropriate scope.
+ * Signs a fresh user JWT for each request.
  */
 export class ApiClient {
   private readonly baseUrl: string;
@@ -32,25 +22,18 @@ export class ApiClient {
     this._fetch = options?.fetch ?? globalThis.fetch;
   }
 
-  private async authHeaders(scope: TokenScope = "admin"): Promise<Record<string, string>> {
-    const jwt =
-      scope === "chat"
-        ? await signInviteToken(this.jwtSecret)
-        : await signAdminToken(this.jwtSecret);
+  private async authHeaders(): Promise<Record<string, string>> {
+    const jwt = await signUserToken(this.jwtSecret);
     return { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" };
   }
 
-  /**
-   * POST with JSON body. Returns parsed JSON. Throws ApiError on non-2xx.
-   * @param scope Token scope — "admin" for lifecycle, "chat" for chat/history.
-   */
+  /** POST with JSON body. Returns parsed JSON. Throws ApiError on non-2xx. */
   async post<T = unknown>(
     path: string,
     body?: unknown,
     signal?: AbortSignal,
-    scope?: TokenScope,
   ): Promise<T> {
-    const res = await this.rawPost(path, body, signal, scope);
+    const res = await this.rawPost(path, body, signal);
     const text = await res.text();
     try {
       return JSON.parse(text) as T;
@@ -59,15 +42,12 @@ export class ApiClient {
     }
   }
 
-  /**
-   * GET with parsed JSON response. Throws ApiError on non-2xx.
-   * @param scope Token scope — "admin" for lifecycle, "chat" for chat/history.
-   */
-  async get<T = unknown>(path: string, signal?: AbortSignal, scope?: TokenScope): Promise<T> {
+  /** GET with parsed JSON response. Throws ApiError on non-2xx. */
+  async get<T = unknown>(path: string, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await this._fetch(`${this.baseUrl}${path}`, {
-        headers: await this.authHeaders(scope),
+        headers: await this.authHeaders(),
         signal,
       });
     } catch (err) {
@@ -93,19 +73,17 @@ export class ApiClient {
   /**
    * POST returning the raw Response (for streaming).
    * Throws ApiError on non-2xx, NetworkError on fetch failure.
-   * @param scope Token scope — "admin" for lifecycle, "chat" for chat/history.
    */
   async rawPost(
     path: string,
     body?: unknown,
     signal?: AbortSignal,
-    scope?: TokenScope,
   ): Promise<Response> {
     let res: Response;
     try {
       res = await this._fetch(`${this.baseUrl}${path}`, {
         method: "POST",
-        headers: await this.authHeaders(scope),
+        headers: await this.authHeaders(),
         body: body != null ? JSON.stringify(body) : undefined,
         signal,
       });

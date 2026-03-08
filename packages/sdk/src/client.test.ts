@@ -3,7 +3,7 @@ import { ClawRunClient } from "./client.js";
 import { ClawRunInstance } from "./instance.js";
 
 vi.mock("@clawrun/auth", () => ({
-  signAdminToken: vi.fn(async () => "jwt"),
+  signUserToken: vi.fn(async () => "jwt"),
   signInviteToken: vi.fn(async () => "invite"),
 }));
 

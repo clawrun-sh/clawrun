@@ -110,6 +110,5 @@ export type {
 
 // --- Low-level clients (for advanced usage) ---
 export { ApiClient } from "./api-client.js";
-export type { TokenScope } from "./api-client.js";
 export { SandboxClient } from "./sandbox.js";
 export { createChatStream } from "./chat.js";

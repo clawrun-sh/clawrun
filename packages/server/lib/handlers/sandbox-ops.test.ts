@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@clawrun/auth", () => ({
-  requireBearerAuth: vi.fn(async () => null),
-}));
-
 const mockManager = {
   wake: vi.fn(async () => ({ status: "running", sandboxId: "sbx-1" })),
   gracefulStop: vi.fn(async () => ({ status: "stopped", sandboxId: "sbx-1" })),
@@ -34,8 +30,6 @@ vi.mock("next/server", () => ({
   },
 }));
 
-import { requireBearerAuth } from "@clawrun/auth";
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -47,15 +41,6 @@ describe("sandbox-start handler", () => {
     vi.resetModules();
     const mod = await import("./sandbox-start.js");
     POST = mod.POST;
-  });
-
-  it("rejects unauthenticated requests", async () => {
-    vi.mocked(requireBearerAuth).mockResolvedValueOnce(
-      new Response("Unauthorized", { status: 401 }),
-    );
-    const req = new Request("http://localhost", { method: "POST" });
-    const resp = await POST(req);
-    expect(resp.status).toBe(401);
   });
 
   it("returns result from manager.wake()", async () => {
@@ -92,15 +77,6 @@ describe("sandbox-stop handler", () => {
     POST = mod.POST;
   });
 
-  it("rejects unauthenticated requests", async () => {
-    vi.mocked(requireBearerAuth).mockResolvedValueOnce(
-      new Response("Unauthorized", { status: 401 }),
-    );
-    const req = new Request("http://localhost", { method: "POST" });
-    const resp = await POST(req);
-    expect(resp.status).toBe(401);
-  });
-
   it("returns result from manager.gracefulStop()", async () => {
     const req = new Request("http://localhost", { method: "POST" });
     const resp = await POST(req);
@@ -123,15 +99,6 @@ describe("sandbox-restart handler", () => {
     vi.resetModules();
     const mod = await import("./sandbox-restart.js");
     POST = mod.POST;
-  });
-
-  it("rejects unauthenticated requests", async () => {
-    vi.mocked(requireBearerAuth).mockResolvedValueOnce(
-      new Response("Unauthorized", { status: 401 }),
-    );
-    const req = new Request("http://localhost", { method: "POST" });
-    const resp = await POST(req);
-    expect(resp.status).toBe(401);
   });
 
   it("returns result from manager.forceRestart()", async () => {

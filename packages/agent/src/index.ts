@@ -15,7 +15,17 @@ export type {
   ChannelInfo,
   CuratedModel,
   AgentSetupData,
+  ThreadInfo,
+  AgentStatus,
+  AgentConfig,
+  RuntimeToolInfo,
+  CliToolInfo,
+  CronJob,
+  MemoryEntryInfo,
+  CostInfo,
+  DiagResult,
 } from "./types.js";
+export type { UIMessage, UIMessageStreamWriter } from "ai";
 export type { Tool, ToolResult } from "./tools.js";
 export { runTools } from "./tools.js";
 export { AgentBrowserTool, GhCliTool } from "./tools/index.js";

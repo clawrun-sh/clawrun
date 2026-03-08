@@ -85,7 +85,7 @@ export async function startChatTUI(
 ): Promise<void> {
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal);
-  const sessionId = randomUUID().replaceAll("-", "_");
+  const threadId = randomUUID().replaceAll("-", "_");
 
   // --- header ---------------------------------------------------------------
   const header = new TruncatedText(colors.accent(instanceName) + colors.dim(` · ${sandboxId}`));
@@ -282,7 +282,7 @@ export async function startChatTUI(
     let responseText: string | undefined;
     let hasError = false;
     try {
-      const stream = instance.chat(message, { sessionId, signal: loader.signal });
+      const stream = instance.chat(message, { threadId, signal: loader.signal });
       for await (const chunk of stream) {
         if (chunk.type === "text-delta") {
           ensureStreaming();

@@ -14,7 +14,7 @@ export async function verifySessionCookie(
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
   if (!match) return null;
   const payload = await verifyToken(match[1], secret);
-  if (!payload || payload.scope !== "chat") return null;
+  if (!payload || payload.scope !== "user") return null;
   return payload;
 }
 
@@ -39,7 +39,7 @@ export async function requireSessionOrBearerAuth(req: Request): Promise<Response
   const token = extractBearerToken(req);
   if (token) {
     const payload = await verifyToken(token, secret);
-    if (payload?.scope === "chat") return null;
+    if (payload?.scope === "user") return null;
   }
 
   return new Response("Unauthorized", { status: 401 });

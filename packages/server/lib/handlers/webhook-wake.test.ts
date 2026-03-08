@@ -330,7 +330,7 @@ describe("handleWakeWebhook", () => {
       mockSandbox,
       "/agent",
       "Hello agent",
-      expect.objectContaining({ sessionId: "telegram-12345" }),
+      expect.objectContaining({ threadId: "telegram-12345" }),
     );
     expect(adapter.sendMessage).toHaveBeenCalledWith("12345", "Agent reply");
   });

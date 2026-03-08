@@ -3,8 +3,7 @@ import { ApiClient } from "./api-client.js";
 import { ApiError, NetworkError } from "./errors.js";
 
 vi.mock("@clawrun/auth", () => ({
-  signAdminToken: vi.fn(async (secret: string) => `admin-jwt-${secret}`),
-  signInviteToken: vi.fn(async (secret: string) => `chat-jwt-${secret}`),
+  signUserToken: vi.fn(async (secret: string) => `user-jwt-${secret}`),
 }));
 
 describe("ApiClient", () => {
@@ -28,7 +27,7 @@ describe("ApiClient", () => {
   });
 
   describe("post", () => {
-    it("sends POST with JSON body and admin auth header by default", async () => {
+    it("sends POST with JSON body and user auth header", async () => {
       mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
       const result = await client.post("/api/v1/test", { key: "value" });
@@ -40,23 +39,8 @@ describe("ApiClient", () => {
           method: "POST",
           body: JSON.stringify({ key: "value" }),
           headers: expect.objectContaining({
-            Authorization: "Bearer admin-jwt-my-secret",
+            Authorization: "Bearer user-jwt-my-secret",
             "Content-Type": "application/json",
-          }),
-        }),
-      );
-    });
-
-    it("uses chat-scoped token when scope is 'chat'", async () => {
-      mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-
-      await client.post("/api/v1/chat", { message: "hi" }, undefined, "chat");
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://example.com/api/v1/chat",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: "Bearer chat-jwt-my-secret",
           }),
         }),
       );
@@ -107,7 +91,7 @@ describe("ApiClient", () => {
   });
 
   describe("get", () => {
-    it("sends GET with admin auth header by default", async () => {
+    it("sends GET with user auth header", async () => {
       mockFetch.mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
 
       const result = await client.get("/api/v1/health");
@@ -117,7 +101,7 @@ describe("ApiClient", () => {
         "https://example.com/api/v1/health",
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: "Bearer admin-jwt-my-secret",
+            Authorization: "Bearer user-jwt-my-secret",
           }),
         }),
       );
@@ -125,21 +109,6 @@ describe("ApiClient", () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.not.objectContaining({ method: "POST" }),
-      );
-    });
-
-    it("uses chat-scoped token when scope is 'chat'", async () => {
-      mockFetch.mockResolvedValue(new Response(JSON.stringify({ messages: [] }), { status: 200 }));
-
-      await client.get("/api/v1/history?sessionId=s1", undefined, "chat");
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://example.com/api/v1/history?sessionId=s1",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: "Bearer chat-jwt-my-secret",
-          }),
-        }),
       );
     });
 
@@ -171,16 +140,16 @@ describe("ApiClient", () => {
       expect(result).toBe(res);
     });
 
-    it("uses chat-scoped token when scope is 'chat'", async () => {
+    it("uses user auth header", async () => {
       mockFetch.mockResolvedValue(new Response("ok", { status: 200 }));
 
-      await client.rawPost("/api/v1/chat", { message: "hi" }, undefined, "chat");
+      await client.rawPost("/api/v1/chat", { message: "hi" });
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://example.com/api/v1/chat",
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: "Bearer chat-jwt-my-secret",
+            Authorization: "Bearer user-jwt-my-secret",
           }),
         }),
       );

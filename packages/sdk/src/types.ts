@@ -144,7 +144,7 @@ export interface HistoryResult {
 // ---------------------------------------------------------------------------
 
 export interface ChatOptions {
-  sessionId?: string;
+  threadId?: string;
   signal?: AbortSignal;
 }
 

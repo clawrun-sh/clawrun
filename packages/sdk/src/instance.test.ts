@@ -6,8 +6,8 @@ import type { UIMessage } from "ai";
 
 // Mock dependencies
 vi.mock("@clawrun/auth", () => ({
-  signAdminToken: vi.fn(async (secret: string) => `admin-jwt-${secret}`),
-  signInviteToken: vi.fn(async (secret: string, ttl?: string) => `chat-jwt-${secret}`),
+  signUserToken: vi.fn(async (secret: string) => `user-jwt-${secret}`),
+  signInviteToken: vi.fn(async (secret: string, ttl?: string) => `invite-jwt-${secret}`),
 }));
 
 vi.mock("@clawrun/provider", () => ({
@@ -39,7 +39,7 @@ describe("ClawRunInstance", () => {
   });
 
   describe("lifecycle methods", () => {
-    it("start() sends POST to /api/v1/sandbox/start with admin scope", async () => {
+    it("start() sends POST to /api/v1/sandbox/start with user scope", async () => {
       mockFetch.mockResolvedValue(
         new Response(JSON.stringify({ status: "running", sandboxId: "sbx-1" }), { status: 200 }),
       );
@@ -53,7 +53,7 @@ describe("ClawRunInstance", () => {
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
-            Authorization: "Bearer admin-jwt-test-secret",
+            Authorization: "Bearer user-jwt-test-secret",
           }),
         }),
       );
@@ -152,7 +152,7 @@ describe("ClawRunInstance", () => {
       );
     });
 
-    it("uses chat-scoped token for chat requests", async () => {
+    it("uses user-scoped token for chat requests", async () => {
       const sseData = `data: [DONE]\n\n`;
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -176,7 +176,7 @@ describe("ClawRunInstance", () => {
         "https://my-agent.vercel.app/api/v1/chat",
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: "Bearer chat-jwt-test-secret",
+            Authorization: "Bearer user-jwt-test-secret",
           }),
         }),
       );
@@ -190,7 +190,7 @@ describe("ClawRunInstance", () => {
   });
 
   describe("getHistory", () => {
-    it("fetches history for a session with chat-scoped token", async () => {
+    it("fetches history for a session with user-scoped token", async () => {
       const historyResponse: HistoryResult = {
         messages: [
           { role: "user", content: "hi" },
@@ -204,10 +204,10 @@ describe("ClawRunInstance", () => {
 
       expect(history).toEqual(historyResponse);
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://my-agent.vercel.app/api/v1/history?sessionId=sess-1",
+        "https://my-agent.vercel.app/api/v1/history?threadId=sess-1",
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: "Bearer chat-jwt-test-secret",
+            Authorization: "Bearer user-jwt-test-secret",
           }),
         }),
       );
@@ -222,14 +222,14 @@ describe("ClawRunInstance", () => {
       expect(history.messages).toEqual([]);
     });
 
-    it("encodes sessionId in URL", async () => {
+    it("encodes threadId in URL", async () => {
       mockFetch.mockResolvedValue(new Response(JSON.stringify({ messages: [] }), { status: 200 }));
 
       const instance = new ClawRunInstance(config, { fetch: mockFetch });
       await instance.getHistory("session with spaces");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("sessionId=session%20with%20spaces"),
+        expect.stringContaining("threadId=session%20with%20spaces"),
         expect.any(Object),
       );
     });
@@ -240,8 +240,8 @@ describe("ClawRunInstance", () => {
       const instance = new ClawRunInstance(config, { fetch: mockFetch });
       const invite = await instance.createInvite();
 
-      expect(invite.token).toBe("chat-jwt-test-secret");
-      expect(invite.url).toBe("https://my-agent.vercel.app/auth/accept?token=chat-jwt-test-secret");
+      expect(invite.token).toBe("invite-jwt-test-secret");
+      expect(invite.url).toBe("https://my-agent.vercel.app/auth/accept?token=invite-jwt-test-secret");
 
       const { signInviteToken } = await import("@clawrun/auth");
       expect(signInviteToken).toHaveBeenCalledWith("test-secret", `${7 * 24 * 60 * 60}s`);

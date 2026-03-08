@@ -1,33 +1,52 @@
 "use client";
 
-import Dexie from "dexie";
 import type { UIMessage } from "ai";
+import Dexie from "dexie";
 
 class ChatDatabase extends Dexie {
-  history!: Dexie.Table<{ id: string; messages: UIMessage[] }, string>;
+  sessions!: Dexie.Table<{ id: string; threadId: string }, string>;
+  messages!: Dexie.Table<{ threadId: string; messages: UIMessage[] }, string>;
 
   constructor() {
     super("clawrun-chat");
-    this.version(1).stores({
-      history: "id",
-    });
+    this.version(3).stores({ sessions: "id", messages: "threadId" });
+    this.version(2).stores({ sessions: "id", history: null });
+    this.version(1).stores({ history: "id" });
   }
 }
 
-export const db = new ChatDatabase();
+const db = new ChatDatabase();
 
-const CHAT_KEY = "default";
+const SESSION_KEY = "default";
 
-export async function loadMessages(): Promise<UIMessage[]> {
-  const row = await db.history.get(CHAT_KEY);
-  if (!Array.isArray(row?.messages)) return [];
-  return row.messages;
+export async function loadThreadId(): Promise<string | null> {
+  try {
+    const row = await db.sessions.get(SESSION_KEY);
+    return row?.threadId ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export async function saveMessages(messages: UIMessage[]): Promise<void> {
-  await db.history.put({ id: CHAT_KEY, messages });
+export async function saveThreadId(threadId: string): Promise<void> {
+  await db.sessions.put({ id: SESSION_KEY, threadId });
 }
 
-export async function clearMessages(): Promise<void> {
-  await db.history.delete(CHAT_KEY);
+export async function loadMessages(threadId: string): Promise<UIMessage[]> {
+  try {
+    const row = await db.messages.get(threadId);
+    return row?.messages ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveMessages(threadId: string, messages: UIMessage[]): Promise<void> {
+  await db.messages.put({ threadId, messages });
+}
+
+export async function clearMessages(threadId: string): Promise<void> {
+  try {
+    await db.messages.delete(threadId);
+  } catch {}
 }

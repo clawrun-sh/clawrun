@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { signInviteToken, signAdminToken, signSessionToken } from "./sign.js";
+import { signInviteToken, signUserToken, signSessionToken } from "./sign.js";
 import { verifyToken } from "./verify.js";
 import { generateSecret, getKey } from "./key.js";
 import { safeEqual, extractBearerToken } from "./compare.js";
-import { requireBearerAuth } from "./bearer.js";
+import { requireCronAuth } from "./bearer.js";
 import { requireSandboxAuth } from "./sandbox.js";
 
 vi.mock("@clawrun/logger", () => ({
@@ -20,7 +20,7 @@ describe("signInviteToken + verifyToken", () => {
     const token = await signInviteToken(TEST_SECRET);
     const payload = await verifyToken(token, TEST_SECRET);
     expect(payload).not.toBeNull();
-    expect(payload!.scope).toBe("chat");
+    expect(payload!.scope).toBe("invite");
   });
 
   it("token with wrong secret fails verification", async () => {
@@ -37,20 +37,20 @@ describe("signInviteToken + verifyToken", () => {
 });
 
 // ---------------------------------------------------------------------------
-// signAdminToken + verifyToken roundtrip
+// signUserToken + verifyToken roundtrip
 // ---------------------------------------------------------------------------
-describe("signAdminToken + verifyToken", () => {
-  it("admin token has scope admin", async () => {
-    const token = await signAdminToken(TEST_SECRET);
+describe("signUserToken + verifyToken", () => {
+  it("user token has scope user", async () => {
+    const token = await signUserToken(TEST_SECRET);
     const payload = await verifyToken(token, TEST_SECRET);
     expect(payload).not.toBeNull();
-    expect(payload!.scope).toBe("admin");
+    expect(payload!.scope).toBe("user");
   });
 
-  it("admin token has sub admin", async () => {
-    const token = await signAdminToken(TEST_SECRET);
+  it("user token has sub user", async () => {
+    const token = await signUserToken(TEST_SECRET);
     const payload = await verifyToken(token, TEST_SECRET);
-    expect(payload!.sub).toBe("admin");
+    expect(payload!.sub).toBe("user");
   });
 });
 
@@ -62,7 +62,7 @@ describe("signSessionToken", () => {
     const token = await signSessionToken(TEST_SECRET);
     const payload = await verifyToken(token, TEST_SECRET);
     expect(payload).not.toBeNull();
-    expect(payload!.scope).toBe("chat");
+    expect(payload!.scope).toBe("user");
   });
 });
 
@@ -126,46 +126,36 @@ describe("safeEqual", () => {
   });
 });
 
-describe("requireBearerAuth", () => {
+describe("requireCronAuth", () => {
   const cronSecret = "test-cron-secret-value";
 
   beforeEach(() => {
-    process.env.CLAWRUN_JWT_SECRET = TEST_SECRET;
     process.env.CLAWRUN_CRON_SECRET = cronSecret;
   });
 
   afterEach(() => {
-    delete process.env.CLAWRUN_JWT_SECRET;
     delete process.env.CLAWRUN_CRON_SECRET;
-  });
-
-  it("returns null for valid admin JWT", async () => {
-    const token = await signAdminToken(TEST_SECRET);
-    const req = new Request("http://localhost", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    expect(await requireBearerAuth(req)).toBeNull();
   });
 
   it("returns null for raw cron secret", async () => {
     const req = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${cronSecret}` },
     });
-    expect(await requireBearerAuth(req)).toBeNull();
+    expect(await requireCronAuth(req)).toBeNull();
   });
 
   it("returns 401 when no Authorization header", async () => {
     const req = new Request("http://localhost");
-    const resp = await requireBearerAuth(req);
+    const resp = await requireCronAuth(req);
     expect(resp?.status).toBe(401);
   });
 
-  it("returns 401 for chat-scoped JWT (not admin)", async () => {
-    const token = await signInviteToken(TEST_SECRET);
+  it("returns 401 for a JWT (not raw cron secret)", async () => {
+    const token = await signUserToken(TEST_SECRET);
     const req = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const resp = await requireBearerAuth(req);
+    const resp = await requireCronAuth(req);
     expect(resp?.status).toBe(401);
   });
 
@@ -173,17 +163,16 @@ describe("requireBearerAuth", () => {
     const req = new Request("http://localhost", {
       headers: { Authorization: "Bearer totally-wrong" },
     });
-    const resp = await requireBearerAuth(req);
+    const resp = await requireCronAuth(req);
     expect(resp?.status).toBe(401);
   });
 
-  it("returns 500 when env vars not configured", async () => {
-    delete process.env.CLAWRUN_JWT_SECRET;
+  it("returns 500 when env var not configured", async () => {
     delete process.env.CLAWRUN_CRON_SECRET;
     const req = new Request("http://localhost", {
       headers: { Authorization: "Bearer something" },
     });
-    const resp = await requireBearerAuth(req);
+    const resp = await requireCronAuth(req);
     expect(resp?.status).toBe(500);
   });
 });

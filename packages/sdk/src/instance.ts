@@ -108,11 +108,10 @@ export class ClawRunInstance {
   /**
    * Get conversation history for a session.
    */
-  async getHistory(sessionId: string, signal?: AbortSignal): Promise<HistoryResult> {
+  async getHistory(threadId: string, signal?: AbortSignal): Promise<HistoryResult> {
     return this.api.get<HistoryResult>(
-      `/api/v1/history?sessionId=${encodeURIComponent(sessionId)}`,
+      `/api/v1/history?threadId=${encodeURIComponent(threadId)}`,
       signal,
-      "chat",
     );
   }
 

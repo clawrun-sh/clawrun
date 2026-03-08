@@ -39,13 +39,24 @@ import {
 } from "@clawrun/ui/components/ai-elements/prompt-input";
 import { Suggestion, Suggestions } from "@clawrun/ui/components/ai-elements/suggestion";
 import { SpeechInput } from "@clawrun/ui/components/ai-elements/speech-input";
-import { ThemeToggle } from "@clawrun/ui/components/theme-toggle";
 import { Button } from "@clawrun/ui/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
-import { CheckIcon, ClipboardIcon, MessageCircleIcon, Trash2Icon } from "lucide-react";
+import {
+  IconCheck,
+  IconClipboard,
+  IconLoader2,
+  IconMessage,
+  IconTrash,
+} from "@tabler/icons-react";
 import type { UIMessage } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useChatHistory } from "../hooks/use-chat-history";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
+import { useSetHeaderActions } from "./header-actions";
 
 const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
@@ -68,35 +79,8 @@ function splitContentParts(text: string): ContentPart[] {
   return parts.length > 0 ? parts : [{ type: "text", content: text }];
 }
 
-const SESSION_KEY = "clawrun-session-id";
-
-function generateSessionId(): string {
+function generateThreadId(): string {
   return crypto.randomUUID().replaceAll("-", "_");
-}
-
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return generateSessionId();
-  const id = localStorage.getItem(SESSION_KEY);
-  if (id) return id;
-  const newId = generateSessionId();
-  localStorage.setItem(SESSION_KEY, newId);
-  return newId;
-}
-
-function resetSessionId(): string {
-  const id = generateSessionId();
-  if (typeof window !== "undefined") {
-    localStorage.setItem(SESSION_KEY, id);
-  }
-  return id;
-}
-
-function historyToUIMessages(history: Array<{ role: string; content: string }>): UIMessage[] {
-  return history.map((msg) => ({
-    id: crypto.randomUUID(),
-    role: msg.role as "user" | "assistant",
-    parts: [{ type: "text" as const, text: msg.content }],
-  }));
 }
 
 const suggestions = ["What can you do?", "Tell me about yourself", "What tools do you have?"];
@@ -106,66 +90,54 @@ interface ChatPageProps {
   version?: string;
 }
 
-export default function ChatPage({ instanceName = "", version = "" }: ChatPageProps) {
+export default function ChatPage(_props: ChatPageProps) {
   const [text, setText] = useState("");
-  const [sessionId, setSessionId] = useState(() => getOrCreateSessionId());
-  const { initialMessages, loaded, saveMessages, clearMessages } = useChatHistory();
+  const [threadId, setSessionId] = useState(generateThreadId);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load persisted session ID from Dexie on mount
+  useEffect(() => {
+    loadThreadId()
+      .then((stored) => {
+        if (stored) setSessionId(stored);
+        else saveThreadId(threadId).catch(() => {});
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/v1/chat",
         credentials: "same-origin",
-        body: { sessionId },
+        body: { threadId },
       }),
-    [sessionId],
+    [threadId],
   );
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({ transport });
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const historyFetched = useRef(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
 
-  // Hydrate: try server history first, fall back to Dexie
+  // Hydrate messages from Dexie on mount (after threadId loaded)
   useEffect(() => {
-    if (!loaded || historyFetched.current) return;
-    historyFetched.current = true;
+    if (!loaded) return;
+    setMessagesLoaded(false);
+    loadMessages(threadId)
+      .then((stored) => {
+        if (stored.length > 0) setMessages(stored);
+      })
+      .finally(() => setMessagesLoaded(true));
+  }, [loaded, threadId, setMessages]);
 
-    (async () => {
-      try {
-        const res = await fetch(`/api/v1/history?sessionId=${encodeURIComponent(sessionId)}`, {
-          credentials: "same-origin",
-        });
-        if (res.ok) {
-          const data = (await res.json()) as {
-            messages?: Array<{ role: string; content: string }>;
-          };
-          if (data.messages && data.messages.length > 0) {
-            setMessages(historyToUIMessages(data.messages));
-            setHistoryLoaded(true);
-            return;
-          }
-        }
-      } catch {}
-
-      // Fallback: Dexie local cache
-      if (initialMessages.length > 0) {
-        setMessages(initialMessages);
-      }
-      setHistoryLoaded(true);
-    })();
-  }, [loaded, sessionId, initialMessages, setMessages]);
-
-  // Persist messages to Dexie — debounced during streaming, immediate on completion
+  // Persist messages to Dexie when response is complete
   useEffect(() => {
-    if (!loaded || messages.length === 0) return;
-    if (status === "ready" || status === "error") {
-      saveMessages(messages).catch(() => {});
-      return;
+    if (status === "ready" && messages.length > 0) {
+      saveMessages(threadId, messages).catch(() => {});
     }
-    const timer = setTimeout(() => saveMessages(messages).catch(() => {}), 500);
-    return () => clearTimeout(timer);
-  }, [messages, loaded, status, saveMessages]);
+  }, [status, messages, threadId]);
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
@@ -198,54 +170,49 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
   }, []);
 
   const handleClearHistory = useCallback(() => {
+    clearMessages(threadId).catch(() => {});
     setMessages([]);
-    clearMessages();
-    setSessionId(resetSessionId());
-  }, [setMessages, clearMessages]);
+    const newId = generateThreadId();
+    setSessionId(newId);
+    saveThreadId(newId).catch(() => {});
+  }, [threadId, setMessages]);
 
-  if (!loaded || !historyLoaded) return null;
+  const isLoading = !loaded || !messagesLoaded;
+
+  const clearButton = useMemo(
+    () =>
+      messages.length > 0 ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon-sm" onClick={handleClearHistory}>
+              <IconTrash className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Clear conversation</TooltipContent>
+        </Tooltip>
+      ) : null,
+    [messages.length, handleClearHistory],
+  );
+  useSetHeaderActions(clearButton);
 
   return (
-    <div className="relative flex size-full flex-col overflow-hidden">
-      {/* Header — pinned top */}
-      <header className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-2">
-          <a
-            href="https://clawrun.sh"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-sm"
-          >
-            ClawRun
-          </a>
-          {version && <span className="text-muted-foreground text-xs">v{version}</span>}
-          {instanceName && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
-              {instanceName}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          {messages.length > 0 && (
-            <Button variant="ghost" size="icon-sm" onClick={handleClearHistory}>
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Clear history</span>
-            </Button>
-          )}
-        </div>
-      </header>
-
+    <div className="absolute inset-0 flex flex-col overflow-hidden">
       {/* Conversation — scrollable middle */}
       <Conversation>
-        {messages.length === 0 && (
+        {isLoading ? (
           <ConversationEmptyState
             className="absolute inset-0"
-            icon={<MessageCircleIcon className="size-8" />}
+            icon={<IconLoader2 className="size-8 animate-spin" />}
+            title="Loading conversation..."
+          />
+        ) : messages.length === 0 ? (
+          <ConversationEmptyState
+            className="absolute inset-0"
+            icon={<IconMessage className="size-8" />}
             title="How can I help you?"
             description="Ask me anything to get started."
           />
-        )}
+        ) : null}
         <ConversationContent>
           {messages.map((m) => (
             <Message key={m.id} from={m.role}>
@@ -312,9 +279,9 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
                     }
                   >
                     {copiedId === m.id ? (
-                      <CheckIcon className="size-4" />
+                      <IconCheck className="size-4" />
                     ) : (
-                      <ClipboardIcon className="size-4" />
+                      <IconClipboard className="size-4" />
                     )}
                   </MessageAction>
                 </MessageActions>
@@ -342,7 +309,7 @@ export default function ChatPage({ instanceName = "", version = "" }: ChatPagePr
 
       {/* Footer — pinned bottom */}
       <div className="grid shrink-0 gap-4 pt-4">
-        {messages.length === 0 && (
+        {!isLoading && messages.length === 0 && (
           <Suggestions className="px-4">
             {suggestions.map((s) => (
               <Suggestion key={s} onClick={handleSuggestionClick} suggestion={s} />

@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@clawrun/logger": "workspace:*",
+    "ai": "^6.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,10 +1,50 @@
 import { parseOutput, buildAgentCommand, DAEMON_PORT } from "zeroclaw";
 import WebSocket from "ws";
-import type { SandboxHandle, AgentResponse, ToolCallInfo } from "@clawrun/agent";
-import type { UIMessageStreamWriter } from "ai";
+import type {
+  SandboxHandle,
+  AgentResponse,
+  ToolCallInfo,
+  ThreadInfo,
+  AgentStatus,
+  AgentConfig,
+  RuntimeToolInfo,
+  CliToolInfo,
+  CronJob,
+  MemoryEntryInfo,
+  CostInfo,
+  DiagResult,
+} from "@clawrun/agent";
+import type { UIMessage, UIMessageStreamWriter } from "ai";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("zeroclaw:ws");
+
+// --- Daemon WS protocol types ---
+
+/** History entry from the agent daemon. */
+export type HistoryMessage = { role: string; content: string };
+
+/**
+ * Superset of all daemon WebSocket message shapes across both `/ws/chat` and
+ * `/ws/clawrun` protocols. Not all fields are present in every message — the
+ * `type` discriminant determines which fields are meaningful.
+ */
+interface DaemonWsMessage {
+  type?:
+    | "message" | "chunk" | "done" | "error" | "history" // both protocols
+    | "tool_call" | "tool_result"                         // /ws/chat only
+    | "status" | "tool_progress" | "clear";               // /ws/clawrun only
+  content?: string;
+  full_response?: string;
+  message?: string;
+  // /ws/chat structured tool fields
+  name?: string;
+  args?: Record<string, unknown>;
+  output?: string;
+  // history payload
+  messages?: HistoryMessage[];
+  thread_id?: string;
+}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -392,6 +432,30 @@ export class StreamingTagParser {
 }
 
 /**
+ * Parse an emoji-prefixed progress line from `/ws/clawrun` `tool_progress`
+ * messages into a structured descriptor.
+ *
+ * Recognised formats:
+ *   `⏳ shell: pwd`    → pending, name="shell", hint="pwd"
+ *   `⏳ shell`         → pending, name="shell", hint=""
+ *   `✅ shell (2s)`    → completed, success=true
+ *   `❌ shell (2s)`    → completed, success=false
+ *
+ * Returns `null` for unrecognised lines.
+ */
+export function parseProgressLine(
+  line: string,
+): { name: string; hint: string; completed: boolean; success?: boolean } | null {
+  const pending = line.match(/^⏳\s+(\S+)(?::\s+(.*))?$/);
+  if (pending) return { name: pending[1], hint: pending[2]?.trim() ?? "", completed: false };
+  const success = line.match(/^✅\s+(\S+)\s+\(\d+s\)$/);
+  if (success) return { name: success[1], hint: "", completed: true, success: true };
+  const fail = line.match(/^❌\s+(\S+)\s+\(\d+s\)$/);
+  if (fail) return { name: fail[1], hint: "", completed: true, success: false };
+  return null;
+}
+
+/**
  * Parse a complete response text for tags and emit all appropriate AI SDK
  * stream events. Used for the done/message fallback when no chunks were
  * streamed.
@@ -494,20 +558,29 @@ export async function embedImages(
   return text;
 }
 
+// --- Daemon WebSocket URL helper ---
+
+export function buildDaemonWsUrl(sandbox: SandboxHandle, path: string, threadId?: string): string {
+  const daemonUrl = sandbox.domain!(DAEMON_PORT);
+  let wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + path;
+  if (threadId) {
+    wsUrl += `?thread_id=${encodeURIComponent(threadId)}`;
+  }
+  return wsUrl;
+}
+
 // --- Fetch history via daemon WebSocket ---
 
-export async function fetchHistoryViaDaemon(
+async function fetchHistoryViaWs(
   sandbox: SandboxHandle,
-  root: string,
-  sessionId: string,
+  threadId: string,
+  path: string,
   opts?: { signal?: AbortSignal },
-): Promise<Array<{ role: string; content: string }>> {
-  const daemonUrl = sandbox.domain!(DAEMON_PORT);
-  let wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws/chat";
-  wsUrl += `?session_id=${encodeURIComponent(sessionId)}`;
-  log.info(`fetchHistory url=${wsUrl} sessionId=${sessionId}`);
+): Promise<HistoryMessage[]> {
+  const wsUrl = buildDaemonWsUrl(sandbox, path, threadId);
+  log.info(`fetchHistory url=${wsUrl} threadId=${threadId}`);
 
-  return new Promise<Array<{ role: string; content: string }>>((resolve) => {
+  return new Promise<HistoryMessage[]>((resolve, reject) => {
     const timeout = setTimeout(() => {
       cleanup();
       resolve([]);
@@ -541,25 +614,30 @@ export async function fetchHistoryViaDaemon(
 
     ws.on("message", (data: Buffer) => {
       try {
-        const msg = JSON.parse(data.toString()) as {
-          type?: string;
-          messages?: Array<{ role: string; content: string }>;
-        };
+        const msg = JSON.parse(data.toString()) as DaemonWsMessage;
         if (msg.type === "history") {
           const messages = Array.isArray(msg.messages) ? msg.messages : [];
-          log.info(`fetchHistory received ${messages.length} messages`);
+          log.info(
+            `fetchHistory received ${messages.length} messages, roles=[${messages.map((m) => m.role).join(", ")}]`,
+          );
           cleanup();
           resolve(messages);
+        } else {
+          log.debug(`fetchHistory ignored message type=${msg.type}`);
         }
-      } catch {}
+      } catch (err) {
+        log.warn(`fetchHistory JSON parse error: ${err instanceof Error ? err.message : err}`);
+      }
     });
 
-    ws.on("error", () => {
+    ws.on("error", (err: Error) => {
+      log.warn(`fetchHistory ws error: ${err.message}`);
       cleanup();
-      resolve([]);
+      reject(err);
     });
 
-    ws.on("close", () => {
+    ws.on("close", (code: number, reason: Buffer) => {
+      log.info(`fetchHistory ws closed code=${code} reason=${reason?.toString() || "none"}`);
       clearTimeout(timeout);
       resolve([]);
     });
@@ -576,7 +654,7 @@ export async function sendMessageViaCli(
   opts?: {
     env?: Record<string, string>;
     signal?: AbortSignal;
-    sessionId?: string;
+    threadId?: string;
   },
 ): Promise<AgentResponse> {
   const cmd = buildAgentCommand(`${root}/bin/zeroclaw`, message, env);
@@ -603,22 +681,24 @@ export async function sendMessageViaCli(
 
 // --- Send via daemon WebSocket ---
 
-export async function sendMessageViaDaemon(
+/**
+ * Send a message and collect a batch AgentResponse. Handles both /ws/chat and
+ * /ws/clawrun protocols — the superset of message types is switched; types that
+ * a given protocol never sends simply never match.
+ */
+async function sendViaWs(
   sandbox: SandboxHandle,
   root: string,
   message: string,
+  path: string,
   opts?: {
     env?: Record<string, string>;
     signal?: AbortSignal;
-    sessionId?: string;
+    threadId?: string;
   },
 ): Promise<AgentResponse> {
-  const daemonUrl = sandbox.domain!(DAEMON_PORT);
-  let wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws/chat";
-  if (opts?.sessionId) {
-    wsUrl += `?session_id=${encodeURIComponent(opts.sessionId)}`;
-  }
-  log.info(`url=${wsUrl} sessionId=${opts?.sessionId ?? "(none)"}`);
+  const wsUrl = buildDaemonWsUrl(sandbox, path, opts?.threadId);
+  log.info(`send url=${wsUrl} threadId=${opts?.threadId ?? "(none)"}`);
 
   const toolCalls: ToolCallInfo[] = [];
 
@@ -663,26 +743,16 @@ export async function sendMessageViaDaemon(
     let pendingContent = "";
 
     ws.on("message", (data: Buffer) => {
-      let msg: {
-        type?: "message" | "chunk" | "tool_call" | "tool_result" | "done" | "error" | "history";
-        content?: string;
-        full_response?: string;
-        name?: string;
-        args?: Record<string, unknown>;
-        output?: string;
-        message?: string;
-      };
+      let msg: DaemonWsMessage;
       try {
-        msg = JSON.parse(data.toString()) as typeof msg;
+        msg = JSON.parse(data.toString()) as DaemonWsMessage;
       } catch {
         return;
       }
 
       switch (msg.type) {
         case "history": {
-          const count = Array.isArray((msg as { messages?: unknown }).messages)
-            ? (msg as { messages: unknown[] }).messages.length
-            : 0;
+          const count = Array.isArray(msg.messages) ? msg.messages.length : 0;
           log.info(`Session history: ${count} messages`);
           break;
         }
@@ -690,6 +760,7 @@ export async function sendMessageViaDaemon(
           pendingContent += msg.content ?? "";
           break;
         }
+        // /ws/chat: structured tool messages
         case "tool_call": {
           toolCalls.push({
             name: msg.name ?? "unknown",
@@ -701,6 +772,16 @@ export async function sendMessageViaDaemon(
           if (toolCalls.length > 0) {
             toolCalls[toolCalls.length - 1].output = msg.output ?? "";
           }
+          break;
+        }
+        // /ws/clawrun: informational events
+        case "status":
+        case "tool_progress": {
+          log.debug(`${msg.type}: ${msg.content ?? ""}`);
+          break;
+        }
+        case "clear": {
+          pendingContent = "";
           break;
         }
         case "message":
@@ -757,9 +838,9 @@ export async function sendMessageViaDaemon(
 
 /**
  * Adapter: connects to ZeroClaw daemon WS and writes AI SDK UIMessageStream
- * events directly to the writer. This is the streaming equivalent of
- * sendMessageViaDaemon — instead of returning a batch AgentResponse, it pipes
- * chunks, tool events, and completion directly to the client stream.
+ * events directly to the writer. Handles both /ws/chat and /ws/clawrun
+ * protocols — the superset of message types is switched; types that a given
+ * protocol never sends simply never match.
  *
  * Chunks are processed through StreamingTagParser which handles:
  *   - `<thinking>` → reasoning-start/delta/end
@@ -767,33 +848,48 @@ export async function sendMessageViaDaemon(
  *   - `<tool_call>` → tool-input-available
  *   - `<tool_result>` → tool-output-available
  *
- * The daemon may also send structured `tool_call`/`tool_result` WS messages
+ * /ws/chat may also send structured `tool_call`/`tool_result` WS messages
  * which are handled alongside the XML tag parsing.
+ *
+ * /ws/clawrun may send `status`, `tool_progress`, and `clear` events which
+ * are logged or used to flush the parser.
  */
-export async function streamMessageViaDaemon(
+async function streamViaWs(
   sandbox: SandboxHandle,
   root: string,
   message: string,
   writer: UIMessageStreamWriter,
-  opts?: { signal?: AbortSignal; sessionId?: string },
+  path: string,
+  opts?: { signal?: AbortSignal; threadId?: string },
 ): Promise<void> {
-  const daemonUrl = sandbox.domain!(DAEMON_PORT);
-  let wsUrl = daemonUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws/chat";
-  if (opts?.sessionId) {
-    wsUrl += `?session_id=${encodeURIComponent(opts.sessionId)}`;
-  }
-  log.info(`stream url=${wsUrl} sessionId=${opts?.sessionId ?? "(none)"}`);
+  const wsUrl = buildDaemonWsUrl(sandbox, path, opts?.threadId);
+  log.info(`stream url=${wsUrl} threadId=${opts?.threadId ?? "(none)"}`);
+
+  const isClawrun = path === "/ws/clawrun";
 
   return new Promise<void>((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
     const signal = opts?.signal;
     let settled = false;
 
-    // Tag-aware parser for chunk content
-    const parser = new StreamingTagParser(writer);
+    // Null writer pattern: for /ws/clawrun, pre-clear chunks go to a
+    // discarded writer (intermediate tool-loop output); only post-clear
+    // chunks stream to the real writer (final answer).
+    const nullWriter = { write: () => {} } as unknown as UIMessageStreamWriter;
+    let parser = new StreamingTagParser(isClawrun ? nullWriter : writer);
+    let receivedClear = false;
 
-    // Track current tool call ID for structured WS tool messages
+    // Track current tool call ID for structured WS tool messages (/ws/chat)
     let currentToolCallId = "";
+
+    // Tool progress tracking for /ws/clawrun
+    interface TrackedToolEntry {
+      name: string;
+      hint: string;
+      toolCallId: string;
+      completed: boolean;
+    }
+    const trackedTools: TrackedToolEntry[] = [];
 
     const cleanup = () => {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
@@ -830,26 +926,16 @@ export async function streamMessageViaDaemon(
     });
 
     ws.on("message", (data: Buffer) => {
-      let msg: {
-        type?: "message" | "chunk" | "tool_call" | "tool_result" | "done" | "error" | "history";
-        content?: string;
-        full_response?: string;
-        name?: string;
-        args?: Record<string, unknown>;
-        output?: string;
-        message?: string;
-      };
+      let msg: DaemonWsMessage;
       try {
-        msg = JSON.parse(data.toString()) as typeof msg;
+        msg = JSON.parse(data.toString()) as DaemonWsMessage;
       } catch {
         return;
       }
 
       switch (msg.type) {
         case "history": {
-          const count = Array.isArray((msg as { messages?: unknown }).messages)
-            ? (msg as { messages: unknown[] }).messages.length
-            : 0;
+          const count = Array.isArray(msg.messages) ? msg.messages.length : 0;
           log.info(`Session history: ${count} messages`);
           break;
         }
@@ -860,8 +946,8 @@ export async function streamMessageViaDaemon(
           break;
         }
 
+        // /ws/chat: structured tool messages
         case "tool_call": {
-          // Structured WS tool message — flush any buffered text first
           parser.flush();
           currentToolCallId = crypto.randomUUID();
           writer.write({
@@ -884,17 +970,104 @@ export async function streamMessageViaDaemon(
           break;
         }
 
+        // /ws/clawrun: informational events
+        case "status": {
+          log.debug(`status: ${msg.content ?? ""}`);
+          break;
+        }
+
+        case "tool_progress": {
+          if (!isClawrun) {
+            log.debug(`tool_progress: ${msg.content ?? ""}`);
+            break;
+          }
+          const content = msg.content ?? "";
+          const lines = content.split("\n").filter((l: string) => l.trim());
+          for (let i = 0; i < lines.length; i++) {
+            const parsed = parseProgressLine(lines[i]);
+            if (!parsed) continue;
+            if (i >= trackedTools.length) {
+              // New tool — emit tool-input-available
+              const toolCallId = crypto.randomUUID();
+              trackedTools.push({
+                name: parsed.name,
+                hint: parsed.hint,
+                toolCallId,
+                completed: parsed.completed,
+              });
+              writer.write({
+                type: "tool-input-available",
+                toolCallId,
+                toolName: parsed.name,
+                input: parsed.hint ? { args: parsed.hint } : {},
+                dynamic: true,
+              });
+              if (parsed.completed) {
+                if (parsed.success) {
+                  writer.write({
+                    type: "tool-output-available",
+                    toolCallId,
+                    output: "completed",
+                    dynamic: true,
+                  });
+                } else {
+                  writer.write({
+                    type: "tool-output-error",
+                    toolCallId,
+                    errorText: "Tool execution failed",
+                    dynamic: true,
+                  });
+                }
+              }
+            } else if (!trackedTools[i].completed && parsed.completed) {
+              trackedTools[i].completed = true;
+              if (parsed.success) {
+                writer.write({
+                  type: "tool-output-available",
+                  toolCallId: trackedTools[i].toolCallId,
+                  output: "completed",
+                  dynamic: true,
+                });
+              } else {
+                writer.write({
+                  type: "tool-output-error",
+                  toolCallId: trackedTools[i].toolCallId,
+                  errorText: "Tool execution failed",
+                  dynamic: true,
+                });
+              }
+            }
+          }
+          break;
+        }
+
+        case "clear": {
+          parser.flush();
+          if (isClawrun) {
+            receivedClear = true;
+            parser = new StreamingTagParser(writer); // fresh parser → real writer
+          }
+          break;
+        }
+
         case "message":
         case "done": {
           // Flush any remaining buffered chunk content
           parser.flush();
 
-          if (parser.hasEmitted) {
-            // Content was streamed via chunks — already emitted
+          if (isClawrun && receivedClear && parser.hasEmitted) {
+            // /ws/clawrun: post-clear content was streamed — embed images then resolve
+            cleanup();
+            embedImages(sandbox, root, msg.full_response ?? "").then(
+              () => settle(() => resolve()),
+              (err) => settle(() => reject(err)),
+            );
+          } else if (!isClawrun && parser.hasEmitted) {
+            // /ws/chat: content was streamed via chunks — already emitted
             cleanup();
             settle(() => resolve());
           } else {
-            // No chunks received — parse the full response for tags + images
+            // No streaming happened — parse the full response for tags + images
             const raw = (msg.full_response ?? msg.content ?? "").trim();
             const finalContent =
               raw || "Tool execution completed, but no final response text was returned.";
@@ -942,4 +1115,631 @@ export async function streamMessageViaDaemon(
       }
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Public exports — try /ws/clawrun first, fall back to /ws/chat
+// ---------------------------------------------------------------------------
+
+export async function fetchHistoryViaDaemon(
+  sandbox: SandboxHandle,
+  root: string,
+  threadId: string,
+  opts?: { signal?: AbortSignal },
+): Promise<HistoryMessage[]> {
+  try {
+    return await fetchHistoryViaWs(sandbox, threadId, "/ws/clawrun", opts);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    log.warn(`/ws/clawrun unavailable for history, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+  }
+  try {
+    return await fetchHistoryViaWs(sandbox, threadId, "/ws/chat", opts);
+  } catch {
+    return [];
+  }
+}
+
+export async function sendMessageViaDaemon(
+  sandbox: SandboxHandle,
+  root: string,
+  message: string,
+  opts?: {
+    env?: Record<string, string>;
+    signal?: AbortSignal;
+    threadId?: string;
+  },
+): Promise<AgentResponse> {
+  try {
+    return await sendViaWs(sandbox, root, message, "/ws/clawrun", opts);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    log.warn(`/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+  }
+  return await sendViaWs(sandbox, root, message, "/ws/chat", opts);
+}
+
+export async function streamMessageViaDaemon(
+  sandbox: SandboxHandle,
+  root: string,
+  message: string,
+  writer: UIMessageStreamWriter,
+  opts?: { signal?: AbortSignal; threadId?: string },
+): Promise<void> {
+  try {
+    return await streamViaWs(sandbox, root, message, writer, "/ws/clawrun", opts);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    log.warn(`/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+  }
+  return await streamViaWs(sandbox, root, message, writer, "/ws/chat", opts);
+}
+
+// ---------------------------------------------------------------------------
+// Memory API — thread listing and retrieval via daemon HTTP
+// ---------------------------------------------------------------------------
+
+/** Entry returned by ZeroClaw's `/api/memory` endpoint. */
+export interface MemoryEntry {
+  key: string;
+  content: string;
+  category?: string;
+  /** Daemon returns `timestamp`, not `created_at`. */
+  timestamp: string;
+  session_id?: string | null;
+}
+
+// --- Key parsing ---
+
+const ASSISTANT_KEY_PREFIX = "assistant_resp_";
+
+const CHANNEL_NAMES: Record<string, string> = {
+  clawrun: "ClawRun",
+  telegram: "Telegram",
+  discord: "Discord",
+  slack: "Slack",
+  whatsapp: "WhatsApp",
+  irc: "IRC",
+  matrix: "Matrix",
+  lark: "Lark",
+  dingtalk: "DingTalk",
+  qq: "QQ",
+  linq: "LinQ",
+};
+
+export interface ParsedMemoryKey {
+  role: "user" | "assistant";
+  channel: string;
+  threadId: string;
+}
+
+/**
+ * Parse a ZeroClaw memory key to extract role, channel, and thread ID.
+ *
+ * Key formats:
+ *   User:      `{channel}_{...}_{suffix}`
+ *   Assistant:  `assistant_resp_{channel}_{...}_{suffix}`
+ *
+ * Thread ID extraction:
+ *   ClawRun: `clawrun_{threadId}_{uuid}` → `clawrun_{threadId}`
+ *   Others:  `{channel}_{sender}_{msgId}` → `{channel}_{sender}`
+ */
+export function parseMemoryKey(key: string): ParsedMemoryKey | null {
+  const isAssistant = key.startsWith(ASSISTANT_KEY_PREFIX);
+  const baseKey = isAssistant ? key.slice(ASSISTANT_KEY_PREFIX.length) : key;
+
+  const firstUnderscore = baseKey.indexOf("_");
+  if (firstUnderscore === -1) return null;
+
+  const channelKey = baseKey.slice(0, firstUnderscore);
+  const channel = CHANNEL_NAMES[channelKey];
+  if (!channel) return null;
+
+  const rest = baseKey.slice(firstUnderscore + 1);
+  if (!rest) return null;
+
+  let threadPart: string;
+  if (channelKey === "clawrun") {
+    // clawrun_{threadId}_{uuid} — UUID uses hyphens (8-4-4-4-12)
+    const match = rest.match(
+      /^(.+)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    threadPart = match ? match[1] : rest;
+  } else {
+    // {channel}_{sender}_{msgId} — strip last segment (message-unique ID)
+    const lastUnderscore = rest.lastIndexOf("_");
+    threadPart = lastUnderscore > 0 ? rest.slice(0, lastUnderscore) : rest;
+  }
+
+  return {
+    role: isAssistant ? "assistant" : "user",
+    channel,
+    threadId: `${channelKey}_${threadPart}`,
+  };
+}
+
+// --- Parse assistant XML into UIMessage parts ---
+
+/**
+ * Parse assistant response content with XML tags into AI SDK UIMessage parts.
+ *
+ * Handles `<thinking>`, `<tool_call name="...">JSON</tool_call>`,
+ * `<tool_result>`, and `<response>` wrappers.
+ */
+export function parseAssistantParts(content: string): UIMessage["parts"] {
+  if (
+    !content.includes("<thinking>") &&
+    !content.includes("<tool_call") &&
+    !content.includes("<response>")
+  ) {
+    return [{ type: "text" as const, text: content }];
+  }
+
+  const parts: UIMessage["parts"] = [];
+  let remaining = content;
+
+  while (remaining.length > 0) {
+    const thinkIdx = remaining.indexOf("<thinking>");
+    const toolIdx = remaining.search(/<tool_call\s/);
+    const respIdx = remaining.indexOf("<response>");
+
+    const candidates = [
+      { idx: thinkIdx, tag: "thinking" as const },
+      { idx: toolIdx, tag: "tool_call" as const },
+      { idx: respIdx, tag: "response" as const },
+    ]
+      .filter((c) => c.idx >= 0)
+      .sort((a, b) => a.idx - b.idx);
+
+    if (candidates.length === 0) {
+      const clean = remaining
+        .replace(/<\/(?:thinking|response)>/g, "")
+        .replace(/<tool_result\s+[^>]*\/>/g, "")
+        .trim();
+      if (clean) parts.push({ type: "text" as const, text: clean });
+      break;
+    }
+
+    const { idx, tag } = candidates[0];
+    const before = remaining.slice(0, idx).trim();
+    if (before) parts.push({ type: "text" as const, text: before });
+
+    if (tag === "thinking") {
+      const end = remaining.indexOf("</thinking>", idx);
+      if (end === -1) {
+        remaining = remaining.slice(idx + "<thinking>".length);
+        continue;
+      }
+      const inner = remaining.slice(idx + "<thinking>".length, end).trim();
+      if (inner) {
+        parts.push({ type: "reasoning" as const, text: inner });
+      }
+      remaining = remaining.slice(end + "</thinking>".length);
+    } else if (tag === "tool_call") {
+      const openMatch = remaining
+        .slice(idx)
+        .match(/^<tool_call\s+(?:name|type)="([^"]+)">/);
+      if (!openMatch) {
+        remaining = remaining.slice(idx + 1);
+        continue;
+      }
+      const name = openMatch[1];
+      const afterOpen = idx + openMatch[0].length;
+      const end = remaining.indexOf("</tool_call>", afterOpen);
+      if (end === -1) {
+        remaining = remaining.slice(afterOpen);
+        continue;
+      }
+      const argsStr = remaining.slice(afterOpen, end).trim();
+      let input: Record<string, unknown> = {};
+      try {
+        input = JSON.parse(argsStr);
+      } catch {}
+      remaining = remaining.slice(end + "</tool_call>".length);
+
+      // Consume following tool_result if present
+      let output: string = "completed";
+      const resultMatch = remaining.match(
+        /^\s*<tool_result[^>]*>([\s\S]*?)<\/tool_result>/,
+      );
+      if (resultMatch) {
+        output = resultMatch[1].trim() || "completed";
+        remaining = remaining.slice(resultMatch[0].length);
+      }
+
+      parts.push({
+        type: "dynamic-tool" as const,
+        toolName: name,
+        toolCallId: crypto.randomUUID(),
+        state: "output-available" as const,
+        input,
+        output,
+      });
+    } else if (tag === "response") {
+      const end = remaining.indexOf("</response>", idx);
+      if (end === -1) {
+        remaining = remaining.slice(idx + "<response>".length);
+        continue;
+      }
+      const inner = remaining.slice(idx + "<response>".length, end).trim();
+      if (inner) parts.push({ type: "text" as const, text: inner });
+      remaining = remaining.slice(end + "</response>".length);
+    }
+  }
+
+  return parts.length > 0 ? parts : [{ type: "text" as const, text: content }];
+}
+
+// --- Daemon HTTP helpers ---
+
+async function fetchMemoryEntries(
+  sandbox: SandboxHandle,
+  params: Record<string, string>,
+  opts?: { signal?: AbortSignal },
+): Promise<MemoryEntry[]> {
+  const base = sandbox.domain!(DAEMON_PORT) + "/api/memory";
+  const qs = new URLSearchParams(params).toString();
+  const url = qs ? `${base}?${qs}` : base;
+  log.info(`fetchMemory url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Memory API ${res.status}: ${res.statusText}`);
+  const data = await res.json();
+  // Daemon wraps entries in { entries: [...] }
+  return (Array.isArray(data) ? data : data.entries ?? []) as MemoryEntry[];
+}
+
+// --- Dashboard API helpers (daemon HTTP) ---
+
+function daemonBase(sandbox: SandboxHandle): string {
+  return sandbox.domain!(DAEMON_PORT);
+}
+
+export async function fetchAgentStatus(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<AgentStatus> {
+  const url = daemonBase(sandbox) + "/api/status";
+  log.info(`fetchAgentStatus url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Status API ${res.status}: ${res.statusText}`);
+  const raw = await res.json();
+
+  // Map snake_case ZeroClaw response → AgentStatus
+  const channels: string[] = [];
+  if (raw.channels && typeof raw.channels === "object") {
+    for (const [name, enabled] of Object.entries(raw.channels)) {
+      if (enabled) channels.push(name);
+    }
+  } else if (Array.isArray(raw.channels)) {
+    channels.push(...raw.channels);
+  }
+
+  const health: AgentStatus["health"] = [];
+  const comps = raw.health?.components;
+  if (comps && typeof comps === "object") {
+    for (const [name, c] of Object.entries(comps) as [string, any][]) {
+      health.push({
+        name,
+        status: c.status ?? "unknown",
+        restarts: c.restart_count ?? c.restarts,
+      });
+    }
+  } else if (Array.isArray(raw.health)) {
+    health.push(...raw.health);
+  }
+
+  return {
+    provider: raw.provider,
+    model: raw.model,
+    uptime: raw.uptime_seconds ?? raw.uptime,
+    memoryBackend: raw.memory_backend ?? raw.memoryBackend,
+    channels,
+    health,
+  };
+}
+
+export async function fetchAgentConfig(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<AgentConfig> {
+  const url = daemonBase(sandbox) + "/api/config";
+  log.info(`fetchAgentConfig url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Config API ${res.status}: ${res.statusText}`);
+  return (await res.json()) as AgentConfig;
+}
+
+export async function putAgentConfig(
+  sandbox: SandboxHandle,
+  content: string,
+  opts?: { signal?: AbortSignal },
+): Promise<void> {
+  const url = daemonBase(sandbox) + "/api/config";
+  log.info(`putAgentConfig url=${url}`);
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+    signal: opts?.signal,
+  });
+  if (!res.ok) throw new Error(`Config PUT ${res.status}: ${res.statusText}`);
+}
+
+export async function fetchRuntimeTools(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<{ tools: RuntimeToolInfo[]; cliTools: CliToolInfo[] }> {
+  const url = daemonBase(sandbox) + "/api/tools";
+  log.info(`fetchRuntimeTools url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Tools API ${res.status}: ${res.statusText}`);
+  const data = await res.json();
+  return {
+    tools: Array.isArray(data.tools) ? data.tools : [],
+    cliTools: Array.isArray(data.cli_tools ?? data.cliTools) ? (data.cli_tools ?? data.cliTools) : [],
+  };
+}
+
+export async function fetchCronJobs(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<CronJob[]> {
+  const url = daemonBase(sandbox) + "/api/cron";
+  log.info(`fetchCronJobs url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Cron API ${res.status}: ${res.statusText}`);
+  const data = await res.json();
+  const raw: Record<string, unknown>[] = Array.isArray(data) ? data : (data.jobs ?? []);
+  return raw.map((j): CronJob => ({
+    id: String(j.id ?? ""),
+    name: j.name != null ? String(j.name) : undefined,
+    schedule: String(j.schedule ?? ""),
+    command: String(j.command ?? ""),
+    nextRun: j.nextRun != null ? String(j.nextRun) : j.next_run != null ? String(j.next_run) : undefined,
+    lastRun: j.lastRun != null ? String(j.lastRun) : j.last_run != null ? String(j.last_run) : undefined,
+    lastStatus: j.lastStatus != null ? String(j.lastStatus) : j.last_status != null ? String(j.last_status) : undefined,
+    enabled: j.enabled != null ? Boolean(j.enabled) : undefined,
+  }));
+}
+
+export async function postCronJob(
+  sandbox: SandboxHandle,
+  job: { name?: string; schedule: string; command: string },
+  opts?: { signal?: AbortSignal },
+): Promise<CronJob> {
+  const url = daemonBase(sandbox) + "/api/cron";
+  log.info(`postCronJob url=${url}`);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(job),
+    signal: opts?.signal,
+  });
+  if (!res.ok) throw new Error(`Cron POST ${res.status}: ${res.statusText}`);
+  return (await res.json()) as CronJob;
+}
+
+export async function deleteCronJobVia(
+  sandbox: SandboxHandle,
+  id: string,
+  opts?: { signal?: AbortSignal },
+): Promise<void> {
+  const url = daemonBase(sandbox) + `/api/cron/${encodeURIComponent(id)}`;
+  log.info(`deleteCronJob url=${url}`);
+  const res = await fetch(url, { method: "DELETE", signal: opts?.signal });
+  if (!res.ok) throw new Error(`Cron DELETE ${res.status}: ${res.statusText}`);
+}
+
+export async function fetchMemories(
+  sandbox: SandboxHandle,
+  query?: { query?: string; category?: string },
+  opts?: { signal?: AbortSignal },
+): Promise<MemoryEntryInfo[]> {
+  const params: Record<string, string> = {};
+  if (query?.query) params.query = query.query;
+  if (query?.category) params.category = query.category;
+  const entries = await fetchMemoryEntries(sandbox, params, opts);
+  return entries.map((e) => ({
+    key: e.key,
+    content: e.content,
+    category: e.category,
+    timestamp: e.timestamp,
+  }));
+}
+
+export async function postMemory(
+  sandbox: SandboxHandle,
+  entry: { key: string; content: string; category?: string },
+  opts?: { signal?: AbortSignal },
+): Promise<void> {
+  const url = daemonBase(sandbox) + "/api/memory";
+  log.info(`postMemory url=${url}`);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+    signal: opts?.signal,
+  });
+  if (!res.ok) throw new Error(`Memory POST ${res.status}: ${res.statusText}`);
+}
+
+export async function deleteMemoryEntry(
+  sandbox: SandboxHandle,
+  key: string,
+  opts?: { signal?: AbortSignal },
+): Promise<void> {
+  const url = daemonBase(sandbox) + `/api/memory/${encodeURIComponent(key)}`;
+  log.info(`deleteMemory url=${url}`);
+  const res = await fetch(url, { method: "DELETE", signal: opts?.signal });
+  if (!res.ok) throw new Error(`Memory DELETE ${res.status}: ${res.statusText}`);
+}
+
+export async function fetchCostInfo(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<CostInfo> {
+  const url = daemonBase(sandbox) + "/api/cost";
+  log.info(`fetchCostInfo url=${url}`);
+  const res = await fetch(url, { signal: opts?.signal });
+  if (!res.ok) throw new Error(`Cost API ${res.status}: ${res.statusText}`);
+  const raw = await res.json();
+
+  // Unwrap optional `cost` envelope and map snake_case → CostInfo
+  const c = raw.cost ?? raw;
+  return {
+    sessionCost: c.session_cost_usd ?? c.sessionCost,
+    dailyCost: c.daily_cost_usd ?? c.dailyCost,
+    monthlyCost: c.monthly_cost_usd ?? c.monthlyCost,
+    totalTokens: c.total_tokens ?? c.totalTokens,
+    requestCount: c.request_count ?? c.requestCount,
+    byModel: Array.isArray(c.by_model)
+      ? c.by_model
+      : c.by_model && typeof c.by_model === "object"
+        ? Object.entries(c.by_model).map(([model, v]: [string, any]) => ({
+            model,
+            cost: v.cost_usd ?? v.cost ?? 0,
+            tokens: v.total_tokens ?? v.tokens ?? 0,
+            requests: v.request_count ?? v.requests ?? 0,
+            share: v.share ?? 0,
+          }))
+        : undefined,
+  };
+}
+
+export async function fetchDiagnostics(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<DiagResult[]> {
+  const url = daemonBase(sandbox) + "/api/diagnostics";
+  log.info(`fetchDiagnostics url=${url}`);
+  const res = await fetch(url, {
+    method: "POST",
+    signal: opts?.signal,
+  });
+  if (!res.ok) throw new Error(`Diagnostics API ${res.status}: ${res.statusText}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.results ?? []);
+}
+
+// --- Thread listing ---
+
+export async function listThreadsViaDaemon(
+  sandbox: SandboxHandle,
+  opts?: { signal?: AbortSignal },
+): Promise<ThreadInfo[]> {
+  const entries = await fetchMemoryEntries(
+    sandbox,
+    { category: "conversation" },
+    opts,
+  );
+
+  // Group entries by thread ID
+  const threads = new Map<
+    string,
+    {
+      channel: string;
+      messages: Array<{ role: string; content: string; createdAt: string }>;
+    }
+  >();
+
+  for (const entry of entries) {
+    const parsed = parseMemoryKey(entry.key);
+    if (!parsed) continue;
+
+    let thread = threads.get(parsed.threadId);
+    if (!thread) {
+      thread = { channel: parsed.channel, messages: [] };
+      threads.set(parsed.threadId, thread);
+    }
+    thread.messages.push({
+      role: parsed.role,
+      content: entry.content,
+      createdAt: entry.timestamp,
+    });
+  }
+
+  // Build ThreadInfo array
+  const result: ThreadInfo[] = [];
+  for (const [threadId, thread] of threads) {
+    thread.messages.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+
+    // Preview: last user message, truncated
+    const lastUserMsg = [...thread.messages]
+      .reverse()
+      .find((m) => m.role === "user");
+    const preview =
+      (lastUserMsg ?? thread.messages[thread.messages.length - 1])?.content.slice(0, 100) ?? "";
+
+    const lastActivity =
+      thread.messages[thread.messages.length - 1]?.createdAt ?? "";
+
+    result.push({
+      id: threadId,
+      channel: thread.channel,
+      preview,
+      messageCount: thread.messages.length,
+      lastActivity,
+    });
+  }
+
+  // Most recent first
+  result.sort(
+    (a, b) =>
+      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime(),
+  );
+
+  return result;
+}
+
+// --- Thread retrieval ---
+
+export async function getThreadViaDaemon(
+  sandbox: SandboxHandle,
+  threadId: string,
+  opts?: { signal?: AbortSignal },
+): Promise<UIMessage[]> {
+  const entries = await fetchMemoryEntries(
+    sandbox,
+    { query: threadId },
+    opts,
+  );
+
+  // Filter to entries that actually belong to this thread
+  const threadEntries = entries.filter((entry) => {
+    const parsed = parseMemoryKey(entry.key);
+    return parsed?.threadId === threadId;
+  });
+
+  // Sort by timestamp (oldest first)
+  threadEntries.sort(
+    (a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
+  // Convert to UIMessage[]
+  return threadEntries
+    .map((entry): UIMessage | null => {
+      const parsed = parseMemoryKey(entry.key);
+      if (!parsed) return null;
+
+      const content = entry.content.trim();
+      if (!content) return null;
+
+      if (parsed.role === "user") {
+        return {
+          id: crypto.randomUUID(),
+          role: "user" as const,
+          parts: [{ type: "text" as const, text: content }],
+        };
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        role: "assistant" as const,
+        parts: parseAssistantParts(content),
+      };
+    })
+    .filter((msg): msg is UIMessage => msg !== null);
 }
