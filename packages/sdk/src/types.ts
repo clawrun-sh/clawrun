@@ -5,6 +5,29 @@ import type { UIMessage, UIMessageChunk } from "ai";
 // Re-export so consumers don't need to depend on @clawrun/runtime
 export type { ClawRunConfig };
 
+// Re-export agent types so consumers don't need a direct @clawrun/agent dependency
+export type {
+  ThreadInfo,
+  CronJob,
+  MemoryEntryInfo,
+  AgentStatus,
+  CostInfo,
+  AgentConfig,
+  RuntimeToolInfo,
+  CliToolInfo,
+  DiagResult,
+  HealthResult,
+  ToolsResult,
+  DiagnosticsResult,
+  ThreadsResult,
+  ThreadResult,
+  MemoriesResult,
+  MemoryQuery,
+  CreateMemoryInput,
+  CronJobsResult,
+  CreateCronJobInput,
+} from "@clawrun/agent";
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -20,7 +43,8 @@ export interface ClientOptions {
 
 export interface InstanceApiConfig {
   url: string;
-  jwtSecret: string;
+  /** JWT secret for Bearer auth. When omitted, relies on browser session cookies. */
+  jwtSecret?: string;
 }
 
 export interface InstanceProviderConfig {
@@ -119,12 +143,6 @@ export type StopResult =
 export type RestartResult =
   | { status: "running"; sandboxId?: SandboxId }
   | { status: "failed"; error: string };
-
-export interface HealthResult {
-  status: string;
-  agent: string;
-  sandbox: { running: boolean; status?: string };
-}
 
 // ---------------------------------------------------------------------------
 // History

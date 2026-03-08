@@ -33,6 +33,10 @@ import type {
   MemoryEntryInfo,
   CostInfo,
   DiagResult,
+  ToolsResult,
+  CreateCronJobInput,
+  MemoryQuery,
+  CreateMemoryInput,
 } from "@clawrun/agent";
 import type { UIMessage } from "ai";
 import type { Tool } from "@clawrun/agent";
@@ -333,7 +337,7 @@ export class ZeroclawAgent implements Agent {
     sandbox: SandboxHandle,
     _root: string,
     opts?: { signal?: AbortSignal },
-  ): Promise<{ tools: RuntimeToolInfo[]; cliTools: CliToolInfo[] }> {
+  ): Promise<ToolsResult> {
     if (typeof sandbox.domain !== "function") {
       return { tools: [], cliTools: [] };
     }
@@ -352,7 +356,7 @@ export class ZeroclawAgent implements Agent {
   async createCronJob(
     sandbox: SandboxHandle,
     _root: string,
-    job: { name?: string; schedule: string; command: string },
+    job: CreateCronJobInput,
     opts?: { signal?: AbortSignal },
   ): Promise<CronJob> {
     if (typeof sandbox.domain !== "function") {
@@ -376,7 +380,7 @@ export class ZeroclawAgent implements Agent {
   async listMemories(
     sandbox: SandboxHandle,
     _root: string,
-    query?: { query?: string; category?: string },
+    query?: MemoryQuery,
     opts?: { signal?: AbortSignal },
   ): Promise<MemoryEntryInfo[]> {
     if (typeof sandbox.domain !== "function") return [];
@@ -386,7 +390,7 @@ export class ZeroclawAgent implements Agent {
   async createMemory(
     sandbox: SandboxHandle,
     _root: string,
-    entry: { key: string; content: string; category?: string },
+    entry: CreateMemoryInput,
     opts?: { signal?: AbortSignal },
   ): Promise<void> {
     if (typeof sandbox.domain !== "function") {

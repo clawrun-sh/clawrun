@@ -11,6 +11,7 @@ import {
   IconClock,
   IconFileText,
   IconHelp,
+  IconLogout,
 } from "@tabler/icons-react";
 import { Logo } from "./logo";
 
@@ -38,6 +39,7 @@ const data = {
   ],
   navSecondary: [
     { title: "Get Help", url: "https://clawrun.sh/docs", icon: IconHelp },
+    { title: "Log Out", url: "/auth/logout", icon: IconLogout },
   ],
 };
 
@@ -53,10 +55,7 @@ export function AppSidebar({ instanceName, version: _, ...props }: AppSidebarPro
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-            >
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1.5!">
               <a href="/">
                 <Logo size={20} className="shrink-0 text-primary" />
                 <span className="text-base font-semibold font-mono">

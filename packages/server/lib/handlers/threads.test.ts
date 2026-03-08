@@ -76,11 +76,9 @@ function applyRuntimeMocks() {
       instance: { provider: "vercel" },
     } as RuntimeConfig);
     vi.mocked(runtimeMod.resolveRoot).mockResolvedValue("/home/user/.clawrun");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
-      (() => ({
-        getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
-      })) as unknown as typeof SLMType,
-    );
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
+      getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
+    })) as unknown as typeof SLMType);
     vi.mocked(runtimeMod.getProvider).mockReturnValue({
       get: vi.fn(async () => mockManagedSandbox),
     } as unknown as SandboxProvider);
@@ -102,11 +100,9 @@ describe("handleListThreads", () => {
 
   it("returns empty when sandbox is not running", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
-      (() => ({
-        getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
-      })) as unknown as typeof SLMType,
-    );
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
+      getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
+    })) as unknown as typeof SLMType);
 
     const req = new Request("http://localhost/api/v1/threads");
     const resp = await handleListThreads(req);
@@ -171,11 +167,9 @@ describe("handleGetThread", () => {
 
   it("returns empty when sandbox is not running", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
-      (() => ({
-        getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
-      })) as unknown as typeof SLMType,
-    );
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
+      getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
+    })) as unknown as typeof SLMType);
 
     const req = new Request("http://localhost/api/v1/threads/clawrun_abc123");
     const resp = await handleGetThread(req, "clawrun_abc123");

@@ -1,38 +1,75 @@
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import type { ProgressCallback } from "@clawrun/provider";
 import type { InstanceStep } from "./steps.js";
-import {
-  DEPLOY_TSCONFIG,
-  STALE_PATHS,
-  SOURCE_DIRS,
-  ROOT_CONFIG_FILES,
-  DEPLOY_ONLY_FILES,
-  CSS_FIXUPS,
-} from "@clawrun/server/deploy-manifest";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { resolveServerPackage } from "./server-package.js";
 
 /**
- * Resolve the path to the installed @clawrun/server package.json.
- *
- * In dev mode (monorepo): resolves via relative path to packages/server.
- * In production: resolves via require.resolve from node_modules.
+ * Deployment tsconfig.json — standalone (no extends to monorepo packages).
+ * Includes the @/* path alias so `@/lib/*` imports resolve correctly.
  */
-function resolveServerPackage(): string {
-  // Dev mode: CLI runs from packages/cli/dist/ or packages/sdk/dist/ inside the monorepo
-  const repoRoot = resolve(__dirname, "..", "..", "..", "..");
-  const monorepoPath = join(repoRoot, "packages", "server", "package.json");
-  if (existsSync(monorepoPath)) {
-    return monorepoPath;
-  }
+const DEPLOY_TSCONFIG = {
+  compilerOptions: {
+    target: "ES2017",
+    lib: ["dom", "dom.iterable", "esnext"],
+    allowJs: true,
+    skipLibCheck: true,
+    strict: true,
+    noEmit: true,
+    esModuleInterop: true,
+    module: "esnext",
+    moduleResolution: "bundler",
+    resolveJsonModule: true,
+    isolatedModules: true,
+    jsx: "preserve",
+    incremental: true,
+    plugins: [{ name: "next" }],
+    paths: { "@/*": ["./*"] },
+  },
+  include: ["**/*.ts", "**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
+  exclude: ["node_modules"],
+};
 
-  // Production: resolve from node_modules
-  const require = createRequire(import.meta.url);
-  return require.resolve("@clawrun/server/package.json");
-}
+/** Paths from previous template versions that should be cleaned up on upgrade. */
+const STALE_PATHS = [
+  "app/api/auth",
+  "app/auth/signin",
+  "app/chat",
+  "app/page.tsx",
+  "node-stub.js",
+  "middleware.ts",
+  "templates",
+];
+
+/** Source directories to copy from server package into deployed instance. */
+const SOURCE_DIRS = ["app", "lib", "public"];
+
+/** Root config files to copy from server package. */
+const ROOT_CONFIG_FILES = ["proxy.ts", "next.config.ts", "postcss.config.mjs"];
+
+/**
+ * Deploy-only files: source path (relative to server root) → destination path (relative to instance root).
+ * Stored outside the server's app root so the framework doesn't auto-detect them.
+ */
+const DEPLOY_ONLY_FILES: Record<string, string> = {
+  "deploy/instrumentation.ts": "instrumentation.ts",
+};
+
+/** CSS path fixups for monorepo → deployed layout transition. */
+const CSS_FIXUPS: Array<{ pattern: RegExp; replacement: string }> = [
+  {
+    pattern: /@import\s+"\.\.\/\.\.\/ui\/src\/styles\/globals\.css"/g,
+    replacement: '@import "../node_modules/@clawrun/ui/src/styles/globals.css"',
+  },
+  {
+    pattern: /@source\s+"\.\.\/\.\.\/ui\/src"/g,
+    replacement: '@source "../node_modules/@clawrun/ui/src"',
+  },
+  {
+    pattern: /@source\s+"\.\.\/\.\.\/ui\/node_modules\/streamdown\/dist"/g,
+    replacement: '@source "../node_modules/streamdown/dist"',
+  },
+];
 
 /**
  * Copy the server app source into a deployed instance directory.
@@ -46,8 +83,8 @@ export function copyServerApp(
   instancePath: string,
   onProgress?: ProgressCallback<InstanceStep>,
 ): void {
-  const serverPkgJson = resolveServerPackage();
-  const serverDir = dirname(serverPkgJson);
+  const serverPkgPath = resolveServerPackage();
+  const serverDir = dirname(serverPkgPath);
 
   // Remove stale paths from previous versions
   for (const rel of STALE_PATHS) {
@@ -92,7 +129,7 @@ export function copyServerApp(
   );
 
   // Stamp server version into the instance's package.json
-  const serverPkg = JSON.parse(readFileSync(serverPkgJson, "utf-8"));
+  const serverPkg = JSON.parse(readFileSync(serverPkgPath, "utf-8"));
   const instancePkgPath = join(instancePath, "package.json");
   if (existsSync(instancePkgPath)) {
     const instancePkg = JSON.parse(readFileSync(instancePkgPath, "utf-8"));

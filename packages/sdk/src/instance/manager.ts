@@ -9,8 +9,10 @@ import type { ClawRunConfig } from "./config.js";
 import { readConfig, writeConfig, sanitizeConfig } from "./config.js";
 import type { PlatformProvider, PlatformStep, ProgressCallback } from "@clawrun/provider";
 import type { InstanceStep } from "./steps.js";
-import { getDeployDependencies } from "@clawrun/server/deploy-manifest";
-import { BUILD_CACHE_DIR } from "@clawrun/server/deploy-manifest";
+import { getDeployDependencies } from "./server-package.js";
+
+/** Build cache directory to clean on upgrade. */
+const BUILD_CACHE_DIR = ".next";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -57,6 +59,7 @@ async function packLocalDeps(
     { name: "@clawrun/runtime", dir: join(root, "packages", "runtime") },
     { name: "@clawrun/logger", dir: join(root, "packages", "logger") },
     { name: "@clawrun/ui", dir: join(root, "packages", "ui") },
+    { name: "@clawrun/sdk", dir: join(root, "packages", "sdk") },
   ];
 
   // Agent-specific packages

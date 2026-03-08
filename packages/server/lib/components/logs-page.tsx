@@ -3,17 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Badge } from "@clawrun/ui/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@clawrun/ui/components/ui/tooltip";
-import {
-  IconPlayerPause,
-  IconPlayerPlay,
-  IconArrowDown,
-  IconTrash,
-} from "@tabler/icons-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
+import { IconPlayerPause, IconPlayerPlay, IconArrowDown, IconTrash } from "@tabler/icons-react";
 
 interface LogEvent {
   id: string;
@@ -89,9 +80,7 @@ export default function LogsPage() {
     eventBufferRef.current = [];
   }, []);
 
-  const filteredEvents = typeFilter
-    ? events.filter((e) => e.type === typeFilter)
-    : events;
+  const filteredEvents = typeFilter ? events.filter((e) => e.type === typeFilter) : events;
 
   const eventTypes = [...new Set(events.map((e) => e.type))];
 
@@ -132,7 +121,11 @@ export default function LogsPage() {
                   size="icon"
                   onClick={() => (paused ? handleResume() : setPaused(true))}
                 >
-                  {paused ? <IconPlayerPlay className="size-4" /> : <IconPlayerPause className="size-4" />}
+                  {paused ? (
+                    <IconPlayerPlay className="size-4" />
+                  ) : (
+                    <IconPlayerPause className="size-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{paused ? "Resume" : "Pause"}</TooltipContent>
@@ -140,12 +133,10 @@ export default function LogsPage() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setAutoScroll(!autoScroll)}
-                >
-                  <IconArrowDown className={`size-4 ${autoScroll ? "text-foreground" : "text-muted-foreground"}`} />
+                <Button variant="ghost" size="icon" onClick={() => setAutoScroll(!autoScroll)}>
+                  <IconArrowDown
+                    className={`size-4 ${autoScroll ? "text-foreground" : "text-muted-foreground"}`}
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{autoScroll ? "Auto-scroll on" : "Auto-scroll off"}</TooltipContent>

@@ -166,4 +166,130 @@ describe("ApiClient", () => {
       await expect(client.rawPost("/test")).rejects.toThrow(NetworkError);
     });
   });
+
+  describe("delete", () => {
+    it("sends DELETE and returns parsed JSON", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ deleted: true }), { status: 200 }));
+
+      const result = await client.delete("/api/v1/memory/key1");
+
+      expect(result).toEqual({ deleted: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://example.com/api/v1/memory/key1",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: expect.objectContaining({
+            Authorization: "Bearer user-jwt-my-secret",
+          }),
+        }),
+      );
+    });
+
+    it("throws ApiError on non-2xx", async () => {
+      mockFetch.mockResolvedValue(new Response("Not Found", { status: 404 }));
+      await expect(client.delete("/test")).rejects.toThrow(ApiError);
+    });
+
+    it("throws NetworkError on fetch failure", async () => {
+      mockFetch.mockRejectedValue(new TypeError("connection refused"));
+      await expect(client.delete("/test")).rejects.toThrow(NetworkError);
+    });
+
+    it("passes abort signal", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      const controller = new AbortController();
+      await client.delete("/test", controller.signal);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+  });
+
+  describe("rawGet", () => {
+    it("returns the raw Response", async () => {
+      const res = new Response("streaming body", { status: 200 });
+      mockFetch.mockResolvedValue(res);
+
+      const result = await client.rawGet("/api/v1/events");
+      expect(result).toBe(res);
+    });
+
+    it("throws ApiError on non-2xx", async () => {
+      mockFetch.mockResolvedValue(new Response("Server Error", { status: 500 }));
+      await expect(client.rawGet("/test")).rejects.toThrow(ApiError);
+    });
+
+    it("throws NetworkError on fetch failure", async () => {
+      mockFetch.mockRejectedValue(new Error("connection refused"));
+      await expect(client.rawGet("/test")).rejects.toThrow(NetworkError);
+    });
+  });
+
+  describe("cookie mode (no jwtSecret)", () => {
+    let cookieClient: ApiClient;
+
+    beforeEach(() => {
+      cookieClient = new ApiClient("https://example.com", undefined, { fetch: mockFetch });
+    });
+
+    it("does not include Authorization header", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      await cookieClient.get("/test");
+
+      const callArgs = mockFetch.mock.calls[0][1];
+      expect(callArgs.headers).not.toHaveProperty("Authorization");
+      expect(callArgs.headers).toHaveProperty("Content-Type", "application/json");
+    });
+
+    it("includes credentials: same-origin on GET", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      await cookieClient.get("/test");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ credentials: "same-origin" }),
+      );
+    });
+
+    it("includes credentials: same-origin on POST", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      await cookieClient.post("/test", { key: "value" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ credentials: "same-origin" }),
+      );
+    });
+
+    it("includes credentials: same-origin on DELETE", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      await cookieClient.delete("/test");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ credentials: "same-origin" }),
+      );
+    });
+
+    it("treats empty string jwtSecret as cookie mode", async () => {
+      const emptySecretClient = new ApiClient("https://example.com", "", { fetch: mockFetch });
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      await emptySecretClient.get("/test");
+
+      const callArgs = mockFetch.mock.calls[0][1];
+      expect(callArgs.headers).not.toHaveProperty("Authorization");
+      expect(callArgs.credentials).toBe("same-origin");
+    });
+  });
+
+  describe("bearer mode does not include credentials", () => {
+    it("does not add credentials option on GET", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+      await client.get("/test");
+
+      const callArgs = mockFetch.mock.calls[0][1];
+      expect(callArgs).not.toHaveProperty("credentials");
+    });
+  });
 });

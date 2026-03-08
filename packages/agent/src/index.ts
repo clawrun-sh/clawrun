@@ -24,6 +24,16 @@ export type {
   MemoryEntryInfo,
   CostInfo,
   DiagResult,
+  HealthResult,
+  ToolsResult,
+  DiagnosticsResult,
+  ThreadsResult,
+  ThreadResult,
+  MemoriesResult,
+  MemoryQuery,
+  CreateMemoryInput,
+  CronJobsResult,
+  CreateCronJobInput,
 } from "./types.js";
 export type { UIMessage, UIMessageStreamWriter } from "ai";
 export type { Tool, ToolResult } from "./tools.js";

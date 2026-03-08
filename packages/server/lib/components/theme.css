@@ -5,3 +5,13 @@ body {
 :root {
   --header-height: calc(var(--spacing) * 12 + 1px);
 }
+
+@keyframes border-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}

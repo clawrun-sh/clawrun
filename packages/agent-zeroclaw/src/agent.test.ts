@@ -59,7 +59,13 @@ vi.mock("./messaging.js", () => ({
   })),
   streamMessageViaDaemon: vi.fn(async () => {}),
   listThreadsViaDaemon: vi.fn(async () => [
-    { id: "clawrun_thread1", channel: "ClawRun", preview: "hi", messageCount: 2, lastActivity: "2025-01-01T00:00:00Z" },
+    {
+      id: "clawrun_thread1",
+      channel: "ClawRun",
+      preview: "hi",
+      messageCount: 2,
+      lastActivity: "2025-01-01T00:00:00Z",
+    },
   ]),
   getThreadViaDaemon: vi.fn(async () => [
     { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
@@ -233,10 +239,7 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(true);
 
-      const threads = await agent.listThreads(
-        sandbox as unknown as SandboxHandle,
-        "/root",
-      );
+      const threads = await agent.listThreads(sandbox as unknown as SandboxHandle, "/root");
 
       expect(listThreadsViaDaemon).toHaveBeenCalledOnce();
       expect(threads).toHaveLength(1);
@@ -247,10 +250,7 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const sandbox = mockSandbox(false);
 
-      const threads = await agent.listThreads(
-        sandbox as unknown as SandboxHandle,
-        "/root",
-      );
+      const threads = await agent.listThreads(sandbox as unknown as SandboxHandle, "/root");
 
       expect(listThreadsViaDaemon).not.toHaveBeenCalled();
       expect(threads).toEqual([]);
@@ -261,10 +261,7 @@ describe("ZeroclawAgent", () => {
       const sandbox = mockSandbox(true);
       vi.mocked(listThreadsViaDaemon).mockRejectedValueOnce(new Error("fetch error"));
 
-      const threads = await agent.listThreads(
-        sandbox as unknown as SandboxHandle,
-        "/root",
-      );
+      const threads = await agent.listThreads(sandbox as unknown as SandboxHandle, "/root");
 
       expect(threads).toEqual([]);
     });

@@ -7,7 +7,10 @@ const mockManager = {
 
 vi.mock("@clawrun/runtime", () => ({
   SandboxLifecycleManager: vi.fn().mockImplementation(() => mockManager),
-  getRuntimeConfig: vi.fn(() => ({ agent: { name: "zeroclaw" }, instance: { provider: "vercel" } })),
+  getRuntimeConfig: vi.fn(() => ({
+    agent: { name: "zeroclaw" },
+    instance: { provider: "vercel" },
+  })),
 }));
 
 vi.mock("@clawrun/logger", () => ({

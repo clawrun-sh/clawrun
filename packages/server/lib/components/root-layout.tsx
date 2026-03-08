@@ -18,7 +18,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geist.variable} ${ibmPlexMono.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${geist.variable} ${ibmPlexMono.variable}`}
+    >
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"

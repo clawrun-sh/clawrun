@@ -25,7 +25,6 @@ export type {
   StartResult,
   StopResult,
   RestartResult,
-  HealthResult,
   HistoryMessage,
   HistoryResult,
   ChatOptions,
@@ -35,6 +34,29 @@ export type {
   ExecOptions,
   InviteResult,
   ClawRunConfig,
+} from "./types.js";
+
+// --- Agent type re-exports (so consumers don't need @clawrun/agent) ---
+export type {
+  ThreadInfo,
+  CronJob,
+  MemoryEntryInfo,
+  AgentStatus,
+  CostInfo,
+  AgentConfig,
+  RuntimeToolInfo,
+  CliToolInfo,
+  DiagResult,
+  HealthResult,
+  ToolsResult,
+  DiagnosticsResult,
+  ThreadsResult,
+  ThreadResult,
+  MemoriesResult,
+  MemoryQuery,
+  CreateMemoryInput,
+  CronJobsResult,
+  CreateCronJobInput,
 } from "./types.js";
 
 // --- AI SDK re-exports (so consumers don't need a direct `ai` dependency) ---

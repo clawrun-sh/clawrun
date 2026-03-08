@@ -145,6 +145,58 @@ export interface DiagResult {
   severity: "ok" | "warning" | "error";
 }
 
+// ---------------------------------------------------------------------------
+// API response / input types — shared by SDK and server UI components
+// ---------------------------------------------------------------------------
+
+export interface HealthResult {
+  status: string;
+  agent: string;
+  sandbox: { running: boolean; status?: string };
+}
+
+export interface ToolsResult {
+  tools: RuntimeToolInfo[];
+  cliTools: CliToolInfo[];
+}
+
+export interface DiagnosticsResult {
+  results: DiagResult[];
+}
+
+export interface ThreadsResult {
+  threads: ThreadInfo[];
+}
+
+export interface ThreadResult {
+  messages: UIMessage[];
+}
+
+export interface MemoriesResult {
+  entries: MemoryEntryInfo[];
+}
+
+export interface MemoryQuery {
+  query?: string;
+  category?: string;
+}
+
+export interface CreateMemoryInput {
+  key: string;
+  content: string;
+  category?: string;
+}
+
+export interface CronJobsResult {
+  jobs: CronJob[];
+}
+
+export interface CreateCronJobInput {
+  name?: string;
+  schedule: string;
+  command: string;
+}
+
 export interface CronInfo {
   jobs: CronEntry[];
 }
@@ -317,7 +369,7 @@ export interface Agent {
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
-  ): Promise<{ tools: RuntimeToolInfo[]; cliTools: CliToolInfo[] }>;
+  ): Promise<ToolsResult>;
 
   listCronJobs?(
     sandbox: SandboxHandle,
@@ -328,7 +380,7 @@ export interface Agent {
   createCronJob?(
     sandbox: SandboxHandle,
     root: string,
-    job: { name?: string; schedule: string; command: string },
+    job: CreateCronJobInput,
     opts?: { signal?: AbortSignal },
   ): Promise<CronJob>;
 
@@ -342,14 +394,14 @@ export interface Agent {
   listMemories?(
     sandbox: SandboxHandle,
     root: string,
-    query?: { query?: string; category?: string },
+    query?: MemoryQuery,
     opts?: { signal?: AbortSignal },
   ): Promise<MemoryEntryInfo[]>;
 
   createMemory?(
     sandbox: SandboxHandle,
     root: string,
-    entry: { key: string; content: string; category?: string },
+    entry: CreateMemoryInput,
     opts?: { signal?: AbortSignal },
   ): Promise<void>;
 

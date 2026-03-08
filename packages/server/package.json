@@ -22,7 +22,7 @@
     "format": "prettier --write lib"
   },
   "exports": {
-    "./deploy-manifest": "./lib/deploy-manifest.ts"
+    "./package.json": "./package.json"
   },
   "files": [
     "app",
@@ -41,6 +41,7 @@
     "@clawrun/logger": "workspace:*",
     "@clawrun/provider": "workspace:*",
     "@clawrun/runtime": "workspace:*",
+    "@clawrun/sdk": "workspace:*",
     "@clawrun/ui": "workspace:*",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/postcss": "^4.0.0",

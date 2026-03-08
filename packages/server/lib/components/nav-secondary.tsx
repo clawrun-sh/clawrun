@@ -37,6 +37,23 @@ export function NavSecondary({
       <SidebarGroupContent>
         <SidebarMenu>
           <SandboxStatus />
+          <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
+            <SidebarMenuButton asChild>
+              <label>
+                <IconBrightness />
+                <span>Dark Mode</span>
+                {mounted ? (
+                  <Switch
+                    className="ml-auto"
+                    checked={resolvedTheme !== "light"}
+                    onCheckedChange={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                  />
+                ) : (
+                  <Skeleton className="ml-auto h-4 w-8 rounded-full" />
+                )}
+              </label>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild>
@@ -47,25 +64,6 @@ export function NavSecondary({
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
-          <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-            <SidebarMenuButton asChild>
-              <label>
-                <IconBrightness />
-                <span>Dark Mode</span>
-                {mounted ? (
-                  <Switch
-                    className="ml-auto"
-                    checked={resolvedTheme !== "light"}
-                    onCheckedChange={() =>
-                      setTheme(resolvedTheme === "dark" ? "light" : "dark")
-                    }
-                  />
-                ) : (
-                  <Skeleton className="ml-auto h-4 w-8 rounded-full" />
-                )}
-              </label>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

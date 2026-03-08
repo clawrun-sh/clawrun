@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
   response.cookies.set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.CLAWRUN_INSECURE_COOKIES !== "true",
     sameSite: "lax",
     path: "/",
   });

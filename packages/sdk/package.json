@@ -15,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
     }
   },
   "files": [
@@ -36,12 +40,19 @@
     "@clawrun/logger": "workspace:*",
     "@clawrun/provider": "workspace:*",
     "@clawrun/runtime": "workspace:*",
-    "@clawrun/server": "workspace:*",
     "ai": "^6.0.0",
     "eventsource-parser": "^3.0.6",
     "execa": "^9.5.0",
     "human-id": "^4.1.1",
     "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@clawrun/server": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@clawrun/server": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@clawrun/tsconfig": "workspace:*",

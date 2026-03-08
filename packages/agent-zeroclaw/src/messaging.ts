@@ -31,9 +31,16 @@ export type HistoryMessage = { role: string; content: string };
  */
 interface DaemonWsMessage {
   type?:
-    | "message" | "chunk" | "done" | "error" | "history" // both protocols
-    | "tool_call" | "tool_result"                         // /ws/chat only
-    | "status" | "tool_progress" | "clear";               // /ws/clawrun only
+    | "message"
+    | "chunk"
+    | "done"
+    | "error"
+    | "history" // both protocols
+    | "tool_call"
+    | "tool_result" // /ws/chat only
+    | "status"
+    | "tool_progress"
+    | "clear"; // /ws/clawrun only
   content?: string;
   full_response?: string;
   message?: string;
@@ -1131,7 +1138,9 @@ export async function fetchHistoryViaDaemon(
     return await fetchHistoryViaWs(sandbox, threadId, "/ws/clawrun", opts);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(`/ws/clawrun unavailable for history, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+    log.warn(
+      `/ws/clawrun unavailable for history, using /ws/chat: ${err instanceof Error ? err.message : err}`,
+    );
   }
   try {
     return await fetchHistoryViaWs(sandbox, threadId, "/ws/chat", opts);
@@ -1154,7 +1163,9 @@ export async function sendMessageViaDaemon(
     return await sendViaWs(sandbox, root, message, "/ws/clawrun", opts);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(`/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+    log.warn(
+      `/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`,
+    );
   }
   return await sendViaWs(sandbox, root, message, "/ws/chat", opts);
 }
@@ -1170,7 +1181,9 @@ export async function streamMessageViaDaemon(
     return await streamViaWs(sandbox, root, message, writer, "/ws/clawrun", opts);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(`/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`);
+    log.warn(
+      `/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`,
+    );
   }
   return await streamViaWs(sandbox, root, message, writer, "/ws/chat", opts);
 }
@@ -1241,9 +1254,7 @@ export function parseMemoryKey(key: string): ParsedMemoryKey | null {
   let threadPart: string;
   if (channelKey === "clawrun") {
     // clawrun_{threadId}_{uuid} — UUID uses hyphens (8-4-4-4-12)
-    const match = rest.match(
-      /^(.+)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    const match = rest.match(/^(.+)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     threadPart = match ? match[1] : rest;
   } else {
     // {channel}_{sender}_{msgId} — strip last segment (message-unique ID)
@@ -1316,9 +1327,7 @@ export function parseAssistantParts(content: string): UIMessage["parts"] {
       }
       remaining = remaining.slice(end + "</thinking>".length);
     } else if (tag === "tool_call") {
-      const openMatch = remaining
-        .slice(idx)
-        .match(/^<tool_call\s+(?:name|type)="([^"]+)">/);
+      const openMatch = remaining.slice(idx).match(/^<tool_call\s+(?:name|type)="([^"]+)">/);
       if (!openMatch) {
         remaining = remaining.slice(idx + 1);
         continue;
@@ -1339,9 +1348,7 @@ export function parseAssistantParts(content: string): UIMessage["parts"] {
 
       // Consume following tool_result if present
       let output: string = "completed";
-      const resultMatch = remaining.match(
-        /^\s*<tool_result[^>]*>([\s\S]*?)<\/tool_result>/,
-      );
+      const resultMatch = remaining.match(/^\s*<tool_result[^>]*>([\s\S]*?)<\/tool_result>/);
       if (resultMatch) {
         output = resultMatch[1].trim() || "completed";
         remaining = remaining.slice(resultMatch[0].length);
@@ -1385,7 +1392,7 @@ async function fetchMemoryEntries(
   if (!res.ok) throw new Error(`Memory API ${res.status}: ${res.statusText}`);
   const data = await res.json();
   // Daemon wraps entries in { entries: [...] }
-  return (Array.isArray(data) ? data : data.entries ?? []) as MemoryEntry[];
+  return (Array.isArray(data) ? data : (data.entries ?? [])) as MemoryEntry[];
 }
 
 // --- Dashboard API helpers (daemon HTTP) ---
@@ -1476,7 +1483,9 @@ export async function fetchRuntimeTools(
   const data = await res.json();
   return {
     tools: Array.isArray(data.tools) ? data.tools : [],
-    cliTools: Array.isArray(data.cli_tools ?? data.cliTools) ? (data.cli_tools ?? data.cliTools) : [],
+    cliTools: Array.isArray(data.cli_tools ?? data.cliTools)
+      ? (data.cli_tools ?? data.cliTools)
+      : [],
   };
 }
 
@@ -1490,16 +1499,25 @@ export async function fetchCronJobs(
   if (!res.ok) throw new Error(`Cron API ${res.status}: ${res.statusText}`);
   const data = await res.json();
   const raw: Record<string, unknown>[] = Array.isArray(data) ? data : (data.jobs ?? []);
-  return raw.map((j): CronJob => ({
-    id: String(j.id ?? ""),
-    name: j.name != null ? String(j.name) : undefined,
-    schedule: String(j.schedule ?? ""),
-    command: String(j.command ?? ""),
-    nextRun: j.nextRun != null ? String(j.nextRun) : j.next_run != null ? String(j.next_run) : undefined,
-    lastRun: j.lastRun != null ? String(j.lastRun) : j.last_run != null ? String(j.last_run) : undefined,
-    lastStatus: j.lastStatus != null ? String(j.lastStatus) : j.last_status != null ? String(j.last_status) : undefined,
-    enabled: j.enabled != null ? Boolean(j.enabled) : undefined,
-  }));
+  return raw.map(
+    (j): CronJob => ({
+      id: String(j.id ?? ""),
+      name: j.name != null ? String(j.name) : undefined,
+      schedule: String(j.schedule ?? ""),
+      command: String(j.command ?? ""),
+      nextRun:
+        j.nextRun != null ? String(j.nextRun) : j.next_run != null ? String(j.next_run) : undefined,
+      lastRun:
+        j.lastRun != null ? String(j.lastRun) : j.last_run != null ? String(j.last_run) : undefined,
+      lastStatus:
+        j.lastStatus != null
+          ? String(j.lastStatus)
+          : j.last_status != null
+            ? String(j.last_status)
+            : undefined,
+      enabled: j.enabled != null ? Boolean(j.enabled) : undefined,
+    }),
+  );
 }
 
 export async function postCronJob(
@@ -1627,11 +1645,7 @@ export async function listThreadsViaDaemon(
   sandbox: SandboxHandle,
   opts?: { signal?: AbortSignal },
 ): Promise<ThreadInfo[]> {
-  const entries = await fetchMemoryEntries(
-    sandbox,
-    { category: "conversation" },
-    opts,
-  );
+  const entries = await fetchMemoryEntries(sandbox, { category: "conversation" }, opts);
 
   // Group entries by thread ID
   const threads = new Map<
@@ -1666,14 +1680,11 @@ export async function listThreadsViaDaemon(
     );
 
     // Preview: last user message, truncated
-    const lastUserMsg = [...thread.messages]
-      .reverse()
-      .find((m) => m.role === "user");
+    const lastUserMsg = [...thread.messages].reverse().find((m) => m.role === "user");
     const preview =
       (lastUserMsg ?? thread.messages[thread.messages.length - 1])?.content.slice(0, 100) ?? "";
 
-    const lastActivity =
-      thread.messages[thread.messages.length - 1]?.createdAt ?? "";
+    const lastActivity = thread.messages[thread.messages.length - 1]?.createdAt ?? "";
 
     result.push({
       id: threadId,
@@ -1685,10 +1696,7 @@ export async function listThreadsViaDaemon(
   }
 
   // Most recent first
-  result.sort(
-    (a, b) =>
-      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime(),
-  );
+  result.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
   return result;
 }
@@ -1700,11 +1708,7 @@ export async function getThreadViaDaemon(
   threadId: string,
   opts?: { signal?: AbortSignal },
 ): Promise<UIMessage[]> {
-  const entries = await fetchMemoryEntries(
-    sandbox,
-    { query: threadId },
-    opts,
-  );
+  const entries = await fetchMemoryEntries(sandbox, { query: threadId }, opts);
 
   // Filter to entries that actually belong to this thread
   const threadEntries = entries.filter((entry) => {
@@ -1713,10 +1717,7 @@ export async function getThreadViaDaemon(
   });
 
   // Sort by timestamp (oldest first)
-  threadEntries.sort(
-    (a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
+  threadEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   // Convert to UIMessage[]
   return threadEntries

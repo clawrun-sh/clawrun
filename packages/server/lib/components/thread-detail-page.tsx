@@ -1,6 +1,6 @@
 "use client";
 
-import { useApi } from "../hooks/use-api";
+import { useApiClient, useQuery } from "../hooks/use-api-client";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { Button } from "@clawrun/ui/components/ui/button";
 import {
@@ -20,16 +20,20 @@ import {
   ReasoningTrigger,
   ReasoningContent,
 } from "@clawrun/ui/components/ai-elements/reasoning";
+import type { ThreadResult } from "@clawrun/agent";
 import type { UIMessage } from "ai";
 import { IconArrowLeft } from "@tabler/icons-react";
+import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 interface ThreadDetailPageProps {
   threadId: string;
 }
 
 export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
-  const { data, loading, error } = useApi<{ messages: UIMessage[] }>(
-    `/api/v1/threads/${encodeURIComponent(threadId)}`,
+  const client = useApiClient();
+  const { data, loading, error } = useQuery(
+    (s) => client.getThread(threadId, s),
+    [client, threadId],
   );
 
   const messages = data?.messages ?? [];
@@ -49,62 +53,64 @@ export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
           </div>
         </div>
 
-        <div className="px-4 lg:px-6">
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : error ? (
-            <p className="text-sm text-muted-foreground">{error}</p>
-          ) : messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No messages in this thread.</p>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((m) => (
-                <Message key={m.id} from={m.role}>
-                  <MessageContent>
-                    {m.role === "assistant"
-                      ? m.parts.map((part, i) => {
-                          if (part.type === "text") {
-                            return <MessageResponse key={i}>{part.text}</MessageResponse>;
-                          }
-                          if (part.type === "reasoning") {
-                            return (
-                              <Reasoning key={i}>
-                                <ReasoningTrigger />
-                                <ReasoningContent>{part.text}</ReasoningContent>
-                              </Reasoning>
-                            );
-                          }
-                          if (part.type === "dynamic-tool") {
-                            return (
-                              <Tool key={i} defaultOpen={false}>
-                                <ToolHeader
-                                  type="dynamic-tool"
-                                  toolName={part.toolName}
-                                  state={part.state}
-                                />
-                                <ToolContent>
-                                  <ToolInput input={part.input} />
-                                  <ToolOutput output={part.output} errorText={part.errorText} />
-                                </ToolContent>
-                              </Tool>
-                            );
-                          }
-                          return null;
-                        })
-                      : m.parts.map((part, i) => {
-                          if (part.type === "text") return <span key={i}>{part.text}</span>;
-                          return null;
-                        })}
-                  </MessageContent>
-                </Message>
-              ))}
-            </div>
-          )}
-        </div>
+        <SandboxOfflineGuard>
+          <div className="px-4 lg:px-6">
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : error ? (
+              <p className="text-sm text-muted-foreground">{error}</p>
+            ) : messages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No messages in this thread.</p>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((m) => (
+                  <Message key={m.id} from={m.role}>
+                    <MessageContent>
+                      {m.role === "assistant"
+                        ? m.parts.map((part, i) => {
+                            if (part.type === "text") {
+                              return <MessageResponse key={i}>{part.text}</MessageResponse>;
+                            }
+                            if (part.type === "reasoning") {
+                              return (
+                                <Reasoning key={i}>
+                                  <ReasoningTrigger />
+                                  <ReasoningContent>{part.text}</ReasoningContent>
+                                </Reasoning>
+                              );
+                            }
+                            if (part.type === "dynamic-tool") {
+                              return (
+                                <Tool key={i} defaultOpen={false}>
+                                  <ToolHeader
+                                    type="dynamic-tool"
+                                    toolName={part.toolName}
+                                    state={part.state}
+                                  />
+                                  <ToolContent>
+                                    <ToolInput input={part.input} />
+                                    <ToolOutput output={part.output} errorText={part.errorText} />
+                                  </ToolContent>
+                                </Tool>
+                              );
+                            }
+                            return null;
+                          })
+                        : m.parts.map((part, i) => {
+                            if (part.type === "text") return <span key={i}>{part.text}</span>;
+                            return null;
+                          })}
+                    </MessageContent>
+                  </Message>
+                ))}
+              </div>
+            )}
+          </div>
+        </SandboxOfflineGuard>
       </div>
     </div>
   );

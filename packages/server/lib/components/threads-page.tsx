@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useApi } from "../hooks/use-api";
+import { useApiClient, useQuery } from "../hooks/use-api-client";
 import {
   Table,
   TableBody,
@@ -12,13 +12,9 @@ import {
 } from "@clawrun/ui/components/ui/table";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
-import type { ThreadInfo } from "@clawrun/agent";
-import {
-  IconMessages,
-  IconArrowUp,
-  IconArrowDown,
-  IconArrowsSort,
-} from "@tabler/icons-react";
+import type { ThreadsResult } from "@clawrun/agent";
+import { IconMessages, IconArrowUp, IconArrowDown, IconArrowsSort } from "@tabler/icons-react";
+import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
@@ -34,17 +30,27 @@ function formatDate(iso: string): string {
 type SortColumn = "messageCount" | "lastActivity";
 type SortDirection = "asc" | "desc";
 
-function SortIcon({ column, current, direction }: { column: SortColumn; current: SortColumn | null; direction: SortDirection }) {
-  if (current !== column) return <IconArrowsSort className="ml-1 inline size-3.5 text-muted-foreground/50" />;
-  return direction === "asc"
-    ? <IconArrowUp className="ml-1 inline size-3.5" />
-    : <IconArrowDown className="ml-1 inline size-3.5" />;
+function SortIcon({
+  column,
+  current,
+  direction,
+}: {
+  column: SortColumn;
+  current: SortColumn | null;
+  direction: SortDirection;
+}) {
+  if (current !== column)
+    return <IconArrowsSort className="ml-1 inline size-3.5 text-muted-foreground/50" />;
+  return direction === "asc" ? (
+    <IconArrowUp className="ml-1 inline size-3.5" />
+  ) : (
+    <IconArrowDown className="ml-1 inline size-3.5" />
+  );
 }
 
 export default function ThreadsPage() {
-  const { data, loading, error } = useApi<{ threads: ThreadInfo[] }>(
-    "/api/v1/threads",
-  );
+  const client = useApiClient();
+  const { data, loading, error } = useQuery((s) => client.listThreads(s), [client]);
 
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -74,73 +80,83 @@ export default function ThreadsPage() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-2">
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        {loading ? (
-          <div className="space-y-2 px-4 lg:px-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : error ? (
-          <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
-        ) : threads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <IconMessages className="mb-4 size-12 text-muted-foreground" />
-            <p className="text-muted-foreground">No threads yet</p>
-          </div>
-        ) : (
-          <div className="px-4 lg:px-6">
-            <div className="overflow-hidden rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Channel</TableHead>
-                    <TableHead className="w-full">Preview</TableHead>
-                    <TableHead
-                      className="cursor-pointer select-none text-right"
-                      onClick={() => toggleSort("messageCount")}
-                    >
-                      Messages
-                      <SortIcon column="messageCount" current={sortColumn} direction={sortDirection} />
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer select-none"
-                      onClick={() => toggleSort("lastActivity")}
-                    >
-                      Last Activity
-                      <SortIcon column="lastActivity" current={sortColumn} direction={sortDirection} />
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sorted.map((thread) => (
-                    <TableRow key={thread.id}>
-                      <TableCell>
-                        <Badge variant="secondary">{thread.channel}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={`/threads/${encodeURIComponent(thread.id)}`}
-                          className="line-clamp-1 text-sm hover:underline"
-                        >
-                          {thread.preview || "—"}
-                        </a>
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        {thread.messageCount}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDate(thread.lastActivity)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+    <SandboxOfflineGuard>
+      <div className="@container/main flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+          {loading ? (
+            <div className="space-y-2 px-4 lg:px-6">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
-          </div>
-        )}
+          ) : error ? (
+            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
+          ) : threads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <IconMessages className="mb-4 size-12 text-muted-foreground" />
+              <p className="text-muted-foreground">No threads yet</p>
+            </div>
+          ) : (
+            <div className="px-4 lg:px-6">
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Channel</TableHead>
+                      <TableHead className="w-full">Preview</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none text-right"
+                        onClick={() => toggleSort("messageCount")}
+                      >
+                        Messages
+                        <SortIcon
+                          column="messageCount"
+                          current={sortColumn}
+                          direction={sortDirection}
+                        />
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort("lastActivity")}
+                      >
+                        Last Activity
+                        <SortIcon
+                          column="lastActivity"
+                          current={sortColumn}
+                          direction={sortDirection}
+                        />
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sorted.map((thread) => (
+                      <TableRow key={thread.id}>
+                        <TableCell>
+                          <Badge variant="secondary">{thread.channel}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <a
+                            href={`/threads/${encodeURIComponent(thread.id)}`}
+                            className="line-clamp-1 text-sm hover:underline"
+                          >
+                            {thread.preview || "—"}
+                          </a>
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                          {thread.messageCount}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDate(thread.lastActivity)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </SandboxOfflineGuard>
   );
 }

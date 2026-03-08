@@ -64,7 +64,8 @@ export async function handleWakeWebhook(req: Request, channelId: string): Promis
   if (!auth.valid) {
     // Distinguish server misconfiguration (500) from auth failure (401)
     const status = auth.error === "Server misconfigured" ? 500 : 401;
-    return new Response(auth.error ?? "Unauthorized", { status });
+    log.warn(`Webhook auth failed (${channelId}): ${auth.error}`);
+    return new Response(status === 500 ? "Server misconfigured" : "Unauthorized", { status });
   }
 
   // 4. Parse body as JSON

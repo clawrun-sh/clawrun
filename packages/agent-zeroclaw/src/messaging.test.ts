@@ -37,8 +37,7 @@ function createMockWriter() {
 // buildDaemonWsUrl
 // ---------------------------------------------------------------------------
 describe("buildDaemonWsUrl", () => {
-  const makeSandbox = (url: string) =>
-    ({ domain: () => url }) as unknown as SandboxHandle;
+  const makeSandbox = (url: string) => ({ domain: () => url }) as unknown as SandboxHandle;
 
   it("converts https to wss and appends path", () => {
     const result = buildDaemonWsUrl(makeSandbox("https://daemon.example.com"), "/ws/clawrun");
@@ -51,7 +50,11 @@ describe("buildDaemonWsUrl", () => {
   });
 
   it("appends thread_id query param when provided", () => {
-    const result = buildDaemonWsUrl(makeSandbox("https://d.example.com"), "/ws/clawrun", "sess-123");
+    const result = buildDaemonWsUrl(
+      makeSandbox("https://d.example.com"),
+      "/ws/clawrun",
+      "sess-123",
+    );
     expect(result).toBe("wss://d.example.com/ws/clawrun?thread_id=sess-123");
   });
 
@@ -352,9 +355,7 @@ describe("extractToolCalls", () => {
 // ---------------------------------------------------------------------------
 describe("parseMemoryKey", () => {
   it("parses a clawrun user message key", () => {
-    const result = parseMemoryKey(
-      "clawrun_my-thread_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    );
+    const result = parseMemoryKey("clawrun_my-thread_a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     expect(result).toEqual({
       role: "user",
       channel: "ClawRun",
@@ -374,9 +375,7 @@ describe("parseMemoryKey", () => {
   });
 
   it("handles clawrun thread IDs with underscores", () => {
-    const result = parseMemoryKey(
-      "clawrun_my_thread_name_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    );
+    const result = parseMemoryKey("clawrun_my_thread_name_a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     expect(result).toEqual({
       role: "user",
       channel: "ClawRun",
@@ -465,9 +464,7 @@ describe("parseAssistantParts", () => {
   });
 
   it("parses <tool_call> into dynamic-tool part", () => {
-    const parts = parseAssistantParts(
-      '<tool_call name="shell">{"cmd":"ls"}</tool_call>',
-    );
+    const parts = parseAssistantParts('<tool_call name="shell">{"cmd":"ls"}</tool_call>');
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({
       type: "dynamic-tool",
@@ -506,9 +503,7 @@ describe("parseAssistantParts", () => {
   });
 
   it("handles malformed tool_call JSON gracefully", () => {
-    const parts = parseAssistantParts(
-      '<tool_call name="shell">{invalid}</tool_call>',
-    );
+    const parts = parseAssistantParts('<tool_call name="shell">{invalid}</tool_call>');
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({
       type: "dynamic-tool",
@@ -518,9 +513,7 @@ describe("parseAssistantParts", () => {
 
   it("treats stray closing tags as plain text when no opening tags present", () => {
     // No opening tags → fast path returns content as-is
-    const parts = parseAssistantParts(
-      'Some text</thinking></response><tool_result name="x" />',
-    );
+    const parts = parseAssistantParts('Some text</thinking></response><tool_result name="x" />');
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({ type: "text" });
   });

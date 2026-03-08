@@ -12,11 +12,26 @@ import type {
   StartResult,
   StopResult,
   RestartResult,
-  HealthResult,
   HistoryResult,
   InviteResult,
   ClientOptions,
 } from "./types.js";
+import type {
+  AgentStatus,
+  CostInfo,
+  AgentConfig,
+  HealthResult,
+  ToolsResult,
+  DiagnosticsResult,
+  ThreadsResult,
+  ThreadResult,
+  MemoriesResult,
+  MemoryQuery,
+  CreateMemoryInput,
+  CronJobsResult,
+  CreateCronJobInput,
+  CronJob,
+} from "@clawrun/agent";
 
 /**
  * Represents a connection to a deployed ClawRun instance.
@@ -24,7 +39,7 @@ import type {
  */
 export class ClawRunInstance {
   private readonly api: ApiClient;
-  private readonly jwtSecret: string;
+  private readonly jwtSecret: string | undefined;
   private readonly config: InstanceConfig;
   private _sandbox: SandboxClient | undefined;
 
@@ -32,6 +47,15 @@ export class ClawRunInstance {
     this.config = config;
     this.jwtSecret = config.api.jwtSecret;
     this.api = new ApiClient(config.api.url, this.jwtSecret, { fetch: options?.fetch });
+  }
+
+  /**
+   * Create an instance for use in the browser (cookie-based auth).
+   * Uses session cookies instead of JWT Bearer tokens.
+   * @param baseUrl Base URL of the deployed instance. Defaults to "" (same-origin).
+   */
+  static browser(baseUrl: string = ""): ClawRunInstance {
+    return new ClawRunInstance({ api: { url: baseUrl } });
   }
 
   /** The base URL of the deployed instance. */
@@ -115,6 +139,83 @@ export class ClawRunInstance {
     );
   }
 
+  // --- Agent queries ---
+
+  /** Get agent status (provider, model, uptime, channels, health). */
+  async getStatus(signal?: AbortSignal): Promise<AgentStatus> {
+    return this.api.get<AgentStatus>("/api/v1/status", signal);
+  }
+
+  /** Get cost and token usage information. */
+  async getCost(signal?: AbortSignal): Promise<CostInfo> {
+    return this.api.get<CostInfo>("/api/v1/cost", signal);
+  }
+
+  /** Get the agent configuration file content. */
+  async getConfig(signal?: AbortSignal): Promise<AgentConfig> {
+    return this.api.get<AgentConfig>("/api/v1/config", signal);
+  }
+
+  /** List available runtime and CLI tools. */
+  async listTools(signal?: AbortSignal): Promise<ToolsResult> {
+    return this.api.get<ToolsResult>("/api/v1/tools", signal);
+  }
+
+  /** Run agent diagnostics. */
+  async runDiagnostics(signal?: AbortSignal): Promise<DiagnosticsResult> {
+    return this.api.get<DiagnosticsResult>("/api/v1/diagnostics", signal);
+  }
+
+  // --- Threads ---
+
+  /** List all conversation threads. */
+  async listThreads(signal?: AbortSignal): Promise<ThreadsResult> {
+    return this.api.get<ThreadsResult>("/api/v1/threads", signal);
+  }
+
+  /** Get messages for a specific thread. */
+  async getThread(threadId: string, signal?: AbortSignal): Promise<ThreadResult> {
+    return this.api.get<ThreadResult>(`/api/v1/threads/${encodeURIComponent(threadId)}`, signal);
+  }
+
+  // --- Memory CRUD ---
+
+  /** List memory entries, optionally filtered by query and/or category. */
+  async listMemories(options?: MemoryQuery, signal?: AbortSignal): Promise<MemoriesResult> {
+    const params = new URLSearchParams();
+    if (options?.query) params.set("query", options.query);
+    if (options?.category) params.set("category", options.category);
+    const qs = params.toString();
+    return this.api.get<MemoriesResult>(`/api/v1/memory${qs ? `?${qs}` : ""}`, signal);
+  }
+
+  /** Create a new memory entry. */
+  async createMemory(entry: CreateMemoryInput, signal?: AbortSignal): Promise<void> {
+    await this.api.post("/api/v1/memory", entry, signal);
+  }
+
+  /** Delete a memory entry by key. */
+  async deleteMemory(key: string, signal?: AbortSignal): Promise<void> {
+    await this.api.delete(`/api/v1/memory/${encodeURIComponent(key)}`, signal);
+  }
+
+  // --- Cron CRUD ---
+
+  /** List all cron jobs. */
+  async listCronJobs(signal?: AbortSignal): Promise<CronJobsResult> {
+    return this.api.get<CronJobsResult>("/api/v1/cron", signal);
+  }
+
+  /** Create a new cron job. */
+  async createCronJob(job: CreateCronJobInput, signal?: AbortSignal): Promise<CronJob> {
+    return this.api.post<CronJob>("/api/v1/cron", job, signal);
+  }
+
+  /** Delete a cron job by ID. */
+  async deleteCronJob(id: string, signal?: AbortSignal): Promise<void> {
+    await this.api.delete(`/api/v1/cron/${encodeURIComponent(id)}`, signal);
+  }
+
   // --- Invite ---
 
   /**
@@ -122,6 +223,9 @@ export class ClawRunInstance {
    * @param ttl Token TTL in seconds (default: 7 days).
    */
   async createInvite(ttl: number = 7 * 24 * 60 * 60): Promise<InviteResult> {
+    if (!this.jwtSecret) {
+      throw new Error("createInvite requires jwtSecret (not available in cookie mode)");
+    }
     const token = await signInviteToken(this.jwtSecret, `${ttl}s`);
     const url = `${this.webUrl}/auth/accept?token=${token}`;
     return { token, url };

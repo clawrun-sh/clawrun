@@ -10,6 +10,8 @@ import {
 import { AppSidebar } from "@/lib/components/app-sidebar";
 import { SiteHeader } from "@/lib/components/site-header";
 import { HeaderActionsProvider } from "@/lib/components/header-actions";
+import { DashboardProviders } from "@/lib/components/dashboard-providers";
+import { ContentShell } from "@/lib/components/content-shell";
 
 import "@/lib/components/theme.css";
 
@@ -51,13 +53,17 @@ export default async function DashboardLayout({
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" instanceName={instanceName} />
-      <SidebarInset>
-        <HeaderActionsProvider>
-          <SiteHeader />
-          <div className="relative flex flex-1 flex-col">{children}</div>
-        </HeaderActionsProvider>
-      </SidebarInset>
+      <DashboardProviders>
+        <AppSidebar variant="inset" instanceName={instanceName} />
+        <SidebarInset>
+          <ContentShell>
+            <HeaderActionsProvider>
+              <SiteHeader />
+              <div className="relative flex flex-1 flex-col">{children}</div>
+            </HeaderActionsProvider>
+          </ContentShell>
+        </SidebarInset>
+      </DashboardProviders>
     </SidebarProvider>
   );
 }

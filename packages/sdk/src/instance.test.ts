@@ -241,7 +241,9 @@ describe("ClawRunInstance", () => {
       const invite = await instance.createInvite();
 
       expect(invite.token).toBe("invite-jwt-test-secret");
-      expect(invite.url).toBe("https://my-agent.vercel.app/auth/accept?token=invite-jwt-test-secret");
+      expect(invite.url).toBe(
+        "https://my-agent.vercel.app/auth/accept?token=invite-jwt-test-secret",
+      );
 
       const { signInviteToken } = await import("@clawrun/auth");
       expect(signInviteToken).toHaveBeenCalledWith("test-secret", `${7 * 24 * 60 * 60}s`);
@@ -294,6 +296,258 @@ describe("ClawRunInstance", () => {
       // The mock provider returns [] for both list and listSnapshots
       // so this should complete without error
       await instance.destroySandboxes();
+    });
+  });
+
+  describe("agent query methods", () => {
+    it("getStatus() sends GET to /api/v1/status", async () => {
+      const statusData = { provider: "openrouter", model: "gpt-4", uptime: 3600 };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(statusData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.getStatus();
+
+      expect(result).toEqual(statusData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/status",
+        expect.any(Object),
+      );
+    });
+
+    it("getCost() sends GET to /api/v1/cost", async () => {
+      const costData = { sessionCost: 0.05, totalTokens: 1000 };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(costData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.getCost();
+
+      expect(result).toEqual(costData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/cost",
+        expect.any(Object),
+      );
+    });
+
+    it("getConfig() sends GET to /api/v1/config", async () => {
+      const configData = { format: "toml", content: "[agent]\nname = 'z'" };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(configData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.getConfig();
+
+      expect(result).toEqual(configData);
+    });
+
+    it("listTools() sends GET to /api/v1/tools", async () => {
+      const toolsData = { tools: [{ name: "search" }], cliTools: [{ name: "git" }] };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(toolsData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.listTools();
+
+      expect(result).toEqual(toolsData);
+    });
+
+    it("runDiagnostics() sends GET to /api/v1/diagnostics", async () => {
+      const diagData = { results: [{ category: "api", message: "ok", severity: "ok" }] };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(diagData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.runDiagnostics();
+
+      expect(result).toEqual(diagData);
+    });
+  });
+
+  describe("thread methods", () => {
+    it("listThreads() sends GET to /api/v1/threads", async () => {
+      const threadsData = {
+        threads: [
+          { id: "t1", channel: "web", preview: "hi", messageCount: 2, lastActivity: "2026-01-01" },
+        ],
+      };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(threadsData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.listThreads();
+
+      expect(result).toEqual(threadsData);
+    });
+
+    it("getThread() sends GET to /api/v1/threads/:id", async () => {
+      const threadData = { messages: [{ role: "user", content: "hello" }] };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(threadData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.getThread("t1");
+
+      expect(result).toEqual(threadData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/threads/t1",
+        expect.any(Object),
+      );
+    });
+
+    it("getThread() encodes thread ID", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ messages: [] }), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.getThread("thread with spaces");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/v1/threads/thread%20with%20spaces"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("memory methods", () => {
+    it("listMemories() sends GET to /api/v1/memory", async () => {
+      const memData = { entries: [{ key: "k1", content: "v1" }] };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(memData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.listMemories();
+
+      expect(result).toEqual(memData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/memory",
+        expect.any(Object),
+      );
+    });
+
+    it("listMemories() appends query params", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.listMemories({ query: "test", category: "facts" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/memory?query=test&category=facts",
+        expect.any(Object),
+      );
+    });
+
+    it("listMemories() without options sends no query params", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.listMemories();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/memory",
+        expect.any(Object),
+      );
+    });
+
+    it("createMemory() sends POST to /api/v1/memory", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.createMemory({ key: "k1", content: "v1", category: "test" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/memory",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ key: "k1", content: "v1", category: "test" }),
+        }),
+      );
+    });
+
+    it("deleteMemory() sends DELETE to /api/v1/memory/:key", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.deleteMemory("k1");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/memory/k1",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+
+    it("deleteMemory() encodes key", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.deleteMemory("key with spaces");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/v1/memory/key%20with%20spaces"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("cron methods", () => {
+    it("listCronJobs() sends GET to /api/v1/cron", async () => {
+      const cronData = { jobs: [{ id: "c1", schedule: "0 * * * *", command: "check" }] };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(cronData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.listCronJobs();
+
+      expect(result).toEqual(cronData);
+    });
+
+    it("createCronJob() sends POST to /api/v1/cron", async () => {
+      const newJob = { id: "c2", schedule: "*/5 * * * *", command: "ping" };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(newJob), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.createCronJob({ schedule: "*/5 * * * *", command: "ping" });
+
+      expect(result).toEqual(newJob);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/cron",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ schedule: "*/5 * * * *", command: "ping" }),
+        }),
+      );
+    });
+
+    it("deleteCronJob() sends DELETE to /api/v1/cron/:id", async () => {
+      mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.deleteCronJob("c1");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/cron/c1",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+  });
+
+  describe("browser() factory", () => {
+    it("creates instance with empty base URL by default", () => {
+      const instance = ClawRunInstance.browser();
+      expect(instance.webUrl).toBe("");
+    });
+
+    it("creates instance with custom base URL", () => {
+      const instance = ClawRunInstance.browser("https://my-agent.vercel.app");
+      expect(instance.webUrl).toBe("https://my-agent.vercel.app");
+    });
+
+    it("uses cookie mode (no Authorization header)", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+      // Attach mock fetch globally for browser() since it uses globalThis.fetch
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = mockFetch;
+
+      try {
+        const instance = ClawRunInstance.browser("https://my-agent.vercel.app");
+        await instance.health();
+
+        const callArgs = mockFetch.mock.calls[0][1];
+        expect(callArgs.headers).not.toHaveProperty("Authorization");
+        expect(callArgs.credentials).toBe("same-origin");
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
   });
 });

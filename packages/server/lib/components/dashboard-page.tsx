@@ -1,6 +1,6 @@
 "use client";
 
-import { useApi } from "../hooks/use-api";
+import { useApiClient, useQuery } from "../hooks/use-api-client";
 import {
   Card,
   CardAction,
@@ -12,12 +12,8 @@ import {
 } from "@clawrun/ui/components/ui/card";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
-import type { AgentStatus, CostInfo } from "@clawrun/agent";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@clawrun/ui/components/ui/tooltip";
+import type { AgentStatus, CostInfo, HealthResult } from "@clawrun/agent";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import {
   IconServer,
   IconBolt,
@@ -27,11 +23,8 @@ import {
 } from "@tabler/icons-react";
 import { ProviderLogo } from "./provider-logo";
 
-interface HealthData {
-  status: string;
-  agent: string;
+interface HealthData extends HealthResult {
   provider: string;
-  sandbox: { running: boolean; status?: string };
 }
 
 function formatUptime(seconds: number): string {
@@ -65,11 +58,7 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Sandbox</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {health.loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              isOnline ? "Online" : "Offline"
-            )}
+            {health.loading ? <Skeleton className="h-8 w-20" /> : isOnline ? "Online" : "Offline"}
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
@@ -103,9 +92,7 @@ function SectionCards({
               <span className="text-lg text-muted-foreground">—</span>
             ) : (
               <div className="flex flex-col gap-0.5">
-                <span className="text-lg truncate">
-                  {status.data?.provider ?? "—"}
-                </span>
+                <span className="text-lg truncate">{status.data?.provider ?? "—"}</span>
                 {status.data?.model && (
                   <span className="text-sm font-medium text-muted-foreground truncate">
                     {status.data.model}
@@ -137,10 +124,10 @@ function SectionCards({
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {status.loading ? (
               <Skeleton className="h-8 w-16" />
+            ) : status.data?.uptime != null ? (
+              formatUptime(status.data.uptime)
             ) : (
-              status.data?.uptime != null
-                ? formatUptime(status.data.uptime)
-                : "—"
+              "—"
             )}
           </CardTitle>
           <CardAction>
@@ -161,7 +148,11 @@ function SectionCards({
           {status.data?.channels && status.data.channels.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {status.data.channels.map((ch) => (
-                <Badge key={ch} variant="outline" className="capitalize bg-muted/60 text-xs dark:bg-muted">
+                <Badge
+                  key={ch}
+                  variant="outline"
+                  className="capitalize bg-muted/60 text-xs dark:bg-muted"
+                >
                   {ch}
                 </Badge>
               ))}
@@ -185,9 +176,7 @@ function SectionCards({
             ) : (
               <>
                 {formatCost(cost.data?.dailyCost)}
-                <span className="text-sm font-medium text-muted-foreground">
-                  /day
-                </span>
+                <span className="text-sm font-medium text-muted-foreground">/day</span>
               </>
             )}
           </CardTitle>
@@ -216,9 +205,15 @@ function SectionCards({
 }
 
 export default function DashboardPage() {
-  const health = useApi<HealthData>("/api/v1/health");
-  const status = useApi<AgentStatus>("/api/v1/status");
-  const cost = useApi<CostInfo>("/api/v1/cost");
+  const client = useApiClient();
+  const poll = { pollInterval: 15_000 };
+  const health = useQuery<HealthData>(
+    (s) => client.health(s) as Promise<HealthData>,
+    [client],
+    poll,
+  );
+  const status = useQuery((s) => client.getStatus(s), [client], poll);
+  const cost = useQuery((s) => client.getCost(s), [client], poll);
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -246,9 +241,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
               ) : !status.data?.health?.length ? (
-                <p className="text-sm text-muted-foreground">
-                  No health data available
-                </p>
+                <p className="text-sm text-muted-foreground">No health data available</p>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   {status.data.health.map((h) => (
@@ -270,7 +263,10 @@ export default function DashboardPage() {
                       <TooltipContent>
                         <span className="capitalize">{h.status}</span>
                         {h.restarts != null && h.restarts > 0 && (
-                          <span> &middot; {h.restarts} restart{h.restarts !== 1 ? "s" : ""}</span>
+                          <span>
+                            {" "}
+                            &middot; {h.restarts} restart{h.restarts !== 1 ? "s" : ""}
+                          </span>
                         )}
                       </TooltipContent>
                     </Tooltip>

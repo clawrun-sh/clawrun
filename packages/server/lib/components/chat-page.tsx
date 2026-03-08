@@ -40,23 +40,14 @@ import {
 import { Suggestion, Suggestions } from "@clawrun/ui/components/ai-elements/suggestion";
 import { SpeechInput } from "@clawrun/ui/components/ai-elements/speech-input";
 import { Button } from "@clawrun/ui/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@clawrun/ui/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
-import {
-  IconCheck,
-  IconClipboard,
-  IconLoader2,
-  IconMessage,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconCheck, IconClipboard, IconLoader2, IconMessage, IconTrash } from "@tabler/icons-react";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
 import { useSetHeaderActions } from "./header-actions";
+import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
@@ -196,150 +187,152 @@ export default function ChatPage(_props: ChatPageProps) {
   useSetHeaderActions(clearButton);
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden">
-      {/* Conversation — scrollable middle */}
-      <Conversation>
-        {isLoading ? (
-          <ConversationEmptyState
-            className="absolute inset-0"
-            icon={<IconLoader2 className="size-8 animate-spin" />}
-            title="Loading conversation..."
-          />
-        ) : messages.length === 0 ? (
-          <ConversationEmptyState
-            className="absolute inset-0"
-            icon={<IconMessage className="size-8" />}
-            title="How can I help you?"
-            description="Ask me anything to get started."
-          />
-        ) : null}
-        <ConversationContent>
-          {messages.map((m) => (
-            <Message key={m.id} from={m.role}>
-              <MessageContent>
-                {m.role === "assistant"
-                  ? m.parts.map((part, i) => {
-                      if (part.type === "text") {
-                        const segments = splitContentParts(part.text);
-                        return segments.map((seg, j) =>
-                          seg.type === "text" ? (
-                            <MessageResponse key={`${i}-${j}`}>{seg.content}</MessageResponse>
-                          ) : (
-                            <img
-                              key={`${i}-${j}`}
-                              src={seg.src}
-                              alt={seg.alt}
-                              className="my-2 max-w-full rounded-md"
-                            />
-                          ),
-                        );
+    <SandboxOfflineGuard>
+      <div className="absolute inset-0 flex flex-col overflow-hidden">
+        {/* Conversation — scrollable middle */}
+        <Conversation>
+          {isLoading ? (
+            <ConversationEmptyState
+              className="absolute inset-0"
+              icon={<IconLoader2 className="size-8 animate-spin" />}
+              title="Loading conversation..."
+            />
+          ) : messages.length === 0 ? (
+            <ConversationEmptyState
+              className="absolute inset-0"
+              icon={<IconMessage className="size-8" />}
+              title="How can I help you?"
+              description="Ask me anything to get started."
+            />
+          ) : null}
+          <ConversationContent>
+            {messages.map((m) => (
+              <Message key={m.id} from={m.role}>
+                <MessageContent>
+                  {m.role === "assistant"
+                    ? m.parts.map((part, i) => {
+                        if (part.type === "text") {
+                          const segments = splitContentParts(part.text);
+                          return segments.map((seg, j) =>
+                            seg.type === "text" ? (
+                              <MessageResponse key={`${i}-${j}`}>{seg.content}</MessageResponse>
+                            ) : (
+                              <img
+                                key={`${i}-${j}`}
+                                src={seg.src}
+                                alt={seg.alt}
+                                className="my-2 max-w-full rounded-md"
+                              />
+                            ),
+                          );
+                        }
+                        if (part.type === "reasoning") {
+                          return (
+                            <Reasoning key={i} isStreaming={part.state === "streaming"}>
+                              <ReasoningTrigger />
+                              <ReasoningContent>{part.text}</ReasoningContent>
+                            </Reasoning>
+                          );
+                        }
+                        if (part.type === "dynamic-tool") {
+                          return (
+                            <Tool key={i} defaultOpen={false}>
+                              <ToolHeader
+                                type="dynamic-tool"
+                                toolName={part.toolName}
+                                state={part.state}
+                              />
+                              <ToolContent>
+                                <ToolInput input={part.input} />
+                                <ToolOutput output={part.output} errorText={part.errorText} />
+                              </ToolContent>
+                            </Tool>
+                          );
+                        }
+                        return null;
+                      })
+                    : m.parts.map((part, i) => {
+                        if (part.type === "text") return <span key={i}>{part.text}</span>;
+                        return null;
+                      })}
+                </MessageContent>
+                {m.role === "assistant" && (
+                  <MessageActions>
+                    <MessageAction
+                      tooltip="Copy"
+                      onClick={() =>
+                        handleCopy(
+                          m.id,
+                          m.parts
+                            .filter((p) => p.type === "text")
+                            .map((p) => p.text)
+                            .join(""),
+                        )
                       }
-                      if (part.type === "reasoning") {
-                        return (
-                          <Reasoning key={i} isStreaming={part.state === "streaming"}>
-                            <ReasoningTrigger />
-                            <ReasoningContent>{part.text}</ReasoningContent>
-                          </Reasoning>
-                        );
-                      }
-                      if (part.type === "dynamic-tool") {
-                        return (
-                          <Tool key={i} defaultOpen={false}>
-                            <ToolHeader
-                              type="dynamic-tool"
-                              toolName={part.toolName}
-                              state={part.state}
-                            />
-                            <ToolContent>
-                              <ToolInput input={part.input} />
-                              <ToolOutput output={part.output} errorText={part.errorText} />
-                            </ToolContent>
-                          </Tool>
-                        );
-                      }
-                      return null;
-                    })
-                  : m.parts.map((part, i) => {
-                      if (part.type === "text") return <span key={i}>{part.text}</span>;
-                      return null;
-                    })}
-              </MessageContent>
-              {m.role === "assistant" && (
-                <MessageActions>
-                  <MessageAction
-                    tooltip="Copy"
-                    onClick={() =>
-                      handleCopy(
-                        m.id,
-                        m.parts
-                          .filter((p) => p.type === "text")
-                          .map((p) => p.text)
-                          .join(""),
-                      )
-                    }
-                  >
-                    {copiedId === m.id ? (
-                      <IconCheck className="size-4" />
-                    ) : (
-                      <IconClipboard className="size-4" />
-                    )}
-                  </MessageAction>
-                </MessageActions>
-              )}
-            </Message>
-          ))}
-          {status === "submitted" && (
-            <Message from="assistant">
-              <MessageContent>
-                <Shimmer className="text-sm" duration={1.5}>
-                  Thinking...
-                </Shimmer>
-              </MessageContent>
-            </Message>
-          )}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
-
-      {error && (
-        <div className="shrink-0 px-4 py-2 text-center text-destructive text-sm">
-          {error.message || "Something went wrong"}
-        </div>
-      )}
-
-      {/* Footer — pinned bottom */}
-      <div className="grid shrink-0 gap-4 pt-4">
-        {!isLoading && messages.length === 0 && (
-          <Suggestions className="px-4">
-            {suggestions.map((s) => (
-              <Suggestion key={s} onClick={handleSuggestionClick} suggestion={s} />
+                    >
+                      {copiedId === m.id ? (
+                        <IconCheck className="size-4" />
+                      ) : (
+                        <IconClipboard className="size-4" />
+                      )}
+                    </MessageAction>
+                  </MessageActions>
+                )}
+              </Message>
             ))}
-          </Suggestions>
+            {status === "submitted" && (
+              <Message from="assistant">
+                <MessageContent>
+                  <Shimmer className="text-sm" duration={1.5}>
+                    Thinking...
+                  </Shimmer>
+                </MessageContent>
+              </Message>
+            )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+
+        {error && (
+          <div className="shrink-0 px-4 py-2 text-center text-destructive text-sm">
+            {error.message || "Something went wrong"}
+          </div>
         )}
-        <div className="w-full px-4 pb-4">
-          <PromptInput onSubmit={handleSubmit}>
-            <PromptInputBody>
-              <PromptInputTextarea
-                autoFocus
-                onChange={handleTextChange}
-                placeholder="Type a message..."
-                value={text}
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <SpeechInput
-                  className="shrink-0"
-                  onTranscriptionChange={handleTranscriptionChange}
-                  size="icon-sm"
-                  variant="ghost"
+
+        {/* Footer — pinned bottom */}
+        <div className="grid shrink-0 gap-4 pt-4">
+          {!isLoading && messages.length === 0 && (
+            <Suggestions className="px-4">
+              {suggestions.map((s) => (
+                <Suggestion key={s} onClick={handleSuggestionClick} suggestion={s} />
+              ))}
+            </Suggestions>
+          )}
+          <div className="w-full px-4 pb-4">
+            <PromptInput onSubmit={handleSubmit}>
+              <PromptInputBody>
+                <PromptInputTextarea
+                  autoFocus
+                  onChange={handleTextChange}
+                  placeholder="Type a message..."
+                  value={text}
                 />
-              </PromptInputTools>
-              <PromptInputSubmit status={status} onStop={stop} />
-            </PromptInputFooter>
-          </PromptInput>
+              </PromptInputBody>
+              <PromptInputFooter>
+                <PromptInputTools>
+                  <SpeechInput
+                    className="shrink-0"
+                    onTranscriptionChange={handleTranscriptionChange}
+                    size="icon-sm"
+                    variant="ghost"
+                  />
+                </PromptInputTools>
+                <PromptInputSubmit status={status} onStop={stop} />
+              </PromptInputFooter>
+            </PromptInput>
+          </div>
         </div>
       </div>
-    </div>
+    </SandboxOfflineGuard>
   );
 }

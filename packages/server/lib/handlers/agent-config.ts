@@ -32,4 +32,3 @@ export async function handleGetConfig() {
     return Response.json({ error: "Internal error" }, { status: 500 });
   }
 }
-

@@ -21,15 +21,15 @@ export async function handleEvents(req: Request) {
           },
           timestamp: new Date().toISOString(),
         };
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`),
-        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusEvent)}\n\n`));
 
         // Heartbeat every 30s to keep connection alive
         const interval = setInterval(() => {
           try {
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "heartbeat", timestamp: new Date().toISOString() })}\n\n`),
+              encoder.encode(
+                `data: ${JSON.stringify({ type: "heartbeat", timestamp: new Date().toISOString() })}\n\n`,
+              ),
             );
           } catch {
             clearInterval(interval);
