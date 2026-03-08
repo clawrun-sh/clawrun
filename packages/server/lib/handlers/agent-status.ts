@@ -18,11 +18,7 @@ export async function handleGetAgentStatus() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.getAgentStatus) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
-    const agentStatus = await agent.getAgentStatus(sandbox, root, {
+    const agentStatus = await agent.getStatus(sandbox, root, {
       signal: AbortSignal.timeout(10_000),
     });
 

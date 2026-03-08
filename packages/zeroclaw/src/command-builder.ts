@@ -35,14 +35,3 @@ export function buildDaemonCommand(
     env,
   };
 }
-
-export function buildCronListCommand(
-  binaryPath: string,
-  env: Record<string, string>,
-): SandboxCommand {
-  return {
-    cmd: binaryPath,
-    args: ["cron", "list"],
-    env,
-  };
-}

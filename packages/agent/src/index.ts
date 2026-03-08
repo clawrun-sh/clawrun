@@ -3,8 +3,6 @@ export type {
   CommandResult,
   AgentResponse,
   ToolCallInfo,
-  CronEntry,
-  CronInfo,
   DaemonCommand,
   MonitorConfig,
   ProvisionOpts,

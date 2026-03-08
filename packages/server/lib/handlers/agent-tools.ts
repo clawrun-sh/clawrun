@@ -18,11 +18,7 @@ export async function handleListTools() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.listRuntimeTools) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
-    const result = await agent.listRuntimeTools(sandbox, root, {
+    const result = await agent.listTools(sandbox, root, {
       signal: AbortSignal.timeout(10_000),
     });
 

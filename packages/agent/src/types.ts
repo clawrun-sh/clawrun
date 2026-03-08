@@ -75,12 +75,6 @@ export interface ThreadInfo {
   lastActivity: string;
 }
 
-export interface CronEntry {
-  name?: string;
-  schedule?: string;
-  nextRunAt: string;
-}
-
 // ---------------------------------------------------------------------------
 // Dashboard API types — agent-agnostic, returned by optional Agent methods
 // ---------------------------------------------------------------------------
@@ -197,10 +191,6 @@ export interface CreateCronJobInput {
   command: string;
 }
 
-export interface CronInfo {
-  jobs: CronEntry[];
-}
-
 export interface DaemonCommand {
   cmd: string;
   args: string[];
@@ -260,7 +250,7 @@ export interface Agent {
    * UIMessageStream events. Agents that don't support streaming can omit
    * this method — the handler will fall back to sendMessage().
    */
-  streamMessage?(
+  streamMessage(
     sandbox: SandboxHandle,
     root: string,
     message: string,
@@ -269,14 +259,14 @@ export interface Agent {
   ): Promise<void>;
 
   /** List all conversation threads across all channels. */
-  listThreads?(
+  listThreads(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<ThreadInfo[]>;
 
   /** Get messages for a specific conversation thread as AI SDK UIMessages. */
-  getThread?(
+  getThread(
     sandbox: SandboxHandle,
     root: string,
     threadId: string,
@@ -292,7 +282,11 @@ export interface Agent {
     },
   ): DaemonCommand;
 
-  getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo>;
+  listCronJobs(
+    sandbox: SandboxHandle,
+    root: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<CronJob[]>;
 
   getMonitorConfig(root: string): MonitorConfig;
 
@@ -344,81 +338,75 @@ export interface Agent {
   /** Glob patterns (relative to deploy dir) for binary files to bundle. */
   getBinaryBundlePaths(): string[];
 
-  // --- Optional dashboard API methods ---
+  // --- Dashboard API methods ---
 
-  getAgentStatus?(
+  getStatus(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<AgentStatus>;
 
-  getConfig?(
+  getConfig(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<AgentConfig>;
 
-  setConfig?(
+  setConfig(
     sandbox: SandboxHandle,
     root: string,
     content: string,
     opts?: { signal?: AbortSignal },
   ): Promise<void>;
 
-  listRuntimeTools?(
+  listTools(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<ToolsResult>;
 
-  listCronJobs?(
-    sandbox: SandboxHandle,
-    root: string,
-    opts?: { signal?: AbortSignal },
-  ): Promise<CronJob[]>;
-
-  createCronJob?(
+  createCronJob(
     sandbox: SandboxHandle,
     root: string,
     job: CreateCronJobInput,
     opts?: { signal?: AbortSignal },
   ): Promise<CronJob>;
 
-  deleteCronJob?(
+  deleteCronJob(
     sandbox: SandboxHandle,
     root: string,
     id: string,
     opts?: { signal?: AbortSignal },
   ): Promise<void>;
 
-  listMemories?(
+  listMemories(
     sandbox: SandboxHandle,
     root: string,
     query?: MemoryQuery,
     opts?: { signal?: AbortSignal },
   ): Promise<MemoryEntryInfo[]>;
 
-  createMemory?(
+  createMemory(
     sandbox: SandboxHandle,
     root: string,
     entry: CreateMemoryInput,
     opts?: { signal?: AbortSignal },
   ): Promise<void>;
 
-  deleteMemory?(
+  deleteMemory(
     sandbox: SandboxHandle,
     root: string,
     key: string,
     opts?: { signal?: AbortSignal },
   ): Promise<void>;
 
-  getCostInfo?(
+  getCostInfo(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<CostInfo>;
 
-  runDiagnostics?(
+  runDiagnostics(
     sandbox: SandboxHandle,
     root: string,
     opts?: { signal?: AbortSignal },

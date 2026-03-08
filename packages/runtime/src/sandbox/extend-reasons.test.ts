@@ -69,38 +69,129 @@ describe("CronScheduleReason", () => {
 
   it("returns reason when cron job is within keepAliveWindow", () => {
     const now = Date.now();
-    const cronInfo = {
-      jobs: [{ nextRunAt: new Date(now + 60_000).toISOString() }],
-    };
-    const result = reason.evaluate(basePayload, now, cronInfo);
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 60_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
     expect(result).not.toBeNull();
     expect(result).toBe("cron due soon");
   });
 
   it("returns null when next cron job is beyond window", () => {
     const now = Date.now();
-    const cronInfo = {
-      jobs: [{ nextRunAt: new Date(now + 600_000).toISOString() }],
-    };
-    const result = reason.evaluate(basePayload, now, cronInfo);
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 600_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
     expect(result).toBeNull();
   });
 
   it("filters NaN dates from cron jobs", () => {
     const now = Date.now();
-    const cronInfo = {
-      jobs: [{ nextRunAt: "not-a-date" }],
-    };
-    const result = reason.evaluate(basePayload, now, cronInfo);
+    const cronJobs = [{ id: "1", schedule: "* * * * *", command: "run", nextRun: "not-a-date" }];
+    const result = reason.evaluate(basePayload, now, cronJobs);
     expect(result).toBeNull();
   });
 
   it("returns null when no future jobs exist", () => {
     const now = Date.now();
-    const cronInfo = {
-      jobs: [{ nextRunAt: new Date(now - 60_000).toISOString() }],
-    };
-    const result = reason.evaluate(basePayload, now, cronInfo);
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 60_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
+    expect(result).toBeNull();
+  });
+
+  it("picks closest cron job when multiple are within window", () => {
+    const now = Date.now();
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "0 * * * *",
+        command: "run hourly",
+        nextRun: new Date(now + 240_000).toISOString(),
+      },
+      {
+        id: "2",
+        schedule: "*/2 * * * *",
+        command: "run often",
+        nextRun: new Date(now + 60_000).toISOString(),
+      },
+      {
+        id: "3",
+        schedule: "0 0 * * *",
+        command: "run daily",
+        nextRun: new Date(now + 400_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
+    expect(result).toBe("cron due soon");
+  });
+
+  it("picks closest future job ignoring past jobs", () => {
+    const now = Date.now();
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 30_000).toISOString(),
+      },
+      {
+        id: "2",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 120_000).toISOString(),
+      },
+      {
+        id: "3",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 60_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
+    expect(result).toBe("cron due soon");
+  });
+
+  it("returns null when closest future job is beyond window", () => {
+    const now = Date.now();
+    const cronJobs = [
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 30_000).toISOString(),
+      },
+      {
+        id: "2",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 400_000).toISOString(),
+      },
+      {
+        id: "3",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 600_000).toISOString(),
+      },
+    ];
+    const result = reason.evaluate(basePayload, now, cronJobs);
     expect(result).toBeNull();
   });
 });

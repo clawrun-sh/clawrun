@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAgentCommand, buildDaemonCommand, buildCronListCommand } from "./command-builder.js";
+import { buildAgentCommand, buildDaemonCommand } from "./command-builder.js";
 import { DAEMON_PORT, DAEMON_HOST } from "./constants.js";
 
 describe("buildAgentCommand", () => {
@@ -116,33 +116,5 @@ describe("buildDaemonCommand", () => {
   it("uses default host when options.host is undefined", () => {
     const result = buildDaemonCommand("/bin/zc", {}, { port: 9090 });
     expect(result.args[4]).toBe(DAEMON_HOST);
-  });
-});
-
-describe("buildCronListCommand", () => {
-  it("sets cmd to the provided binary path", () => {
-    const result = buildCronListCommand("/usr/bin/zeroclaw", {});
-    expect(result.cmd).toBe("/usr/bin/zeroclaw");
-  });
-
-  it("includes 'cron' as the first arg", () => {
-    const result = buildCronListCommand("/bin/zc", {});
-    expect(result.args[0]).toBe("cron");
-  });
-
-  it("includes 'list' as the second arg", () => {
-    const result = buildCronListCommand("/bin/zc", {});
-    expect(result.args[1]).toBe("list");
-  });
-
-  it("has exactly 2 args", () => {
-    const result = buildCronListCommand("/bin/zc", {});
-    expect(result.args).toHaveLength(2);
-  });
-
-  it("passes env through directly", () => {
-    const env = { HOME: "/home/user" };
-    const result = buildCronListCommand("/bin/zc", env);
-    expect(result.env).toEqual(env);
   });
 });

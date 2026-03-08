@@ -18,10 +18,6 @@ export async function handleRunDiagnostics() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.runDiagnostics) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const results = await agent.runDiagnostics(sandbox, root, {
       signal: AbortSignal.timeout(30_000),
     });

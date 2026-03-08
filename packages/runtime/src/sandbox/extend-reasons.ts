@@ -1,4 +1,4 @@
-import type { CronInfo } from "@clawrun/agent";
+import type { CronJob } from "@clawrun/agent";
 import type { ExtendPayload } from "./lifecycle.js";
 
 /**
@@ -7,7 +7,7 @@ import type { ExtendPayload } from "./lifecycle.js";
  */
 export interface ExtendReason {
   /** Returns a human-readable label if this reason justifies extending, null otherwise. */
-  evaluate(payload: ExtendPayload, now: number, cronInfo?: CronInfo): string | null;
+  evaluate(payload: ExtendPayload, now: number, cronJobs?: CronJob[]): string | null;
 }
 
 /**
@@ -45,11 +45,11 @@ export class FileActivityReason implements ExtendReason {
 export class CronScheduleReason implements ExtendReason {
   constructor(private keepAliveWindowMs: number) {}
 
-  evaluate(_payload: ExtendPayload, now: number, cronInfo?: CronInfo): string | null {
-    if (!cronInfo || cronInfo.jobs.length === 0) return null;
+  evaluate(_payload: ExtendPayload, now: number, cronJobs?: CronJob[]): string | null {
+    if (!cronJobs || cronJobs.length === 0) return null;
 
-    const nextRunMs = cronInfo.jobs
-      .map((j) => new Date(j.nextRunAt).getTime())
+    const nextRunMs = cronJobs
+      .map((j) => new Date(j.nextRun ?? "").getTime())
       .filter((t) => !isNaN(t) && t > now)
       .sort((a, b) => a - b)[0];
 

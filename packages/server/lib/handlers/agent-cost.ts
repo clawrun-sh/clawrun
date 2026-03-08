@@ -18,10 +18,6 @@ export async function handleGetCost() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.getCostInfo) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const cost = await agent.getCostInfo(sandbox, root, {
       signal: AbortSignal.timeout(10_000),
     });

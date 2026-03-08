@@ -22,10 +22,6 @@ export async function handleListCronJobs() {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
 
-    if (!ctx.agent.listCronJobs) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const jobs = await ctx.agent.listCronJobs(ctx.sandbox, ctx.root, {
       signal: AbortSignal.timeout(10_000),
     });
@@ -41,10 +37,6 @@ export async function handleCreateCronJob(req: Request) {
   try {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
-
-    if (!ctx.agent.createCronJob) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
 
     const body = await req.json();
     const job = await ctx.agent.createCronJob(
@@ -65,10 +57,6 @@ export async function handleDeleteCronJob(_req: Request, id: string) {
   try {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
-
-    if (!ctx.agent.deleteCronJob) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
 
     await ctx.agent.deleteCronJob(ctx.sandbox, ctx.root, id, {
       signal: AbortSignal.timeout(10_000),

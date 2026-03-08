@@ -8,7 +8,7 @@ import type {
   SnapshotId,
 } from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
-import type { Agent, CronInfo } from "@clawrun/agent";
+import type { Agent, CronJob } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 import { getStateStore } from "../storage/state.js";
@@ -386,16 +386,16 @@ export class SandboxLifecycleManager {
     const activeDurationMs = getActiveDurationMs();
 
     // Get cron info from agent (server-side)
-    let cronInfo: CronInfo = { jobs: [] };
+    let cronJobs: CronJob[] = [];
     try {
-      cronInfo = await this.agent.getCrons(sandbox, payload.root);
+      cronJobs = await this.agent.listCronJobs(sandbox, payload.root);
     } catch (err) {
-      log.error("getCrons failed:", err);
+      log.error("listCronJobs failed:", err);
     }
 
     // Compute nextCronAt from jobs
-    const futureTimes = cronInfo.jobs
-      .map((j) => new Date(j.nextRunAt).getTime())
+    const futureTimes = cronJobs
+      .map((j) => new Date(j.nextRun ?? "").getTime())
       .filter((t) => !isNaN(t) && t > now);
     const nextCronAt =
       futureTimes.length > 0 ? new Date(Math.min(...futureTimes)).toISOString() : null;
@@ -404,7 +404,7 @@ export class SandboxLifecycleManager {
       `Extend: sandbox=${payload.sandboxId},` +
         ` idle=${Math.round(idleMs / 1000)}s (threshold=${activeDurationMs / 1000}s),` +
         ` nextCronAt=${nextCronAt ?? "none"},` +
-        ` cronJobs=${cronInfo.jobs.length}`,
+        ` cronJobs=${cronJobs.length}`,
     );
 
     // Persist next_wake_at on every tick that reports a cron schedule.
@@ -427,7 +427,7 @@ export class SandboxLifecycleManager {
     const reasons = this.extendReasons;
     let reason: string | null = null;
     for (const r of reasons) {
-      reason = r.evaluate(payload, now, cronInfo);
+      reason = r.evaluate(payload, now, cronJobs);
       if (reason) break;
     }
 

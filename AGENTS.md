@@ -15,7 +15,7 @@ interface Agent {
   provision(sandbox, root, opts: ProvisionOpts): Promise<void>;
   getDaemonCommand(root, opts?): DaemonCommand;
   sendMessage(sandbox, root, message, opts?): Promise<AgentResponse>;
-  getCrons(sandbox, root): Promise<CronInfo>;
+  listCronJobs(sandbox, root, opts?): Promise<CronJob[]>;
   getMonitorConfig(root): MonitorConfig;
 
   // Setup & configuration

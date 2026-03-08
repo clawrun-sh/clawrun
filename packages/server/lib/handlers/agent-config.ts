@@ -18,10 +18,6 @@ export async function handleGetConfig() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.getConfig) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const agentConfig = await agent.getConfig(sandbox, root, {
       signal: AbortSignal.timeout(10_000),
     });

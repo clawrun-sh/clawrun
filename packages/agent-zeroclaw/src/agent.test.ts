@@ -5,7 +5,6 @@ import type { SandboxHandle } from "@clawrun/agent";
 
 vi.mock("zeroclaw", () => ({
   provision: vi.fn(async () => {}),
-  parseCronListOutput: vi.fn(() => ({ jobs: [], nextRunAt: null })),
   buildDaemonCommand: vi.fn(
     (_bin: string, _env: Record<string, string>, opts?: { port?: number }) => ({
       cmd: "/usr/bin/zeroclaw",
@@ -13,11 +12,6 @@ vi.mock("zeroclaw", () => ({
       env: { ZC: "1" },
     }),
   ),
-  buildCronListCommand: vi.fn(() => ({
-    cmd: "/usr/bin/zeroclaw",
-    args: ["cron", "list"],
-    env: { ZC: "1" },
-  })),
   HOUSEKEEPING_FILES: [".git", "node_modules"],
   DAEMON_PORT: 3000,
 }));
@@ -102,7 +96,6 @@ import {
   listThreadsViaDaemon,
   getThreadViaDaemon,
 } from "./messaging.js";
-import { parseCronListOutput } from "zeroclaw";
 import { existsSync, readFileSync } from "node:fs";
 import * as TOML from "@iarna/toml";
 
@@ -366,23 +359,6 @@ describe("ZeroclawAgent", () => {
 
       expect(tools).toHaveLength(2);
       expect(tools.map((t) => t.id)).toEqual(["agent-browser", "gh-cli"]);
-    });
-  });
-
-  describe("getCrons", () => {
-    it("runs cron-list command and parses output", async () => {
-      const agent = new ZeroclawAgent();
-      const sandbox = mockSandbox(true);
-      vi.mocked(parseCronListOutput).mockReturnValue({
-        jobs: [{ schedule: "0 * * * *", task: "check" }],
-        nextRunAt: 1234,
-      } as unknown as ReturnType<typeof parseCronListOutput>);
-
-      const result = await agent.getCrons(sandbox as unknown as SandboxHandle, "/root");
-
-      expect(sandbox.runCommand).toHaveBeenCalledOnce();
-      expect(parseCronListOutput).toHaveBeenCalledWith("cron output");
-      expect(result.jobs).toHaveLength(1);
     });
   });
 

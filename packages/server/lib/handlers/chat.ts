@@ -73,50 +73,10 @@ export async function POST(req: Request) {
 
           const agent = getAgent();
 
-          // Prefer streaming — the agent writes AI SDK stream events directly
-          if (agent.streamMessage) {
-            await agent.streamMessage(sandbox, root, message, writer, {
-              signal: AbortSignal.timeout(120_000),
-              threadId,
-            });
-          } else {
-            // Batch fallback for agents that don't support streaming
-            const resp = await agent.sendMessage(sandbox, root, message, {
-              signal: AbortSignal.timeout(120_000),
-              threadId,
-            });
-
-            if (resp.success) {
-              if (resp.toolCalls?.length) {
-                for (const tc of resp.toolCalls) {
-                  const toolCallId = crypto.randomUUID();
-                  writer.write({
-                    type: "tool-input-available",
-                    toolCallId,
-                    toolName: tc.name,
-                    input: tc.arguments,
-                    dynamic: true,
-                  });
-                  writer.write({
-                    type: "tool-output-available",
-                    toolCallId,
-                    output: tc.output ?? "completed",
-                    dynamic: true,
-                  });
-                }
-              }
-
-              const textId = crypto.randomUUID();
-              writer.write({ type: "text-start", id: textId });
-              writer.write({ type: "text-delta", id: textId, delta: resp.message });
-              writer.write({ type: "text-end", id: textId });
-            } else {
-              writer.write({
-                type: "error",
-                errorText: resp.error ?? resp.message,
-              });
-            }
-          }
+          await agent.streamMessage(sandbox, root, message, writer, {
+            signal: AbortSignal.timeout(120_000),
+            threadId,
+          });
         } catch (err) {
           log.error("Chat error:", err instanceof Error ? err.message : "Unknown error");
           writer.write({

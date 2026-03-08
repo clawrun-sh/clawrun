@@ -31,16 +31,3 @@ export function parseOutput(stdout: string, stderr: string, exitCode: number): P
     exitCode,
   };
 }
-
-export function parseCronListOutput(stdout: string): { jobs: Array<{ nextRunAt: string }> } {
-  const matches = [...stdout.matchAll(/next=([\d-]+T[\d:.+Z]+)/g)];
-  const now = Date.now();
-  const jobs = matches
-    .map((m) => {
-      const t = new Date(m[1]);
-      return { nextRunAt: t.toISOString(), _ms: t.getTime() };
-    })
-    .filter((j) => !isNaN(j._ms) && j._ms > now)
-    .map(({ nextRunAt }) => ({ nextRunAt }));
-  return { jobs };
-}

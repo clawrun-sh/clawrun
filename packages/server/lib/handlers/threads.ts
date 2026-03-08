@@ -21,10 +21,6 @@ export async function handleListThreads() {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.listThreads) {
-      return Response.json({ threads: [] });
-    }
-
     const threads = await agent.listThreads(sandbox, root, {
       signal: AbortSignal.timeout(10_000),
     });
@@ -58,10 +54,6 @@ export async function handleGetThread(_req: Request, threadId: string) {
     const root = await resolveRoot(sandbox);
 
     const agent = getAgent();
-    if (!agent.getThread) {
-      return Response.json({ messages: [] });
-    }
-
     const messages = await agent.getThread(sandbox, root, threadId, {
       signal: AbortSignal.timeout(10_000),
     });

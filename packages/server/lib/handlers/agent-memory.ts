@@ -22,10 +22,6 @@ export async function handleListMemories(req: Request) {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
 
-    if (!ctx.agent.listMemories) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const url = new URL(req.url);
     const query = url.searchParams.get("query") ?? undefined;
     const category = url.searchParams.get("category") ?? undefined;
@@ -49,10 +45,6 @@ export async function handleCreateMemory(req: Request) {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
 
-    if (!ctx.agent.createMemory) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
-
     const body = await req.json();
     await ctx.agent.createMemory(
       ctx.sandbox,
@@ -72,10 +64,6 @@ export async function handleDeleteMemory(_req: Request, key: string) {
   try {
     const ctx = await getSandboxAndAgent();
     if (!ctx) return Response.json({ error: "Sandbox offline" }, { status: 503 });
-
-    if (!ctx.agent.deleteMemory) {
-      return Response.json({ error: "Not supported" }, { status: 501 });
-    }
 
     await ctx.agent.deleteMemory(ctx.sandbox, ctx.root, key, {
       signal: AbortSignal.timeout(10_000),

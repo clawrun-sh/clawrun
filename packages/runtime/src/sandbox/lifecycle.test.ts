@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sandboxId, snapshotId } from "@clawrun/provider";
 import type { ManagedSandbox, SandboxInfo, SandboxProvider, SnapshotInfo } from "@clawrun/provider";
-import type { Agent, CronInfo, DaemonCommand, MonitorConfig } from "@clawrun/agent";
+import type { Agent, DaemonCommand, MonitorConfig } from "@clawrun/agent";
 import type { StateStore } from "../storage/state-types.js";
 import type { RuntimeConfig } from "../config.js";
 import type { ExtendPayload } from "./lifecycle.js";
@@ -86,7 +86,7 @@ function mockAgent(): Agent {
     getDaemonCommand: vi
       .fn()
       .mockReturnValue({ cmd: "zeroclaw", args: ["serve"], env: {} } as DaemonCommand),
-    getCrons: vi.fn().mockResolvedValue({ jobs: [] } as CronInfo),
+    listCronJobs: vi.fn().mockResolvedValue([]),
     getMonitorConfig: vi
       .fn()
       .mockReturnValue({ dir: "/home/user/.clawrun", ignoreFiles: [] } as MonitorConfig),
@@ -543,9 +543,9 @@ describe("handleExtend()", () => {
       timeout: 6_000_000,
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [{ nextRunAt: nextRun }],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      { id: "1", schedule: "* * * * *", command: "run", nextRun: nextRun },
+    ]);
 
     const mgr = createManager();
     await mgr.handleExtend(
@@ -563,7 +563,7 @@ describe("handleExtend()", () => {
       timeout: 6_000_000,
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
-    vi.mocked(_agent.getCrons).mockResolvedValue({ jobs: [] });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([]);
 
     const mgr = createManager();
     await mgr.handleExtend(
@@ -634,9 +634,14 @@ describe("handleExtend()", () => {
     const now = Date.now();
     const sandbox = mockManagedSandbox({ status: "running" });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [{ nextRunAt: new Date(now + 60_000).toISOString() }],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 60_000).toISOString(),
+      },
+    ]);
     vi.mocked(_stateStore.set).mockRejectedValue(new Error("Redis down"));
 
     const mgr = createManager();
@@ -646,7 +651,7 @@ describe("handleExtend()", () => {
     expect(result.error).toContain("persist");
   });
 
-  it("handles getCrons failure gracefully (continues with empty crons)", async () => {
+  it("handles listCronJobs failure gracefully (continues with empty crons)", async () => {
     const now = Date.now();
     const sandbox = mockManagedSandbox({
       status: "running",
@@ -654,7 +659,7 @@ describe("handleExtend()", () => {
       timeout: 6_000_000,
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
-    vi.mocked(_agent.getCrons).mockRejectedValue(new Error("Agent unreachable"));
+    vi.mocked(_agent.listCronJobs).mockRejectedValue(new Error("Agent unreachable"));
 
     const mgr = createManager();
     const result = await mgr.handleExtend(
@@ -1331,13 +1336,21 @@ describe("handleExtend() cron computation", () => {
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     const earliest = new Date(now + 120_000).toISOString();
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [
-        { nextRunAt: new Date(now + 300_000).toISOString() }, // 5 min
-        { nextRunAt: earliest }, // 2 min — earliest
-        { nextRunAt: new Date(now + 600_000).toISOString() }, // 10 min
-      ],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 300_000).toISOString(),
+      },
+      { id: "2", schedule: "* * * * *", command: "run", nextRun: earliest },
+      {
+        id: "3",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now + 600_000).toISOString(),
+      },
+    ]);
 
     const mgr = createManager();
     await mgr.handleExtend(
@@ -1356,13 +1369,21 @@ describe("handleExtend() cron computation", () => {
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     const futureTime = new Date(now + 200_000).toISOString();
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [
-        { nextRunAt: new Date(now - 60_000).toISOString() }, // past — filtered
-        { nextRunAt: new Date(now - 120_000).toISOString() }, // past — filtered
-        { nextRunAt: futureTime }, // only future one
-      ],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 60_000).toISOString(),
+      },
+      {
+        id: "2",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 120_000).toISOString(),
+      },
+      { id: "3", schedule: "* * * * *", command: "run", nextRun: futureTime },
+    ]);
 
     const mgr = createManager();
     await mgr.handleExtend(
@@ -1380,12 +1401,20 @@ describe("handleExtend() cron computation", () => {
       timeout: 6_000_000,
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [
-        { nextRunAt: new Date(now - 60_000).toISOString() },
-        { nextRunAt: new Date(now - 120_000).toISOString() },
-      ],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      {
+        id: "1",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 60_000).toISOString(),
+      },
+      {
+        id: "2",
+        schedule: "* * * * *",
+        command: "run",
+        nextRun: new Date(now - 120_000).toISOString(),
+      },
+    ]);
 
     const mgr = createManager();
     await mgr.handleExtend(
@@ -1404,9 +1433,9 @@ describe("handleExtend() cron computation", () => {
     // Cron 30 min in future — BEYOND the 15min keep-alive window,
     // so CronScheduleReason does NOT fire and sandbox stops.
     const nextCron = new Date(now + 1_800_000).toISOString();
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [{ nextRunAt: nextCron }],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      { id: "1", schedule: "* * * * *", command: "run", nextRun: nextCron },
+    ]);
     SandboxLifecycleManager.setHooks({
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),
     });
@@ -1462,9 +1491,14 @@ describe("handleExtend() eventual consistency", () => {
     });
     vi.mocked(_provider.get).mockResolvedValue(sandbox);
     // cronKeepAliveWindow is 900s = 15min. Cron due in 5 min — within window.
-    vi.mocked(_agent.getCrons).mockResolvedValue({
-      jobs: [{ nextRunAt: new Date(now + 300_000).toISOString() }],
-    });
+    vi.mocked(_agent.listCronJobs).mockResolvedValue([
+      {
+        id: "1",
+        schedule: "*/5 * * * *",
+        command: "run check",
+        nextRun: new Date(now + 300_000).toISOString(),
+      },
+    ]);
 
     const mgr = createManager();
     const result = await mgr.handleExtend(

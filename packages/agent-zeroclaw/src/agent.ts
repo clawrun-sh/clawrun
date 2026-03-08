@@ -1,8 +1,6 @@
 import {
   provision as zeroclawProvision,
-  parseCronListOutput,
   buildDaemonCommand,
-  buildCronListCommand,
   HOUSEKEEPING_FILES,
   DAEMON_PORT,
 } from "zeroclaw";
@@ -14,7 +12,6 @@ import type {
   Agent,
   SandboxHandle,
   AgentResponse,
-  CronInfo,
   DaemonCommand,
   MonitorConfig,
   ProvisionOpts,
@@ -215,19 +212,6 @@ export class ZeroclawAgent implements Agent {
     };
   }
 
-  async getCrons(sandbox: SandboxHandle, root: string): Promise<CronInfo> {
-    const cmd = buildCronListCommand(`${root}/bin/zeroclaw`, {
-      ZEROCLAW_WORKSPACE: `${root}/agent`,
-    });
-    const result = await sandbox.runCommand({
-      cmd: cmd.cmd,
-      args: cmd.args,
-      env: cmd.env,
-    });
-    const stdout = await result.stdout();
-    return parseCronListOutput(stdout);
-  }
-
   getMonitorConfig(root: string): MonitorConfig {
     return {
       dir: `${root}/agent`,
@@ -301,7 +285,7 @@ export class ZeroclawAgent implements Agent {
 
   // --- Dashboard API methods ---
 
-  async getAgentStatus(
+  async getStatus(
     sandbox: SandboxHandle,
     _root: string,
     opts?: { signal?: AbortSignal },
@@ -333,7 +317,7 @@ export class ZeroclawAgent implements Agent {
     await putAgentConfig(sandbox, content, opts);
   }
 
-  async listRuntimeTools(
+  async listTools(
     sandbox: SandboxHandle,
     _root: string,
     opts?: { signal?: AbortSignal },
