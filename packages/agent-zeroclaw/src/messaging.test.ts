@@ -7,6 +7,7 @@ import {
   parseProgressLine,
   parseMemoryKey,
   parseAssistantParts,
+  splitTextForStreaming,
 } from "./messaging.js";
 import type { SandboxHandle } from "@clawrun/agent";
 
@@ -80,9 +81,12 @@ describe("StreamingTagParser", () => {
     p.flush();
 
     expect(w.events.some((e: StreamEvent) => e.type === "text-start")).toBe(true);
-    expect(
-      w.events.some((e: StreamEvent) => e.type === "text-delta" && e.delta === "hello world"),
-    ).toBe(true);
+    // Text is split into word-sized deltas for progressive streaming
+    const textDeltas = w.events
+      .filter((e: StreamEvent) => e.type === "text-delta")
+      .map((e: StreamEvent) => e.delta)
+      .join("");
+    expect(textDeltas).toBe("hello world");
   });
 
   it("emits reasoning-start + reasoning-delta for <thinking> tags", () => {
@@ -533,5 +537,150 @@ describe("parseAssistantParts", () => {
       type: "dynamic-tool",
       toolName: "web_fetch",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// splitTextForStreaming
+// ---------------------------------------------------------------------------
+describe("splitTextForStreaming", () => {
+  it("returns short text (<=8 chars) as a single chunk", () => {
+    expect(splitTextForStreaming("hello")).toEqual(["hello"]);
+    expect(splitTextForStreaming("hi there")).toEqual(["hi there"]);
+  });
+
+  it("splits multi-word text into word-sized chunks", () => {
+    const chunks = splitTextForStreaming("hello world foo bar");
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join("")).toBe("hello world foo bar");
+  });
+
+  it("preserves trailing whitespace on each word", () => {
+    const chunks = splitTextForStreaming("The quick brown fox");
+    // Each chunk except possibly last should include its trailing space
+    expect(chunks[0]).toBe("The ");
+    expect(chunks[1]).toBe("quick ");
+    expect(chunks[2]).toBe("brown ");
+    expect(chunks[3]).toBe("fox");
+  });
+
+  it("handles leading whitespace", () => {
+    const chunks = splitTextForStreaming("  hello world");
+    expect(chunks.join("")).toBe("  hello world");
+  });
+
+  it("handles multiple spaces between words", () => {
+    const chunks = splitTextForStreaming("hello   world  test");
+    expect(chunks.join("")).toBe("hello   world  test");
+  });
+
+  it("handles newlines as whitespace", () => {
+    const chunks = splitTextForStreaming("line one\nline two\nline three");
+    expect(chunks.join("")).toBe("line one\nline two\nline three");
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("handles empty string", () => {
+    expect(splitTextForStreaming("")).toEqual([""]);
+  });
+
+  it("returns single chunk for a single long word", () => {
+    const longWord = "superlongword";
+    const chunks = splitTextForStreaming(longWord);
+    expect(chunks).toEqual([longWord]);
+  });
+
+  it("handles text with punctuation", () => {
+    const chunks = splitTextForStreaming("Hello, world! How are you?");
+    expect(chunks.join("")).toBe("Hello, world! How are you?");
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("handles markdown-like content", () => {
+    const text = "Here is a **bold** word and `code` block.";
+    const chunks = splitTextForStreaming(text);
+    expect(chunks.join("")).toBe(text);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StreamingTagParser — word-level delta streaming
+// ---------------------------------------------------------------------------
+describe("StreamingTagParser word-level deltas", () => {
+  it("splits long text into multiple text-delta events", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    p.feed("The quick brown fox jumps over the lazy dog");
+    p.flush();
+
+    const deltas = w.events.filter((e: StreamEvent) => e.type === "text-delta");
+    // Should have multiple word-level deltas, not a single blob
+    expect(deltas.length).toBeGreaterThan(1);
+    expect(deltas.map((e: StreamEvent) => e.delta).join("")).toBe(
+      "The quick brown fox jumps over the lazy dog",
+    );
+  });
+
+  it("keeps short text as a single delta", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    p.feed("Hi");
+    p.flush();
+
+    const deltas = w.events.filter((e: StreamEvent) => e.type === "text-delta");
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0].delta).toBe("Hi");
+  });
+
+  it("all deltas share the same text ID", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    p.feed("word one word two word three word four");
+    p.flush();
+
+    const deltas = w.events.filter((e: StreamEvent) => e.type === "text-delta");
+    const ids = new Set(deltas.map((e: StreamEvent) => e.id));
+    expect(ids.size).toBe(1);
+  });
+
+  it("emits text-start before first delta and text-end after flush", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    p.feed("Hello world from agent");
+    p.flush();
+
+    const types = w.events.map((e: StreamEvent) => e.type);
+    const startIdx = types.indexOf("text-start");
+    const firstDeltaIdx = types.indexOf("text-delta");
+    const endIdx = types.indexOf("text-end");
+
+    expect(startIdx).toBeLessThan(firstDeltaIdx);
+    expect(firstDeltaIdx).toBeLessThan(endIdx);
+  });
+
+  it("preserves exact content across multiple feed calls", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    // Simulate multiple WS chunks arriving
+    p.feed("First chunk of text ");
+    p.feed("and the second chunk ");
+    p.feed("followed by the third.");
+    p.flush();
+
+    const deltas = w.events.filter((e: StreamEvent) => e.type === "text-delta");
+    const combined = deltas.map((e: StreamEvent) => e.delta).join("");
+    expect(combined).toBe("First chunk of text and the second chunk followed by the third.");
+  });
+
+  it("does not split reasoning content into word deltas", () => {
+    const w = createMockWriter();
+    const p = new StreamingTagParser(w as unknown as UIMessageStreamWriter);
+    p.feed("<thinking>This is a longer reasoning block with many words</thinking>");
+    p.flush();
+
+    // Reasoning content is emitted as-is (not word-split)
+    const reasoningDeltas = w.events.filter((e: StreamEvent) => e.type === "reasoning-delta");
+    expect(reasoningDeltas).toHaveLength(1);
+    expect(reasoningDeltas[0].delta).toBe("This is a longer reasoning block with many words");
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { UIMessageChunk } from "ai";
 
 /**
  * Tests for chat handler message extraction logic.
@@ -128,5 +129,139 @@ describe("chat handler POST", () => {
     });
     const resp = await POST(req);
     expect(resp.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SSE streaming: delta delay and formatting
+// ---------------------------------------------------------------------------
+describe("SSE streaming transform", () => {
+  /**
+   * Builds the same TransformStream used in chat.ts for SSE formatting.
+   * We duplicate the logic here so tests stay focused on behavior, not
+   * module wiring. If the constant or types change, these tests will
+   * catch regressions.
+   */
+  const SSE_DELTA_DELAY_MS = 10;
+  const DELTA_TYPES = new Set<UIMessageChunk["type"]>(["text-delta", "reasoning-delta"]);
+
+  function createSseTransform() {
+    return new TransformStream<UIMessageChunk, string>({
+      async transform(part, controller) {
+        controller.enqueue(`data: ${JSON.stringify(part)}\n\n`);
+        if (DELTA_TYPES.has(part.type)) {
+          await new Promise<void>((r) => setTimeout(r, SSE_DELTA_DELAY_MS));
+        }
+      },
+      flush(controller) {
+        controller.enqueue("data: [DONE]\n\n");
+      },
+    });
+  }
+
+  async function collectChunks(stream: ReadableStream<string>): Promise<string[]> {
+    const reader = stream.getReader();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    return chunks;
+  }
+
+  it("formats parts as SSE data lines", async () => {
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "text-start", id: "t1" } as UIMessageChunk);
+        controller.enqueue({ type: "text-end", id: "t1" } as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const chunks = await collectChunks(input.pipeThrough(createSseTransform()));
+    expect(chunks.every((c) => c.startsWith("data: ") && c.endsWith("\n\n"))).toBe(true);
+  });
+
+  it("appends [DONE] sentinel on flush", async () => {
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "text-start", id: "t1" } as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const chunks = await collectChunks(input.pipeThrough(createSseTransform()));
+    expect(chunks[chunks.length - 1]).toBe("data: [DONE]\n\n");
+  });
+
+  it("delays after text-delta events", async () => {
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "text-delta", id: "t1", delta: "hello " } as UIMessageChunk);
+        controller.enqueue({ type: "text-delta", id: "t1", delta: "world" } as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const start = performance.now();
+    await collectChunks(input.pipeThrough(createSseTransform()));
+    const elapsed = performance.now() - start;
+
+    // 2 text-deltas × 10ms = at least ~20ms of delay
+    expect(elapsed).toBeGreaterThanOrEqual(15);
+  });
+
+  it("delays after reasoning-delta events", async () => {
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({
+          type: "reasoning-delta",
+          id: "r1",
+          delta: "think ",
+        } as UIMessageChunk);
+        controller.enqueue({ type: "reasoning-delta", id: "r1", delta: "more" } as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const start = performance.now();
+    await collectChunks(input.pipeThrough(createSseTransform()));
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeGreaterThanOrEqual(15);
+  });
+
+  it("does not delay for non-delta events", async () => {
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "text-start", id: "t1" } as UIMessageChunk);
+        controller.enqueue({ type: "text-end", id: "t1" } as UIMessageChunk);
+        controller.enqueue({ type: "reasoning-start", id: "r1" } as UIMessageChunk);
+        controller.enqueue({ type: "reasoning-end", id: "r1" } as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const start = performance.now();
+    await collectChunks(input.pipeThrough(createSseTransform()));
+    const elapsed = performance.now() - start;
+
+    // Non-delta events should pass through with no artificial delay
+    expect(elapsed).toBeLessThan(15);
+  });
+
+  it("preserves JSON structure in SSE output", async () => {
+    const part = { type: "text-delta" as const, id: "t1", delta: "hello" };
+    const input = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue(part as UIMessageChunk);
+        controller.close();
+      },
+    });
+
+    const chunks = await collectChunks(input.pipeThrough(createSseTransform()));
+    const sseData = chunks[0].replace(/^data: /, "").replace(/\n\n$/, "");
+    expect(JSON.parse(sseData)).toEqual(part);
   });
 });

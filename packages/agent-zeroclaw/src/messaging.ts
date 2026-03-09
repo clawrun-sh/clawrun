@@ -128,6 +128,19 @@ type ParserState = "normal" | "thinking" | "response" | "tool_call" | "tool_resu
  *
  * Content outside tags is emitted as text-delta.
  */
+
+/**
+ * Split a text chunk into word-sized pieces for progressive streaming.
+ *
+ * Matches the AI SDK `smoothStream` default ("word") chunking pattern:
+ * each piece is a word with its trailing whitespace attached, so the
+ * concatenation of all pieces equals the original text.
+ */
+export function splitTextForStreaming(text: string): string[] {
+  if (text.length <= 8) return [text];
+  return text.match(/\S+\s*|\s+/g) ?? [text];
+}
+
 export class StreamingTagParser {
   private buffer = "";
   private state: ParserState = "normal";
@@ -379,7 +392,12 @@ export class StreamingTagParser {
       this.writer.write({ type: "text-start", id: this.textId });
       this.textOpen = true;
     }
-    this.writer.write({ type: "text-delta", id: this.textId, delta: content });
+    // Split large chunks into word-sized deltas for progressive streaming.
+    // The pull-based merge stream adds a macrotask delay between each write,
+    // ensuring every delta gets its own SSE event and TCP segment.
+    for (const delta of splitTextForStreaming(content)) {
+      this.writer.write({ type: "text-delta", id: this.textId, delta });
+    }
   }
 
   private closeText(): void {
@@ -883,6 +901,7 @@ async function streamViaWs(
     // discarded writer (intermediate tool-loop output); only post-clear
     // chunks stream to the real writer (final answer).
     const nullWriter = { write: () => {} } as unknown as UIMessageStreamWriter;
+
     let parser = new StreamingTagParser(isClawrun ? nullWriter : writer);
     let receivedClear = false;
 
@@ -932,14 +951,8 @@ async function streamViaWs(
       ws.send(JSON.stringify({ type: "message", content: message }));
     });
 
-    ws.on("message", (data: Buffer) => {
-      let msg: DaemonWsMessage;
-      try {
-        msg = JSON.parse(data.toString()) as DaemonWsMessage;
-      } catch {
-        return;
-      }
-
+    // -- Async message handler (extracted for queue-based processing) ----------
+    async function handleMessage(msg: DaemonWsMessage): Promise<void> {
       switch (msg.type) {
         case "history": {
           const count = Array.isArray(msg.messages) ? msg.messages.length : 0;
@@ -1052,7 +1065,7 @@ async function streamViaWs(
           parser.flush();
           if (isClawrun) {
             receivedClear = true;
-            parser = new StreamingTagParser(writer); // fresh parser → real writer
+            parser = new StreamingTagParser(writer);
           }
           break;
         }
@@ -1065,10 +1078,12 @@ async function streamViaWs(
           if (isClawrun && receivedClear && parser.hasEmitted) {
             // /ws/clawrun: post-clear content was streamed — embed images then resolve
             cleanup();
-            embedImages(sandbox, root, msg.full_response ?? "").then(
-              () => settle(() => resolve()),
-              (err) => settle(() => reject(err)),
-            );
+            try {
+              await embedImages(sandbox, root, msg.full_response ?? "");
+              settle(() => resolve());
+            } catch (err) {
+              settle(() => reject(err as Error));
+            }
           } else if (!isClawrun && parser.hasEmitted) {
             // /ws/chat: content was streamed via chunks — already emitted
             cleanup();
@@ -1079,13 +1094,13 @@ async function streamViaWs(
             const finalContent =
               raw || "Tool execution completed, but no final response text was returned.";
             cleanup();
-            embedImages(sandbox, root, finalContent).then(
-              (enriched) => {
-                emitParsedResponse(writer, enriched);
-                settle(() => resolve());
-              },
-              (err) => settle(() => reject(err)),
-            );
+            try {
+              const enriched = await embedImages(sandbox, root, finalContent);
+              emitParsedResponse(writer, enriched);
+              settle(() => resolve());
+            } catch (err) {
+              settle(() => reject(err as Error));
+            }
           }
           break;
         }
@@ -1101,6 +1116,32 @@ async function streamViaWs(
           break;
         }
       }
+    }
+
+    // Message queue — serializes WS message processing so async handlers
+    // (e.g. embedImages in done/message) don't interleave.
+    const messageQueue: DaemonWsMessage[] = [];
+    let processingQueue = false;
+
+    async function processQueue(): Promise<void> {
+      if (processingQueue) return;
+      processingQueue = true;
+      while (messageQueue.length > 0 && !settled) {
+        const msg = messageQueue.shift()!;
+        await handleMessage(msg);
+      }
+      processingQueue = false;
+    }
+
+    ws.on("message", (data: Buffer) => {
+      let msg: DaemonWsMessage;
+      try {
+        msg = JSON.parse(data.toString()) as DaemonWsMessage;
+      } catch {
+        return;
+      }
+      messageQueue.push(msg);
+      processQueue();
     });
 
     ws.on("error", (err: Error) => {
