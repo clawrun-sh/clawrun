@@ -1544,7 +1544,7 @@ export async function fetchCronJobs(
     (j): CronJob => ({
       id: String(j.id ?? ""),
       name: j.name != null ? String(j.name) : undefined,
-      schedule: String(j.schedule ?? ""),
+      schedule: j.schedule != null ? String(j.schedule) : undefined,
       command: String(j.command ?? ""),
       nextRun:
         j.nextRun != null ? String(j.nextRun) : j.next_run != null ? String(j.next_run) : undefined,

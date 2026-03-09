@@ -1,15 +1,26 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useApiClient, useQuery } from "../hooks/use-api-client";
+import { useCallback, useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@clawrun/ui/components/ui/table";
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useApiClient } from "../hooks/use-api-client";
+import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { DataTable } from "@clawrun/ui/components/ui/data-table";
+import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
+import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
+import { DataTableViewOptions } from "@clawrun/ui/components/ui/data-table-view-options";
+import { DataTableFacetedFilter } from "@clawrun/ui/components/ui/data-table-faceted-filter";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Input } from "@clawrun/ui/components/ui/input";
 import { Badge } from "@clawrun/ui/components/ui/badge";
@@ -34,67 +45,166 @@ import {
 } from "@clawrun/ui/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Label } from "@clawrun/ui/components/ui/label";
-import type { MemoriesResult } from "@clawrun/agent";
-import { Brain, Plus, Search, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import type { MemoryEntryInfo } from "@clawrun/agent";
+import { Separator } from "@clawrun/ui/components/ui/separator";
+import { Brain, Fingerprint, MessageSquare, Plus, Search, Tag, Trash2, X } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
+import { timeAgo } from "@clawrun/ui/lib/time-ago";
 
-type SortColumn = "timestamp";
-type SortDirection = "asc" | "desc";
+const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  conversation: MessageSquare,
+  core: Fingerprint,
+};
 
-function SortIcon({
-  column,
-  current,
-  direction,
-}: {
-  column: SortColumn;
-  current: SortColumn | null;
-  direction: SortDirection;
-}) {
-  if (current !== column)
-    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
-  return direction === "asc" ? (
-    <ArrowUp className="ml-1 inline size-3.5" />
-  ) : (
-    <ArrowDown className="ml-1 inline size-3.5" />
-  );
+function CategoryIcon({ category }: { category?: string }) {
+  if (!category) return null;
+  const Icon = categoryIcons[category] ?? Tag;
+  return <Icon className="size-3.5 shrink-0" />;
 }
+
+const columns: ColumnDef<MemoryEntryInfo>[] = [
+  {
+    accessorKey: "key",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Key" />,
+    cell: ({ row }) => (
+      <span className="truncate font-mono text-xs block">{row.getValue("key")}</span>
+    ),
+    size: 180,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "content",
+    header: "Content",
+    cell: function ContentCell({ row, table }) {
+      const onView = (table.options.meta as { onViewEntry?: (entry: MemoryEntryInfo) => void })
+        ?.onViewEntry;
+      return (
+        <button
+          type="button"
+          className="line-clamp-2 text-sm text-left hover:underline cursor-pointer w-full overflow-hidden"
+          onClick={() => onView?.(row.original)}
+        >
+          {row.getValue("content")}
+        </button>
+      );
+    },
+    meta: { cellClassName: "whitespace-normal" },
+  },
+  {
+    accessorKey: "category",
+    header: "Category",
+    cell: ({ row }) => {
+      const category = row.getValue("category") as string | undefined;
+      return category ? (
+        <Badge variant="secondary" className="gap-1">
+          <CategoryIcon category={category} />
+          {category}
+        </Badge>
+      ) : null;
+    },
+    size: 120,
+    filterFn: (row, id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      const val = row.getValue(id) as string | undefined;
+      return val != null && filterValues.includes(val);
+    },
+  },
+  {
+    accessorKey: "timestamp",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Timestamp" />,
+    cell: ({ row }) => {
+      const ts = row.getValue("timestamp") as string | undefined;
+      return <span className="whitespace-nowrap text-xs text-muted-foreground">{timeAgo(ts)}</span>;
+    },
+    size: 120,
+    sortingFn: "datetime",
+  },
+  {
+    id: "actions",
+    cell: function ActionsCell({ row, table }) {
+      const handleDelete = (table.options.meta as { handleDelete: (key: string) => void })
+        ?.handleDelete;
+      const entry = row.original;
+      return (
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="size-4" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Delete memory</TooltipContent>
+          </Tooltip>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete memory entry?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete &ldquo;{entry.key}&rdquo;. This action cannot be
+                undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleDelete?.(entry.key)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+    },
+    size: 56,
+    enableHiding: false,
+  },
+];
 
 export default function MemoryPage() {
   const client = useApiClient();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
 
-  const { data, loading, error, refetch } = useQuery(
-    (s) =>
-      client.listMemories(
-        { query: searchQuery || undefined, category: categoryFilter || undefined },
-        s,
-      ),
-    [client, searchQuery, categoryFilter],
+  const { data, loading, error, refetch } = useSandboxQuery(
+    (s) => client.listMemories({}, s),
+    [client],
   );
 
   const entries = data?.entries ?? [];
-  const categories = [...new Set(entries.map((e) => e.category).filter(Boolean))] as string[];
 
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  const sorted = useMemo(() => {
-    if (!sortColumn) return entries;
-    return Array.from(entries).sort((a, b) => {
-      const cmp = new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime();
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-  }, [entries, sortColumn, sortDirection]);
+  const [viewEntry, setViewEntry] = useState<MemoryEntryInfo | null>(null);
 
-  const toggleSort = (col: SortColumn) => {
-    if (sortColumn === col) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(col);
-      setSortDirection("desc");
-    }
-  };
+  const handleDelete = useCallback(
+    async (key: string) => {
+      try {
+        await client.deleteMemory(key);
+        refetch();
+      } catch {}
+    },
+    [client, refetch],
+  );
+
+  const table = useReactTable({
+    data: entries,
+    columns,
+    state: { sorting, columnFilters, columnVisibility, globalFilter },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getPaginationRowModel: getPaginationRowModel(),
+    meta: { handleDelete, onViewEntry: setViewEntry },
+  });
+
+  const isFiltered = columnFilters.length > 0 || globalFilter.length > 0;
 
   const [addOpen, setAddOpen] = useState(false);
   const [newKey, setNewKey] = useState("");
@@ -120,16 +230,6 @@ export default function MemoryPage() {
     setAdding(false);
   }, [client, newKey, newContent, newCategory, refetch]);
 
-  const handleDelete = useCallback(
-    async (key: string) => {
-      try {
-        await client.deleteMemory(key);
-        refetch();
-      } catch {}
-    },
-    [client, refetch],
-  );
-
   return (
     <SandboxOfflineGuard>
       <div className="@container/main flex flex-1 flex-col gap-2">
@@ -141,31 +241,27 @@ export default function MemoryPage() {
               <Input
                 className="pl-9"
                 placeholder="Search memories..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
               />
             </div>
-            {categories.length > 0 && (
-              <div className="flex gap-1">
-                <Button
-                  variant={!categoryFilter ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCategoryFilter("")}
-                >
-                  All
-                </Button>
-                {categories.map((cat) => (
-                  <Button
-                    key={cat}
-                    variant={categoryFilter === cat ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCategoryFilter(cat === categoryFilter ? "" : cat)}
-                  >
-                    {cat}
-                  </Button>
-                ))}
-              </div>
+            {table.getColumn("category") && (
+              <DataTableFacetedFilter column={table.getColumn("category")} title="Category" />
             )}
+            {isFiltered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setColumnFilters([]);
+                  setGlobalFilter("");
+                }}
+              >
+                Reset
+                <X className="ml-1 size-3.5" />
+              </Button>
+            )}
+            <DataTableViewOptions table={table} />
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -234,80 +330,47 @@ export default function MemoryPage() {
                 <p className="text-muted-foreground">No memories found</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Key</TableHead>
-                      <TableHead className="w-full">Content</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => toggleSort("timestamp")}
-                      >
-                        Timestamp
-                        <SortIcon
-                          column="timestamp"
-                          current={sortColumn}
-                          direction={sortDirection}
-                        />
-                      </TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sorted.map((entry) => (
-                      <TableRow key={entry.key}>
-                        <TableCell className="max-w-48 truncate font-mono text-xs">
-                          {entry.key}
-                        </TableCell>
-                        <TableCell className="max-w-96">
-                          <p className="line-clamp-2 text-sm">{entry.content}</p>
-                        </TableCell>
-                        <TableCell>
-                          {entry.category && <Badge variant="secondary">{entry.category}</Badge>}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                          {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <AlertDialog>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="size-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete memory</TooltipContent>
-                            </Tooltip>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete memory entry?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete &ldquo;{entry.key}&rdquo;. This
-                                  action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(entry.key)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <>
+                <DataTable table={table} columns={columns} />
+                <DataTablePagination table={table} />
+              </>
             )}
           </div>
         </div>
       </div>
+      {viewEntry && (
+        <Dialog
+          open={!!viewEntry}
+          onOpenChange={(open) => {
+            if (!open) setViewEntry(null);
+          }}
+        >
+          <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+            <DialogHeader className="shrink-0">
+              <DialogTitle className="font-mono text-sm break-all pr-8">
+                {viewEntry.key}
+              </DialogTitle>
+              <div className="flex items-center gap-2 pt-1">
+                {viewEntry.category && (
+                  <Badge variant="secondary" className="gap-1">
+                    <CategoryIcon category={viewEntry.category} />
+                    {viewEntry.category}
+                  </Badge>
+                )}
+                {viewEntry.timestamp && (
+                  <span className="text-xs text-muted-foreground">
+                    {timeAgo(viewEntry.timestamp)}
+                  </span>
+                )}
+              </div>
+            </DialogHeader>
+            <Separator className="shrink-0" />
+            <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed">
+              {viewEntry.content}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </SandboxOfflineGuard>
   );
 }

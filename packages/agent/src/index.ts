@@ -32,6 +32,11 @@ export type {
   CreateMemoryInput,
   CronJobsResult,
   CreateCronJobInput,
+  LogEntry,
+  LogsResult,
+  WorkspaceFile,
+  WorkspaceListResult,
+  WorkspaceFileResult,
 } from "./types.js";
 export type { UIMessage, UIMessageStreamWriter } from "ai";
 export type { Tool, ToolResult } from "./tools.js";

@@ -1,15 +1,26 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useApiClient, useQuery } from "../hooks/use-api-client";
+import { useCallback, useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@clawrun/ui/components/ui/table";
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useApiClient } from "../hooks/use-api-client";
+import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { DataTable } from "@clawrun/ui/components/ui/data-table";
+import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
+import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
+import { DataTableViewOptions } from "@clawrun/ui/components/ui/data-table-view-options";
+import { DataTableFacetedFilter } from "@clawrun/ui/components/ui/data-table-faceted-filter";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Input } from "@clawrun/ui/components/ui/input";
 import { Badge } from "@clawrun/ui/components/ui/badge";
@@ -34,67 +45,195 @@ import {
 } from "@clawrun/ui/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Label } from "@clawrun/ui/components/ui/label";
-import type { CronJobsResult } from "@clawrun/agent";
-import { Clock, Plus, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import type { CronJob } from "@clawrun/agent";
+import { Clock, Plus, Search, Trash2, X } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
+import { timeAgo } from "@clawrun/ui/lib/time-ago";
 
-function formatDate(iso?: string): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const columns: ColumnDef<CronJob>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <span className="font-medium truncate block">{row.original.name ?? row.original.id}</span>
+    ),
+    enableHiding: false,
+  },
+  {
+    accessorKey: "enabled",
+    id: "status",
+    header: "Status",
+    size: 90,
+    cell: ({ row }) => {
+      const job = row.original;
+      return job.enabled === false ? (
+        <Badge variant="secondary" className="capitalize">
+          Disabled
+        </Badge>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-block size-2 rounded-full bg-emerald-500" />
+          </TooltipTrigger>
+          <TooltipContent>Active</TooltipContent>
+        </Tooltip>
+      );
+    },
+    filterFn: (row, _id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      const enabled = row.original.enabled !== false;
+      return filterValues.includes(enabled ? "active" : "disabled");
+    },
+    enableSorting: false,
+  },
+  {
+    accessorKey: "command",
+    header: "Command",
+    cell: ({ row }) => {
+      const val: string | undefined = row.getValue("command");
+      return (
+        <span
+          className={val ? "font-mono text-xs truncate block" : "text-xs text-muted-foreground"}
+        >
+          {val || "—"}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "nextRun",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Next Run" />,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-xs text-muted-foreground">
+        {timeAgo(row.getValue("nextRun"))}
+      </span>
+    ),
+    size: 140,
+    sortingFn: "datetime",
+  },
+  {
+    accessorKey: "lastRun",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Last Run" />,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-xs text-muted-foreground">
+        {timeAgo(row.getValue("lastRun"))}
+      </span>
+    ),
+    size: 140,
+    sortingFn: "datetime",
+  },
+  {
+    accessorKey: "lastStatus",
+    header: "Last Status",
+    size: 100,
+    cell: ({ row }) => {
+      const val: string | undefined = row.getValue("lastStatus");
+      if (!val) return <span className="text-xs text-muted-foreground">—</span>;
+      return (
+        <Badge
+          variant="secondary"
+          className={
+            val === "ok"
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "bg-destructive/10 text-destructive"
+          }
+        >
+          {val}
+        </Badge>
+      );
+    },
+    enableSorting: false,
+  },
+  {
+    id: "actions",
+    cell: function ActionsCell({ row, table }) {
+      const handleDelete = (table.options.meta as { handleDelete: (id: string) => void })
+        ?.handleDelete;
+      const job = row.original;
+      return (
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="size-4" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Delete cron job</TooltipContent>
+          </Tooltip>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete cron job?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete &ldquo;{job.name ?? job.id}&rdquo;. This action cannot
+                be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-white hover:bg-destructive/90"
+                onClick={() => handleDelete?.(job.id)}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+    },
+    size: 56,
+    enableHiding: false,
+  },
+];
 
-type SortColumn = "nextRun" | "lastRun";
-type SortDirection = "asc" | "desc";
-
-function SortIcon({
-  column,
-  current,
-  direction,
-}: {
-  column: SortColumn;
-  current: SortColumn | null;
-  direction: SortDirection;
-}) {
-  if (current !== column)
-    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
-  return direction === "asc" ? (
-    <ArrowUp className="ml-1 inline size-3.5" />
-  ) : (
-    <ArrowDown className="ml-1 inline size-3.5" />
-  );
-}
+const statusOptions = [
+  { label: "Active", value: "active" },
+  { label: "Disabled", value: "disabled" },
+];
 
 export default function CronPage() {
   const client = useApiClient();
-  const { data, loading, error, refetch } = useQuery((s) => client.listCronJobs(s), [client]);
+  const { data, loading, error, refetch } = useSandboxQuery(
+    (s) => client.listCronJobs(s),
+    [client],
+  );
   const jobs = data?.jobs ?? [];
 
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  const sorted = useMemo(() => {
-    if (!sortColumn) return jobs;
-    return Array.from(jobs).sort((a, b) => {
-      const aVal = sortColumn === "nextRun" ? a.nextRun : a.lastRun;
-      const bVal = sortColumn === "nextRun" ? b.nextRun : b.lastRun;
-      const cmp = new Date(aVal || 0).getTime() - new Date(bVal || 0).getTime();
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-  }, [jobs, sortColumn, sortDirection]);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      try {
+        await client.deleteCronJob(id);
+        refetch();
+      } catch {}
+    },
+    [client, refetch],
+  );
 
-  const toggleSort = (col: SortColumn) => {
-    if (sortColumn === col) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(col);
-      setSortDirection("desc");
-    }
-  };
+  const table = useReactTable({
+    data: jobs,
+    columns,
+    state: { sorting, columnFilters, columnVisibility, globalFilter },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getPaginationRowModel: getPaginationRowModel(),
+    meta: { handleDelete },
+  });
+
+  const isFiltered = columnFilters.length > 0 || globalFilter.length > 0;
 
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -120,21 +259,41 @@ export default function CronPage() {
     setAdding(false);
   }, [client, newName, newSchedule, newCommand, refetch]);
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      try {
-        await client.deleteCronJob(id);
-        refetch();
-      } catch {}
-    },
-    [client, refetch],
-  );
-
   return (
     <SandboxOfflineGuard>
       <div className="@container/main flex flex-1 flex-col gap-2">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <div className="flex items-center justify-end px-4 lg:px-6">
+          <div className="flex items-center justify-between gap-3 px-4 lg:px-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Filter jobs..."
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+              />
+            </div>
+            {table.getColumn("status") && (
+              <DataTableFacetedFilter
+                column={table.getColumn("status")}
+                title="Status"
+                options={statusOptions}
+              />
+            )}
+            {isFiltered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setColumnFilters([]);
+                  setGlobalFilter("");
+                }}
+              >
+                Reset
+                <X className="ml-1 size-3.5" />
+              </Button>
+            )}
+            <DataTableViewOptions table={table} />
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -201,90 +360,10 @@ export default function CronPage() {
                 <p className="text-muted-foreground">No cron jobs configured</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-full">Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => toggleSort("nextRun")}
-                      >
-                        Next Run
-                        <SortIcon column="nextRun" current={sortColumn} direction={sortDirection} />
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => toggleSort("lastRun")}
-                      >
-                        Last Run
-                        <SortIcon column="lastRun" current={sortColumn} direction={sortDirection} />
-                      </TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sorted.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium">{job.name ?? job.id}</TableCell>
-                        <TableCell>
-                          {job.enabled === false ? (
-                            <Badge variant="secondary" className="capitalize">
-                              Disabled
-                            </Badge>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-block size-2 rounded-full bg-emerald-500" />
-                              </TooltipTrigger>
-                              <TooltipContent>Active</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                          {formatDate(job.nextRun)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                          {formatDate(job.lastRun)}
-                        </TableCell>
-                        <TableCell>
-                          <AlertDialog>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="size-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete cron job</TooltipContent>
-                            </Tooltip>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete cron job?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete &ldquo;{job.name ?? job.id}&rdquo;.
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive text-white hover:bg-destructive/90"
-                                  onClick={() => handleDelete(job.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <>
+                <DataTable table={table} columns={columns} />
+                <DataTablePagination table={table} />
+              </>
             )}
           </div>
         </div>

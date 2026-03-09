@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Config" };
 export const dynamic = "force-dynamic";
-export { default } from "@/lib/components/config-page";
+
+export default function ConfigRedirect() {
+  redirect("/files");
+}

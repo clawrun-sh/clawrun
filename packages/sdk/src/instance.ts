@@ -31,6 +31,9 @@ import type {
   CronJobsResult,
   CreateCronJobInput,
   CronJob,
+  LogsResult,
+  WorkspaceListResult,
+  WorkspaceFileResult,
 } from "@clawrun/agent";
 
 /**
@@ -214,6 +217,31 @@ export class ClawRunInstance {
   /** Delete a cron job by ID. */
   async deleteCronJob(id: string, signal?: AbortSignal): Promise<void> {
     await this.api.delete(`/api/v1/cron/${encodeURIComponent(id)}`, signal);
+  }
+
+  // --- Logs ---
+
+  /** Read sidecar log entries from the sandbox. */
+  async readLogs(options?: { limit?: number }, signal?: AbortSignal): Promise<LogsResult> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    const qs = params.toString();
+    return this.api.get<LogsResult>(`/api/v1/logs${qs ? `?${qs}` : ""}`, signal);
+  }
+
+  // --- Workspace ---
+
+  /** List .md files in the agent workspace directory. */
+  async listWorkspaceFiles(signal?: AbortSignal): Promise<WorkspaceListResult> {
+    return this.api.get<WorkspaceListResult>("/api/v1/workspace", signal);
+  }
+
+  /** Read a workspace file by name. */
+  async readWorkspaceFile(name: string, signal?: AbortSignal): Promise<WorkspaceFileResult> {
+    return this.api.get<WorkspaceFileResult>(
+      `/api/v1/workspace/${encodeURIComponent(name)}`,
+      signal,
+    );
   }
 
   // --- Invite ---

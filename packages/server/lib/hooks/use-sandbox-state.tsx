@@ -68,15 +68,30 @@ export function SandboxStateProvider({ children }: { children: React.ReactNode }
     };
   }, [refetch, isTransitioning]);
 
-  // Clear user-initiated action when sandbox state catches up
+  // Clear user-initiated action when sandbox state catches up.
+  // When starting, hold the transitioning state for 10s after sandbox
+  // reports running to let the agent daemon fully start.
+  const settleRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const sandboxRunning = data?.sandbox?.running ?? false;
+
   useEffect(() => {
-    if (userAction === "starting" && data?.sandbox?.running) {
+    if (userAction === "starting" && sandboxRunning && !settleRef.current) {
+      settleRef.current = setTimeout(() => {
+        settleRef.current = null;
+        setUserAction(null);
+      }, 5_000);
+    }
+    if (userAction === "stopping" && data?.sandbox && !sandboxRunning) {
       setUserAction(null);
     }
-    if (userAction === "stopping" && data?.sandbox && !data.sandbox.running) {
-      setUserAction(null);
-    }
-  }, [userAction, data?.sandbox?.running, data?.sandbox]);
+  }, [userAction, sandboxRunning, data?.sandbox]);
+
+  // Clean up settle timer on unmount
+  useEffect(() => {
+    return () => {
+      if (settleRef.current) clearTimeout(settleRef.current);
+    };
+  }, []);
 
   const start = useCallback(async () => {
     setUserAction("starting");

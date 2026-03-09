@@ -1,192 +1,249 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useApiClient } from "../hooks/use-api-client";
+import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { DataTable } from "@clawrun/ui/components/ui/data-table";
+import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
+import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
+import { DataTableViewOptions } from "@clawrun/ui/components/ui/data-table-view-options";
+import { DataTableFacetedFilter } from "@clawrun/ui/components/ui/data-table-faceted-filter";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Badge } from "@clawrun/ui/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
-import { Pause, Play, ArrowDown, Trash2 } from "lucide-react";
+import { Input } from "@clawrun/ui/components/ui/input";
+import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
+import type { LogEntry } from "@clawrun/agent";
+import { FileText, RefreshCw, Search, X } from "lucide-react";
+import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
-interface LogEvent {
-  id: string;
-  type: string;
-  data: unknown;
-  timestamp: string;
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-const MAX_EVENTS = 500;
-
-const EVENT_COLORS: Record<string, string> = {
-  status: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  heartbeat: "bg-muted text-muted-foreground",
-  error: "bg-destructive/10 text-destructive",
+const LEVEL_LABELS: Record<number, string> = {
+  10: "trace",
+  20: "debug",
+  30: "info",
+  40: "warn",
+  50: "error",
+  60: "fatal",
 };
 
+const LEVEL_BADGE_COLORS: Record<string, string> = {
+  trace: "bg-muted text-muted-foreground",
+  debug: "bg-muted text-muted-foreground",
+  info: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  warn: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+  error: "bg-destructive/10 text-destructive",
+  fatal: "bg-destructive/10 text-destructive",
+};
+
+function formatDateTime(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function levelLabel(level: number): string {
+  return LEVEL_LABELS[level] ?? `L${level}`;
+}
+
+// ---------------------------------------------------------------------------
+// Table row type — extends LogEntry with a derived `levelLabel` for filtering
+// ---------------------------------------------------------------------------
+
+interface LogRow extends LogEntry {
+  levelLabel: string;
+}
+
+// ---------------------------------------------------------------------------
+// Columns
+// ---------------------------------------------------------------------------
+
+const columns: ColumnDef<LogRow>[] = [
+  {
+    accessorKey: "time",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
+    cell: ({ row }) => (
+      <span className="text-sm tabular-nums text-muted-foreground">
+        {formatDateTime(row.getValue("time"))}
+      </span>
+    ),
+    size: 180,
+    sortingFn: "basic",
+  },
+  {
+    accessorKey: "levelLabel",
+    header: "Level",
+    cell: ({ row }) => {
+      const label = row.getValue("levelLabel") as string;
+      const color = LEVEL_BADGE_COLORS[label] ?? "bg-muted text-muted-foreground";
+      return (
+        <Badge variant="secondary" className={`text-[10px] ${color}`}>
+          {label}
+        </Badge>
+      );
+    },
+    size: 80,
+    filterFn: (row, id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      return filterValues.includes(row.getValue(id) as string);
+    },
+  },
+  {
+    accessorKey: "tag",
+    header: "Tag",
+    cell: ({ row }) => {
+      const tag = row.getValue("tag") as string | undefined;
+      return tag ? (
+        <Badge variant="outline" className="text-[10px]">
+          {tag}
+        </Badge>
+      ) : null;
+    },
+    size: 110,
+    filterFn: (row, id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      return filterValues.includes(row.getValue(id) as string);
+    },
+  },
+  {
+    accessorKey: "msg",
+    header: "Message",
+    cell: ({ row }) => <span className="font-mono text-xs">{row.getValue("msg")}</span>,
+    enableSorting: false,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function LogsPage() {
-  const [events, setEvents] = useState<LogEvent[]>([]);
-  const [paused, setPaused] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const pausedRef = useRef(false);
-  const eventBufferRef = useRef<LogEvent[]>([]);
+  const client = useApiClient();
+  const { data, loading, error, refetch } = useSandboxQuery(
+    (s) => client.readLogs({ limit: 1000 }, s),
+    [client],
+  );
 
-  pausedRef.current = paused;
+  // Reverse so newest entries come first, derive levelLabel for filtering
+  const rows: LogRow[] = useMemo(() => {
+    if (!data?.entries) return [];
+    return [...data.entries].reverse().map((e) => ({
+      ...e,
+      levelLabel: levelLabel(e.level),
+    }));
+  }, [data]);
 
-  useEffect(() => {
-    const es = new EventSource("/api/v1/events", { withCredentials: true });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "time", desc: true }]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = useState("");
 
-    es.onopen = () => setConnected(true);
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting, columnFilters, columnVisibility, globalFilter },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 50 } },
+  });
 
-    es.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        const logEvent: LogEvent = {
-          id: crypto.randomUUID(),
-          type: parsed.type ?? "unknown",
-          data: parsed.data ?? parsed,
-          timestamp: parsed.timestamp ?? new Date().toISOString(),
-        };
-        if (pausedRef.current) {
-          eventBufferRef.current.push(logEvent);
-        } else {
-          setEvents((prev) => [...prev, logEvent].slice(-MAX_EVENTS));
-        }
-      } catch {}
-    };
-
-    es.onerror = () => setConnected(false);
-
-    return () => es.close();
-  }, []);
-
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [events, autoScroll]);
-
-  const handleResume = useCallback(() => {
-    setPaused(false);
-    const buffered = eventBufferRef.current;
-    eventBufferRef.current = [];
-    if (buffered.length > 0) {
-      setEvents((prev) => [...prev, ...buffered].slice(-MAX_EVENTS));
-    }
-  }, []);
-
-  const handleClear = useCallback(() => {
-    setEvents([]);
-    eventBufferRef.current = [];
-  }, []);
-
-  const filteredEvents = typeFilter ? events.filter((e) => e.type === typeFilter) : events;
-
-  const eventTypes = [...new Set(events.map((e) => e.type))];
+  const isFiltered = columnFilters.length > 0 || globalFilter.length > 0;
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-2">
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        <div className="flex items-center justify-between gap-2 px-4 lg:px-6">
-          <div className="flex items-center gap-2">
-            <Badge variant={connected ? "default" : "secondary"}>
-              {connected ? "Connected" : "Disconnected"}
-            </Badge>
-            <div className="flex gap-1">
-              <Button
-                variant={!typeFilter ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTypeFilter(null)}
-              >
-                All
-              </Button>
-              {eventTypes.map((t) => (
-                <Button
-                  key={t}
-                  variant={typeFilter === t ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setTypeFilter(t === typeFilter ? null : t)}
-                >
-                  {t}
-                </Button>
+    <SandboxOfflineGuard>
+      <div className="@container/main flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+          {loading ? (
+            <div className="space-y-2 px-4 lg:px-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => (paused ? handleResume() : setPaused(true))}
-                >
-                  {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{paused ? "Resume" : "Pause"}</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => setAutoScroll(!autoScroll)}>
-                  <ArrowDown
-                    className={`size-4 ${autoScroll ? "text-foreground" : "text-muted-foreground"}`}
+          ) : error ? (
+            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
+          ) : rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="mb-4 size-12 text-muted-foreground" />
+              <p className="text-muted-foreground">No log entries</p>
+            </div>
+          ) : (
+            <div className="px-4 lg:px-6">
+              <div className="flex items-center gap-3 pb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Search logs..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
                   />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{autoScroll ? "Auto-scroll on" : "Auto-scroll off"}</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleClear}>
-                  <Trash2 className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Clear logs</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-
-        <div className="flex-1 px-4 lg:px-6">
-          <div
-            ref={scrollRef}
-            className="h-[calc(100vh-14rem)] overflow-auto rounded-lg border bg-muted/30 font-mono text-xs"
-          >
-            {filteredEvents.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                {connected ? "Waiting for events..." : "Connecting..."}
-              </div>
-            ) : (
-              <div className="p-2">
-                {filteredEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className={`flex gap-2 rounded px-2 py-1 ${EVENT_COLORS[event.type] ?? ""}`}
+                </div>
+                {table.getColumn("levelLabel") && (
+                  <DataTableFacetedFilter column={table.getColumn("levelLabel")} title="Level" />
+                )}
+                {table.getColumn("tag") && (
+                  <DataTableFacetedFilter column={table.getColumn("tag")} title="Tag" />
+                )}
+                {isFiltered && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setColumnFilters([]);
+                      setGlobalFilter("");
+                    }}
                   >
-                    <span className="shrink-0 text-muted-foreground">
-                      {new Date(event.timestamp).toLocaleTimeString()}
-                    </span>
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
-                      {event.type}
-                    </Badge>
-                    <span className="min-w-0 break-all">
-                      {typeof event.data === "string" ? event.data : JSON.stringify(event.data)}
-                    </span>
-                  </div>
-                ))}
+                    Reset
+                    <X className="ml-1 size-3.5" />
+                  </Button>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => refetch()}>
+                    <RefreshCw className="mr-1 size-3.5" />
+                    Refresh
+                  </Button>
+                  <DataTableViewOptions table={table} />
+                </div>
               </div>
-            )}
-          </div>
+              <DataTable
+                table={table}
+                columns={columns}
+                containerClassName="overflow-auto"
+                tableClassName="table-auto"
+              />
+              <DataTablePagination table={table} pageSizeOptions={[20, 50, 100]} />
+            </div>
+          )}
         </div>
-
-        {paused && eventBufferRef.current.length > 0 && (
-          <div className="text-center text-xs text-muted-foreground">
-            {eventBufferRef.current.length} events buffered while paused
-          </div>
-        )}
       </div>
-    </div>
+    </SandboxOfflineGuard>
   );
 }

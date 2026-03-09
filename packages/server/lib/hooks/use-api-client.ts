@@ -22,9 +22,11 @@ interface QueryResult<T> {
   refetch: () => void;
 }
 
-interface QueryOptions {
+export interface QueryOptions {
   /** Re-fetch on this interval (ms). Polling stops on unmount. */
   pollInterval?: number;
+  /** When false, the query will not execute. Fetches automatically when it becomes true. */
+  enabled?: boolean;
 }
 
 /**
@@ -46,6 +48,8 @@ export function useQuery<T>(
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
+
+  const enabled = options?.enabled ?? true;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const refetch = useCallback(() => {
@@ -71,17 +75,18 @@ export function useQuery<T>(
   }, deps);
 
   useEffect(() => {
+    if (!enabled) return;
     refetch();
     return () => abortRef.current?.abort();
-  }, [refetch]);
+  }, [refetch, enabled]);
 
   // Polling
   const pollInterval = options?.pollInterval;
   useEffect(() => {
-    if (!pollInterval) return;
+    if (!pollInterval || !enabled) return;
     const id = setInterval(refetch, pollInterval);
     return () => clearInterval(id);
-  }, [refetch, pollInterval]);
+  }, [refetch, pollInterval, enabled]);
 
   return { data, error, loading, refetch };
 }

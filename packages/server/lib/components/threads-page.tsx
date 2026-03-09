@@ -1,83 +1,113 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useApiClient, useQuery } from "../hooks/use-api-client";
+import { useState } from "react";
+import Link from "next/link";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@clawrun/ui/components/ui/table";
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useApiClient } from "../hooks/use-api-client";
+import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { DataTable } from "@clawrun/ui/components/ui/data-table";
+import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
+import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
+import { DataTableViewOptions } from "@clawrun/ui/components/ui/data-table-view-options";
+import { DataTableFacetedFilter } from "@clawrun/ui/components/ui/data-table-faceted-filter";
+import { Button } from "@clawrun/ui/components/ui/button";
+import { Input } from "@clawrun/ui/components/ui/input";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
-import type { ThreadsResult } from "@clawrun/agent";
-import { MessagesSquare, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import type { ThreadInfo } from "@clawrun/agent";
+import { MessagesSquare, Search, X } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
+import { timeAgo } from "@clawrun/ui/lib/time-ago";
 
-function formatDate(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-type SortColumn = "messageCount" | "lastActivity";
-type SortDirection = "asc" | "desc";
-
-function SortIcon({
-  column,
-  current,
-  direction,
-}: {
-  column: SortColumn;
-  current: SortColumn | null;
-  direction: SortDirection;
-}) {
-  if (current !== column)
-    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
-  return direction === "asc" ? (
-    <ArrowUp className="ml-1 inline size-3.5" />
-  ) : (
-    <ArrowDown className="ml-1 inline size-3.5" />
-  );
-}
+const columns: ColumnDef<ThreadInfo>[] = [
+  {
+    accessorKey: "channel",
+    header: "Channel",
+    cell: ({ row }) => <Badge variant="secondary">{row.getValue("channel")}</Badge>,
+    size: 120,
+    filterFn: (row, id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      return filterValues.includes(row.getValue(id) as string);
+    },
+  },
+  {
+    accessorKey: "preview",
+    header: "Preview",
+    cell: ({ row }) => (
+      <Link
+        href={`/threads/${encodeURIComponent(row.original.id)}`}
+        className="truncate text-sm hover:underline block"
+      >
+        {row.original.preview || "—"}
+      </Link>
+    ),
+    enableSorting: false,
+  },
+  {
+    accessorKey: "messageCount",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Messages" className="justify-end" />
+    ),
+    cell: ({ row }) => (
+      <span className="text-right text-sm text-muted-foreground tabular-nums block">
+        {row.getValue("messageCount")}
+      </span>
+    ),
+    size: 100,
+    meta: { cellClassName: "text-right" },
+  },
+  {
+    accessorKey: "lastActivity",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Last Activity" />,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-sm text-muted-foreground">
+        {timeAgo(row.getValue("lastActivity"))}
+      </span>
+    ),
+    size: 160,
+    sortingFn: "datetime",
+  },
+];
 
 export default function ThreadsPage() {
   const client = useApiClient();
-  const { data, loading, error } = useQuery((s) => client.listThreads(s), [client]);
-
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
+  const { data, loading, error } = useSandboxQuery((s) => client.listThreads(s), [client]);
   const threads = data?.threads ?? [];
 
-  const sorted = useMemo(() => {
-    if (!sortColumn) return threads;
-    return Array.from(threads).sort((a, b) => {
-      let cmp = 0;
-      if (sortColumn === "messageCount") {
-        cmp = (a.messageCount ?? 0) - (b.messageCount ?? 0);
-      } else if (sortColumn === "lastActivity") {
-        cmp = new Date(a.lastActivity || 0).getTime() - new Date(b.lastActivity || 0).getTime();
-      }
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-  }, [threads, sortColumn, sortDirection]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  const toggleSort = (col: SortColumn) => {
-    if (sortColumn === col) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(col);
-      setSortDirection("desc");
-    }
-  };
+  const table = useReactTable({
+    data: threads,
+    columns,
+    state: { sorting, columnFilters, columnVisibility, globalFilter },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const isFiltered = columnFilters.length > 0 || globalFilter.length > 0;
 
   return (
     <SandboxOfflineGuard>
@@ -98,61 +128,36 @@ export default function ThreadsPage() {
             </div>
           ) : (
             <div className="px-4 lg:px-6">
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Channel</TableHead>
-                      <TableHead className="w-full">Preview</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none text-right"
-                        onClick={() => toggleSort("messageCount")}
-                      >
-                        Messages
-                        <SortIcon
-                          column="messageCount"
-                          current={sortColumn}
-                          direction={sortDirection}
-                        />
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => toggleSort("lastActivity")}
-                      >
-                        Last Activity
-                        <SortIcon
-                          column="lastActivity"
-                          current={sortColumn}
-                          direction={sortDirection}
-                        />
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sorted.map((thread) => (
-                      <TableRow key={thread.id}>
-                        <TableCell>
-                          <Badge variant="secondary">{thread.channel}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <a
-                            href={`/threads/${encodeURIComponent(thread.id)}`}
-                            className="line-clamp-1 text-sm hover:underline"
-                          >
-                            {thread.preview || "—"}
-                          </a>
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                          {thread.messageCount}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDate(thread.lastActivity)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="flex items-center gap-3 pb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Filter threads..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                  />
+                </div>
+                {table.getColumn("channel") && (
+                  <DataTableFacetedFilter column={table.getColumn("channel")} title="Channel" />
+                )}
+                {isFiltered && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setColumnFilters([]);
+                      setGlobalFilter("");
+                    }}
+                  >
+                    Reset
+                    <X className="ml-1 size-3.5" />
+                  </Button>
+                )}
+                <DataTableViewOptions table={table} />
               </div>
+              <DataTable table={table} columns={columns} />
+              <DataTablePagination table={table} />
             </div>
           )}
         </div>

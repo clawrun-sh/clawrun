@@ -112,6 +112,7 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
     // (e.g. browser snapshots can be 60K+ chars per page visit).
     max_history_messages: 20,
     max_tool_iterations: 50,
+    parallel_tools: true,
     session: {
       backend: "sqlite",
       strategy: "per-sender",
@@ -131,6 +132,23 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
     allowed_domains: ["*"],
     max_response_size: 500_000,
     timeout_secs: 30,
+  },
+  // Web search via DuckDuckGo — free, no API key required.
+  web_search: {
+    enabled: true,
+    provider: "duckduckgo",
+  },
+  // Raw HTTP client for API interactions (REST calls, webhooks, JSON APIs).
+  http_request: {
+    enabled: true,
+    allowed_domains: ["*"],
+    max_response_size: 1_000_000,
+    timeout_secs: 30,
+  },
+  // Proactive research phase — agent gathers info before answering when needed.
+  research: {
+    enabled: true,
+    trigger: "keywords",
   },
   security: { otp: { enabled: false } },
 };

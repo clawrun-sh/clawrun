@@ -521,6 +521,82 @@ describe("ClawRunInstance", () => {
     });
   });
 
+  describe("logs methods", () => {
+    it("readLogs() sends GET to /api/v1/logs with default params", async () => {
+      const logsData = {
+        entries: [{ level: 30, time: 1710000000000, tag: "supervisor", msg: "ok" }],
+      };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(logsData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.readLogs();
+
+      expect(result).toEqual(logsData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/logs",
+        expect.any(Object),
+      );
+    });
+
+    it("readLogs() appends limit query param", async () => {
+      mockFetch.mockResolvedValue(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.readLogs({ limit: 100 });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/logs?limit=100",
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("workspace methods", () => {
+    it("listWorkspaceFiles() sends GET to /api/v1/workspace", async () => {
+      const filesData = {
+        files: [{ name: "AGENTS.md", path: "/home/user/.clawrun/agent/workspace/AGENTS.md" }],
+      };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(filesData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.listWorkspaceFiles();
+
+      expect(result).toEqual(filesData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/workspace",
+        expect.any(Object),
+      );
+    });
+
+    it("readWorkspaceFile() sends GET to /api/v1/workspace/:name", async () => {
+      const fileData = { name: "AGENTS.md", content: "# Agents" };
+      mockFetch.mockResolvedValue(new Response(JSON.stringify(fileData), { status: 200 }));
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      const result = await instance.readWorkspaceFile("AGENTS.md");
+
+      expect(result).toEqual(fileData);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-agent.vercel.app/api/v1/workspace/AGENTS.md",
+        expect.any(Object),
+      );
+    });
+
+    it("readWorkspaceFile() encodes file name", async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ name: "MY FILE.md", content: "" }), { status: 200 }),
+      );
+
+      const instance = new ClawRunInstance(config, { fetch: mockFetch });
+      await instance.readWorkspaceFile("MY FILE.md");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/v1/workspace/MY%20FILE.md"),
+        expect.any(Object),
+      );
+    });
+  });
+
   describe("browser() factory", () => {
     it("creates instance with empty base URL by default", () => {
       const instance = ClawRunInstance.browser();

@@ -26,6 +26,11 @@ export type {
   CreateMemoryInput,
   CronJobsResult,
   CreateCronJobInput,
+  LogEntry,
+  LogsResult,
+  WorkspaceFile,
+  WorkspaceListResult,
+  WorkspaceFileResult,
 } from "@clawrun/agent";
 
 // ---------------------------------------------------------------------------

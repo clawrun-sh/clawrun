@@ -109,7 +109,7 @@ export interface CliToolInfo {
 export interface CronJob {
   id: string;
   name?: string;
-  schedule: string;
+  schedule?: string;
   command: string;
   nextRun?: string;
   lastRun?: string;
@@ -183,6 +183,31 @@ export interface CreateMemoryInput {
 
 export interface CronJobsResult {
   jobs: CronJob[];
+}
+
+export interface LogEntry {
+  level: number;
+  time: number;
+  tag?: string;
+  msg: string;
+}
+
+export interface LogsResult {
+  entries: LogEntry[];
+}
+
+export interface WorkspaceFile {
+  name: string;
+  path: string;
+}
+
+export interface WorkspaceListResult {
+  files: WorkspaceFile[];
+}
+
+export interface WorkspaceFileResult {
+  name: string;
+  content: string;
 }
 
 export interface CreateCronJobInput {

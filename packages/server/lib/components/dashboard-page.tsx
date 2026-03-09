@@ -45,6 +45,11 @@ function SectionCards({
 }) {
   const isOnline = health.data?.sandbox?.running ?? false;
 
+  // When sandbox is offline, treat status/cost data as unavailable
+  // (useQuery retains stale data on error, so we gate on health instead)
+  const statusData = isOnline ? status.data : null;
+  const costData = isOnline ? cost.data : null;
+
   return (
     <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
       {/* Sandbox status */}
@@ -80,16 +85,16 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Provider / Model</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {status.loading ? (
+            {status.loading && isOnline ? (
               <Skeleton className="h-8 w-32" />
-            ) : status.error ? (
+            ) : !isOnline || status.error ? (
               <span className="text-lg text-muted-foreground">—</span>
             ) : (
               <div className="flex flex-col gap-0.5">
-                <span className="text-lg truncate">{status.data?.provider ?? "—"}</span>
-                {status.data?.model && (
+                <span className="text-lg truncate">{statusData?.provider ?? "—"}</span>
+                {statusData?.model && (
                   <span className="text-sm font-medium text-muted-foreground truncate">
-                    {status.data.model}
+                    {statusData.model}
                   </span>
                 )}
               </div>
@@ -104,8 +109,8 @@ function SectionCards({
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            {status.data?.memoryBackend
-              ? `Memory: ${status.data.memoryBackend}`
+            {statusData?.memoryBackend
+              ? `Memory: ${statusData.memoryBackend}`
               : "Memory backend unknown"}
           </div>
         </CardFooter>
@@ -116,16 +121,16 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Uptime</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {status.loading ? (
+            {status.loading && isOnline ? (
               <Skeleton className="h-8 w-16" />
-            ) : status.data?.uptime != null ? (
-              formatUptime(status.data.uptime)
+            ) : statusData?.uptime != null ? (
+              formatUptime(statusData.uptime)
             ) : (
               "—"
             )}
           </CardTitle>
           <CardAction>
-            {status.data?.uptime != null ? (
+            {statusData?.uptime != null ? (
               <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
                 <TrendingUp className="size-3" />
                 Live
@@ -139,9 +144,9 @@ function SectionCards({
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          {status.data?.channels && status.data.channels.length > 0 && (
+          {statusData?.channels && statusData.channels.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {status.data.channels.map((ch) => (
+              {statusData.channels.map((ch) => (
                 <Badge
                   key={ch}
                   variant="outline"
@@ -152,7 +157,7 @@ function SectionCards({
               ))}
             </div>
           )}
-          {(!status.data?.channels || status.data.channels.length === 0) && (
+          {(!statusData?.channels || statusData.channels.length === 0) && (
             <div className="text-muted-foreground">No active channels</div>
           )}
         </CardFooter>
@@ -163,13 +168,13 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Cost</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {cost.loading ? (
+            {cost.loading && isOnline ? (
               <Skeleton className="h-8 w-20" />
-            ) : cost.error ? (
+            ) : !isOnline || cost.error ? (
               <span className="text-lg text-muted-foreground">—</span>
             ) : (
               <>
-                {formatCost(cost.data?.dailyCost)}
+                {formatCost(costData?.dailyCost)}
                 <span className="text-sm font-medium text-muted-foreground">/day</span>
               </>
             )}
@@ -183,13 +188,13 @@ function SectionCards({
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Session: {formatCost(cost.data?.sessionCost)} &middot; Monthly:{" "}
-            {formatCost(cost.data?.monthlyCost)}
+            Session: {formatCost(costData?.sessionCost)} &middot; Monthly:{" "}
+            {formatCost(costData?.monthlyCost)}
           </div>
-          {cost.data?.totalTokens != null && (
+          {costData?.totalTokens != null && (
             <div className="text-muted-foreground">
-              {cost.data.totalTokens.toLocaleString()} tokens &middot;{" "}
-              {cost.data.requestCount?.toLocaleString() ?? 0} requests
+              {costData.totalTokens.toLocaleString()} tokens &middot;{" "}
+              {costData.requestCount?.toLocaleString() ?? 0} requests
             </div>
           )}
         </CardFooter>
@@ -209,6 +214,9 @@ export default function DashboardPage() {
   const status = useQuery((s) => client.getStatus(s), [client], poll);
   const cost = useQuery((s) => client.getCost(s), [client], poll);
 
+  const isOnline = health.data?.sandbox?.running ?? false;
+  const statusData = isOnline ? status.data : null;
+
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -222,23 +230,23 @@ export default function DashboardPage() {
               <CardDescription>Agent process health status</CardDescription>
             </CardHeader>
             <CardContent>
-              {status.loading ? (
+              {status.loading && isOnline ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-3/4" />
                 </div>
-              ) : status.error ? (
+              ) : !isOnline || status.error ? (
                 <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-4">
                   <Server className="size-4 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
                     Sandbox is offline — health data unavailable
                   </p>
                 </div>
-              ) : !status.data?.health?.length ? (
+              ) : !statusData?.health?.length ? (
                 <p className="text-sm text-muted-foreground">No health data available</p>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {status.data.health.map((h) => (
+                  {statusData.health.map((h) => (
                     <Tooltip key={h.name}>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1.5">

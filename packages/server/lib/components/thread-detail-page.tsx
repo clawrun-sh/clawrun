@@ -1,6 +1,7 @@
 "use client";
 
-import { useApiClient, useQuery } from "../hooks/use-api-client";
+import { useApiClient } from "../hooks/use-api-client";
+import { useSandboxQuery } from "../hooks/use-sandbox-query";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { Button } from "@clawrun/ui/components/ui/button";
 import {
@@ -31,7 +32,7 @@ interface ThreadDetailPageProps {
 
 export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
   const client = useApiClient();
-  const { data, loading, error } = useQuery(
+  const { data, loading, error } = useSandboxQuery(
     (s) => client.getThread(threadId, s),
     [client, threadId],
   );

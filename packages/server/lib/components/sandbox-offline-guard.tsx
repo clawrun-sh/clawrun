@@ -1,12 +1,12 @@
 "use client";
 
-import { CloudOff, Play } from "lucide-react";
+import { CloudOff, Loader2, Play } from "lucide-react";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { useSandboxState } from "../hooks/use-sandbox-state";
 
 export function SandboxOfflineGuard({ children }: { children: React.ReactNode }) {
-  const { state, start } = useSandboxState();
+  const { state, transitionLabel, start } = useSandboxState();
 
   if (state === "loading") {
     return (
@@ -32,6 +32,17 @@ export function SandboxOfflineGuard({ children }: { children: React.ReactNode })
           <Play className="size-4" />
           Start Sandbox
         </Button>
+      </div>
+    );
+  }
+
+  if (state === "transitioning") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24">
+        <Loader2 className="size-10 animate-spin text-muted-foreground" />
+        <p className="text-sm font-medium text-muted-foreground">
+          {transitionLabel ?? "Starting"}&hellip;
+        </p>
       </div>
     );
   }

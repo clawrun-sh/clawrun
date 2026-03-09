@@ -44,6 +44,7 @@
     "@clawrun/sdk": "workspace:*",
     "@clawrun/ui": "workspace:*",
     "@tailwindcss/postcss": "^4.0.0",
+    "@tanstack/react-table": "^8.21.3",
     "ai": "^6.0.0",
     "dexie": "^4.0.0",
     "lucide-react": "^0.500.0",
