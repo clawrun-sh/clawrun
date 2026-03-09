@@ -23,7 +23,7 @@ export function createChatStream(
     if (!responsePromise) {
       responsePromise = apiClient.rawPost(
         "/api/v1/chat",
-        { message, threadId: options?.threadId },
+        { message, id: options?.id },
         options?.signal,
       );
     }

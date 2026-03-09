@@ -282,7 +282,7 @@ export async function startChatTUI(
     let responseText: string | undefined;
     let hasError = false;
     try {
-      const stream = instance.chat(message, { threadId, signal: loader.signal });
+      const stream = instance.chat(message, { id: threadId, signal: loader.signal });
       for await (const chunk of stream) {
         if (chunk.type === "text-delta") {
           ensureStreaming();

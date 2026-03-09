@@ -162,7 +162,7 @@ export interface HistoryResult {
 // ---------------------------------------------------------------------------
 
 export interface ChatOptions {
-  threadId?: string;
+  id?: string;
   signal?: AbortSignal;
 }
 

@@ -42,12 +42,13 @@ import { SpeechInput } from "@clawrun/ui/components/ai-elements/speech-input";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
-import { IconCheck, IconClipboard, IconLoader2, IconMessage, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconClipboard, IconEdit, IconLoader2, IconMessage } from "@tabler/icons-react";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
 import { useSetHeaderActions } from "./header-actions";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
+import { useSandboxState } from "../hooks/use-sandbox-state";
 
 const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
@@ -103,12 +104,14 @@ export default function ChatPage(_props: ChatPageProps) {
       new DefaultChatTransport({
         api: "/api/v1/chat",
         credentials: "same-origin",
-        body: { threadId },
       }),
-    [threadId],
+    [],
   );
 
-  const { messages, setMessages, sendMessage, status, stop, error } = useChat({ transport });
+  const { messages, setMessages, sendMessage, status, stop, error } = useChat({
+    id: threadId,
+    transport,
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
 
@@ -169,22 +172,23 @@ export default function ChatPage(_props: ChatPageProps) {
   }, [threadId, setMessages]);
 
   const isLoading = !loaded || !messagesLoaded;
+  const { state: sandboxState } = useSandboxState();
 
-  const clearButton = useMemo(
+  const newConversationButton = useMemo(
     () =>
-      messages.length > 0 ? (
+      sandboxState === "running" ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="icon-sm" onClick={handleClearHistory}>
-              <IconTrash className="size-4" />
+              <IconEdit className="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Clear conversation</TooltipContent>
+          <TooltipContent>New conversation</TooltipContent>
         </Tooltip>
       ) : null,
-    [messages.length, handleClearHistory],
+    [sandboxState, handleClearHistory],
   );
-  useSetHeaderActions(clearButton);
+  useSetHeaderActions(newConversationButton);
 
   return (
     <SandboxOfflineGuard>

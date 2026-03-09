@@ -356,16 +356,16 @@ describe("createChatStream", () => {
   });
 
   describe("API client integration", () => {
-    it("passes message and threadId to rawPost", async () => {
+    it("passes message and id to rawPost", async () => {
       const response = mockSseResponse(["[DONE]"]);
       const api = createMockApiClient(response);
 
-      const stream = createChatStream(api, "hello", { threadId: "sess-1" });
+      const stream = createChatStream(api, "hello", { id: "sess-1" });
       await stream.result();
 
       expect(api.rawPost).toHaveBeenCalledWith(
         "/api/v1/chat",
-        { message: "hello", threadId: "sess-1" },
+        { message: "hello", id: "sess-1" },
         undefined,
       );
     });

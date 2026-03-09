@@ -20,14 +20,14 @@ const log = createLogger("handler:chat");
 export const maxDuration = 150;
 
 export async function POST(req: Request) {
-  let body: { message?: unknown; messages?: unknown; threadId?: unknown };
+  let body: { message?: unknown; messages?: unknown; id?: unknown };
   try {
-    body = (await req.json()) as { message?: unknown; messages?: unknown; threadId?: unknown };
+    body = (await req.json()) as { message?: unknown; messages?: unknown; id?: unknown };
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  const threadId = typeof body.threadId === "string" ? body.threadId.trim() : undefined;
+  const threadId = typeof body.id === "string" ? body.id.trim() : undefined;
   log.info(
     `[chat] threadId=${threadId ?? "(none)"} bodyKeys=${Object.keys(body as Record<string, unknown>).join(",")}`,
   );
