@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { SunMoon, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { useTheme } from "next-themes";
 
 import {
@@ -54,16 +55,26 @@ export function NavSecondary({
               </label>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <a href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isExternal = item.url.startsWith("http");
+            // Logout and other action routes must use plain <a> to avoid
+            // Next.js <Link> prefetching triggering the action on page load.
+            const useAnchor = isExternal || item.url.startsWith("/auth/");
+            const Comp = useAnchor ? "a" : Link;
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild>
+                  <Comp
+                    href={item.url}
+                    {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Comp>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

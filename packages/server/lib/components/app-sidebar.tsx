@@ -13,6 +13,7 @@ import {
   HelpCircle,
   LogOut,
 } from "lucide-react";
+import Link from "next/link";
 import { Logo } from "./logo";
 
 import {
@@ -56,12 +57,12 @@ export function AppSidebar({ instanceName, version: _, ...props }: AppSidebarPro
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1.5!">
-              <a href="/">
+              <Link href="/">
                 <Logo size={20} className="shrink-0 text-primary" />
                 <span className="text-base font-semibold font-mono">
                   {instanceName || "ClawRun"}
                 </span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
