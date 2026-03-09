@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { IconBrightness, type Icon } from "@tabler/icons-react";
+import { SunMoon, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import {
@@ -22,7 +22,7 @@ export function NavSecondary({
   items: {
     title: string;
     url: string;
-    icon: Icon;
+    icon: LucideIcon;
   }[];
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -40,7 +40,7 @@ export function NavSecondary({
           <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
             <SidebarMenuButton asChild>
               <label>
-                <IconBrightness />
+                <SunMoon />
                 <span>Dark Mode</span>
                 {mounted ? (
                   <Switch

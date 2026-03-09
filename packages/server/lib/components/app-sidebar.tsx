@@ -2,17 +2,17 @@
 
 import * as React from "react";
 import {
-  IconDashboard,
-  IconMessage,
-  IconMessages,
-  IconTool,
-  IconSettings,
-  IconBrain,
-  IconClock,
-  IconFileText,
-  IconHelp,
-  IconLogout,
-} from "@tabler/icons-react";
+  LayoutDashboard,
+  MessageSquare,
+  MessagesSquare,
+  Wrench,
+  Settings,
+  Brain,
+  Clock,
+  FileText,
+  HelpCircle,
+  LogOut,
+} from "lucide-react";
 import { Logo } from "./logo";
 
 import {
@@ -28,18 +28,18 @@ import { NavSecondary } from "./nav-secondary";
 
 const data = {
   navMain: [
-    { title: "Dashboard", url: "/", icon: IconDashboard },
-    { title: "Chat", url: "/chat", icon: IconMessage },
-    { title: "Threads", url: "/threads", icon: IconMessages },
-    { title: "Tools", url: "/tools", icon: IconTool },
-    { title: "Config", url: "/config", icon: IconSettings },
-    { title: "Memory", url: "/memory", icon: IconBrain },
-    { title: "Cron", url: "/cron", icon: IconClock },
-    { title: "Logs", url: "/logs", icon: IconFileText },
+    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Chat", url: "/chat", icon: MessageSquare },
+    { title: "Threads", url: "/threads", icon: MessagesSquare },
+    { title: "Tools", url: "/tools", icon: Wrench },
+    { title: "Config", url: "/config", icon: Settings },
+    { title: "Memory", url: "/memory", icon: Brain },
+    { title: "Cron", url: "/cron", icon: Clock },
+    { title: "Logs", url: "/logs", icon: FileText },
   ],
   navSecondary: [
-    { title: "Get Help", url: "https://clawrun.sh/docs", icon: IconHelp },
-    { title: "Log Out", url: "/auth/logout", icon: IconLogout },
+    { title: "Get Help", url: "https://clawrun.sh/docs", icon: HelpCircle },
+    { title: "Log Out", url: "/auth/logout", icon: LogOut },
   ],
 };
 

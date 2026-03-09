@@ -3,7 +3,7 @@
  * Mirrors packages/website/components/icons/cloud-providers.tsx.
  */
 
-import { IconServer } from "@tabler/icons-react";
+import { Server } from "lucide-react";
 
 interface ProviderLogoProps {
   provider: string;
@@ -46,5 +46,5 @@ export function ProviderLogo({ provider, size = 16, className }: ProviderLogoPro
   }
 
   // Fallback: generic server icon
-  return <IconServer size={size} className={className} />;
+  return <Server size={size} className={className} />;
 }

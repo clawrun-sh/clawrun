@@ -11,7 +11,7 @@ import {
   CardDescription,
 } from "@clawrun/ui/components/ui/card";
 import type { AgentConfig } from "@clawrun/agent";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { Info } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 export default function ConfigPage() {
@@ -37,7 +37,7 @@ export default function ConfigPage() {
                   <CardDescription>Read-only view of the agent configuration file</CardDescription>
                 </div>
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                  <IconInfoCircle className="size-4 shrink-0" />
+                  <Info className="size-4 shrink-0" />
                   <span>
                     To update the config, edit it locally and redeploy with{" "}
                     <code className="rounded bg-muted px-1 py-0.5 font-mono">clawrun deploy</code>

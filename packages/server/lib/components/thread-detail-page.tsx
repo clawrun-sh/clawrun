@@ -22,7 +22,7 @@ import {
 } from "@clawrun/ui/components/ai-elements/reasoning";
 import type { ThreadResult } from "@clawrun/agent";
 import type { UIMessage } from "ai";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { ArrowLeft } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 interface ThreadDetailPageProps {
@@ -44,7 +44,7 @@ export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
         <div className="flex items-center gap-3 px-4 lg:px-6">
           <Button variant="ghost" size="icon" asChild>
             <a href="/threads">
-              <IconArrowLeft className="size-4" />
+              <ArrowLeft className="size-4" />
             </a>
           </Button>
           <div>

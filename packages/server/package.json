@@ -43,7 +43,6 @@
     "@clawrun/runtime": "workspace:*",
     "@clawrun/sdk": "workspace:*",
     "@clawrun/ui": "workspace:*",
-    "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/postcss": "^4.0.0",
     "ai": "^6.0.0",
     "dexie": "^4.0.0",

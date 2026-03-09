@@ -20,7 +20,7 @@ import {
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import type { ToolsResult } from "@clawrun/agent";
-import { IconTool } from "@tabler/icons-react";
+import { Wrench } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 export default function ToolsPage() {
@@ -44,7 +44,7 @@ export default function ToolsPage() {
             <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
           ) : tools.length === 0 && cliTools.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <IconTool className="mb-4 size-12 text-muted-foreground" />
+              <Wrench className="mb-4 size-12 text-muted-foreground" />
               <p className="text-muted-foreground">No tools available</p>
             </div>
           ) : (

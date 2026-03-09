@@ -14,13 +14,7 @@ import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import type { AgentStatus, CostInfo, HealthResult } from "@clawrun/agent";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
-import {
-  IconServer,
-  IconBolt,
-  IconActivity,
-  IconTrendingUp,
-  IconTrendingDown,
-} from "@tabler/icons-react";
+import { Server, Zap, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { ProviderLogo } from "./provider-logo";
 
 interface HealthData extends HealthResult {
@@ -62,7 +56,7 @@ function SectionCards({
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
-              <IconServer className="size-3" />
+              <Server className="size-3" />
               {health.data?.sandbox?.status ?? (isOnline ? "running" : "stopped")}
             </Badge>
           </CardAction>
@@ -103,7 +97,7 @@ function SectionCards({
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
-              <IconBolt className="size-3" />
+              <Zap className="size-3" />
               AI
             </Badge>
           </CardAction>
@@ -133,12 +127,12 @@ function SectionCards({
           <CardAction>
             {status.data?.uptime != null ? (
               <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
-                <IconTrendingUp className="size-3" />
+                <TrendingUp className="size-3" />
                 Live
               </Badge>
             ) : (
               <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
-                <IconTrendingDown className="size-3" />
+                <TrendingDown className="size-3" />
                 Idle
               </Badge>
             )}
@@ -182,7 +176,7 @@ function SectionCards({
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
-              <IconActivity className="size-3" />
+              <Activity className="size-3" />
               Usage
             </Badge>
           </CardAction>
@@ -235,7 +229,7 @@ export default function DashboardPage() {
                 </div>
               ) : status.error ? (
                 <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-4">
-                  <IconServer className="size-4 text-muted-foreground" />
+                  <Server className="size-4 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
                     Sandbox is offline — health data unavailable
                   </p>

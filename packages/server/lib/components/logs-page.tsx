@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
-import { IconPlayerPause, IconPlayerPlay, IconArrowDown, IconTrash } from "@tabler/icons-react";
+import { Pause, Play, ArrowDown, Trash2 } from "lucide-react";
 
 interface LogEvent {
   id: string;
@@ -121,11 +121,7 @@ export default function LogsPage() {
                   size="icon"
                   onClick={() => (paused ? handleResume() : setPaused(true))}
                 >
-                  {paused ? (
-                    <IconPlayerPlay className="size-4" />
-                  ) : (
-                    <IconPlayerPause className="size-4" />
-                  )}
+                  {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{paused ? "Resume" : "Pause"}</TooltipContent>
@@ -134,7 +130,7 @@ export default function LogsPage() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={() => setAutoScroll(!autoScroll)}>
-                  <IconArrowDown
+                  <ArrowDown
                     className={`size-4 ${autoScroll ? "text-foreground" : "text-muted-foreground"}`}
                   />
                 </Button>
@@ -145,7 +141,7 @@ export default function LogsPage() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={handleClear}>
-                  <IconTrash className="size-4" />
+                  <Trash2 className="size-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Clear logs</TooltipContent>

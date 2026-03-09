@@ -13,7 +13,7 @@ import {
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import type { ThreadsResult } from "@clawrun/agent";
-import { IconMessages, IconArrowUp, IconArrowDown, IconArrowsSort } from "@tabler/icons-react";
+import { MessagesSquare, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 function formatDate(iso: string): string {
@@ -40,11 +40,11 @@ function SortIcon({
   direction: SortDirection;
 }) {
   if (current !== column)
-    return <IconArrowsSort className="ml-1 inline size-3.5 text-muted-foreground/50" />;
+    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
   return direction === "asc" ? (
-    <IconArrowUp className="ml-1 inline size-3.5" />
+    <ArrowUp className="ml-1 inline size-3.5" />
   ) : (
-    <IconArrowDown className="ml-1 inline size-3.5" />
+    <ArrowDown className="ml-1 inline size-3.5" />
   );
 }
 
@@ -93,7 +93,7 @@ export default function ThreadsPage() {
             <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
           ) : threads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <IconMessages className="mb-4 size-12 text-muted-foreground" />
+              <MessagesSquare className="mb-4 size-12 text-muted-foreground" />
               <p className="text-muted-foreground">No threads yet</p>
             </div>
           ) : (

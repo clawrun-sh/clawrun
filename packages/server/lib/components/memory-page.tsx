@@ -35,15 +35,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Label } from "@clawrun/ui/components/ui/label";
 import type { MemoriesResult } from "@clawrun/agent";
-import {
-  IconBrain,
-  IconPlus,
-  IconSearch,
-  IconTrash,
-  IconArrowUp,
-  IconArrowDown,
-  IconArrowsSort,
-} from "@tabler/icons-react";
+import { Brain, Plus, Search, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 type SortColumn = "timestamp";
@@ -59,11 +51,11 @@ function SortIcon({
   direction: SortDirection;
 }) {
   if (current !== column)
-    return <IconArrowsSort className="ml-1 inline size-3.5 text-muted-foreground/50" />;
+    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
   return direction === "asc" ? (
-    <IconArrowUp className="ml-1 inline size-3.5" />
+    <ArrowUp className="ml-1 inline size-3.5" />
   ) : (
-    <IconArrowDown className="ml-1 inline size-3.5" />
+    <ArrowDown className="ml-1 inline size-3.5" />
   );
 }
 
@@ -145,7 +137,7 @@ export default function MemoryPage() {
           {/* Controls */}
           <div className="flex items-center justify-between gap-3 px-4 lg:px-6">
             <div className="relative flex-1">
-              <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
                 placeholder="Search memories..."
@@ -177,7 +169,7 @@ export default function MemoryPage() {
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
-                  <IconPlus className="mr-1 size-4" />
+                  <Plus className="mr-1 size-4" />
                   Add
                 </Button>
               </DialogTrigger>
@@ -238,7 +230,7 @@ export default function MemoryPage() {
               <p className="text-sm text-muted-foreground">{error}</p>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <IconBrain className="mb-4 size-12 text-muted-foreground" />
+                <Brain className="mb-4 size-12 text-muted-foreground" />
                 <p className="text-muted-foreground">No memories found</p>
               </div>
             ) : (
@@ -284,7 +276,7 @@ export default function MemoryPage() {
                               <TooltipTrigger asChild>
                                 <AlertDialogTrigger asChild>
                                   <Button variant="ghost" size="icon">
-                                    <IconTrash className="size-4" />
+                                    <Trash2 className="size-4" />
                                   </Button>
                                 </AlertDialogTrigger>
                               </TooltipTrigger>

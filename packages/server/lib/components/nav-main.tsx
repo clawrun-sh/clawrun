@@ -1,6 +1,6 @@
 "use client";
 
-import type { Icon } from "@tabler/icons-react";
+import type { LucideIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import {
@@ -17,7 +17,7 @@ export function NavMain({
   items: {
     title: string;
     url: string;
-    icon?: Icon;
+    icon?: LucideIcon;
   }[];
 }) {
   const pathname = usePathname();

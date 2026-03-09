@@ -42,7 +42,7 @@ import { SpeechInput } from "@clawrun/ui/components/ai-elements/speech-input";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
-import { IconCheck, IconClipboard, IconEdit, IconLoader2, IconMessage } from "@tabler/icons-react";
+import { Check, Clipboard, SquarePen, Loader2, MessageSquare } from "lucide-react";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
@@ -180,7 +180,7 @@ export default function ChatPage(_props: ChatPageProps) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="icon-sm" onClick={handleClearHistory}>
-              <IconEdit className="size-4" />
+              <SquarePen className="size-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>New conversation</TooltipContent>
@@ -198,13 +198,13 @@ export default function ChatPage(_props: ChatPageProps) {
           {isLoading ? (
             <ConversationEmptyState
               className="absolute inset-0"
-              icon={<IconLoader2 className="size-8 animate-spin" />}
+              icon={<Loader2 className="size-8 animate-spin" />}
               title="Loading conversation..."
             />
           ) : messages.length === 0 ? (
             <ConversationEmptyState
               className="absolute inset-0"
-              icon={<IconMessage className="size-8" />}
+              icon={<MessageSquare className="size-8" />}
               title="How can I help you?"
               description="Ask me anything to get started."
             />
@@ -275,9 +275,9 @@ export default function ChatPage(_props: ChatPageProps) {
                       }
                     >
                       {copiedId === m.id ? (
-                        <IconCheck className="size-4" />
+                        <Check className="size-4" />
                       ) : (
-                        <IconClipboard className="size-4" />
+                        <Clipboard className="size-4" />
                       )}
                     </MessageAction>
                   </MessageActions>

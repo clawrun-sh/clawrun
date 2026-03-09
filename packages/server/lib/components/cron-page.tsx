@@ -35,14 +35,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Label } from "@clawrun/ui/components/ui/label";
 import type { CronJobsResult } from "@clawrun/agent";
-import {
-  IconClock,
-  IconPlus,
-  IconTrash,
-  IconArrowUp,
-  IconArrowDown,
-  IconArrowsSort,
-} from "@tabler/icons-react";
+import { Clock, Plus, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 function formatDate(iso?: string): string {
@@ -68,11 +61,11 @@ function SortIcon({
   direction: SortDirection;
 }) {
   if (current !== column)
-    return <IconArrowsSort className="ml-1 inline size-3.5 text-muted-foreground/50" />;
+    return <ArrowUpDown className="ml-1 inline size-3.5 text-muted-foreground/50" />;
   return direction === "asc" ? (
-    <IconArrowUp className="ml-1 inline size-3.5" />
+    <ArrowUp className="ml-1 inline size-3.5" />
   ) : (
-    <IconArrowDown className="ml-1 inline size-3.5" />
+    <ArrowDown className="ml-1 inline size-3.5" />
   );
 }
 
@@ -145,7 +138,7 @@ export default function CronPage() {
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
-                  <IconPlus className="mr-1 size-4" />
+                  <Plus className="mr-1 size-4" />
                   Add Job
                 </Button>
               </DialogTrigger>
@@ -204,7 +197,7 @@ export default function CronPage() {
               <p className="text-sm text-muted-foreground">{error}</p>
             ) : jobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <IconClock className="mb-4 size-12 text-muted-foreground" />
+                <Clock className="mb-4 size-12 text-muted-foreground" />
                 <p className="text-muted-foreground">No cron jobs configured</p>
               </div>
             ) : (
@@ -261,7 +254,7 @@ export default function CronPage() {
                               <TooltipTrigger asChild>
                                 <AlertDialogTrigger asChild>
                                   <Button variant="ghost" size="icon">
-                                    <IconTrash className="size-4" />
+                                    <Trash2 className="size-4" />
                                   </Button>
                                 </AlertDialogTrigger>
                               </TooltipTrigger>

@@ -1,6 +1,6 @@
 "use client";
 
-import { IconLoader2, IconPlayerPlay, IconServer } from "@tabler/icons-react";
+import { Loader2, Play, Server } from "lucide-react";
 import { Button } from "@clawrun/ui/components/ui/button";
 import { SidebarMenuItem, SidebarMenuButton } from "@clawrun/ui/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
@@ -25,7 +25,7 @@ export function SandboxStatus() {
     return (
       <SidebarMenuItem>
         <Button variant="default" size="sm" className="w-full justify-start gap-2" onClick={start}>
-          <IconPlayerPlay className="size-4" />
+          <Play className="size-4" />
           Start Sandbox
         </Button>
       </SidebarMenuItem>
@@ -41,7 +41,7 @@ export function SandboxStatus() {
             <TooltipTrigger asChild>
               <AlertDialogTrigger asChild>
                 <SidebarMenuButton className="cursor-pointer">
-                  <IconServer />
+                  <Server />
                   <span>Sandbox</span>
                   <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-500" />
                 </SidebarMenuButton>
@@ -79,7 +79,7 @@ export function SandboxStatus() {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton className="pointer-events-none">
-        <IconLoader2 className="animate-spin" />
+        <Loader2 className="animate-spin" />
         <span>Sandbox</span>
         <span className={`ml-auto size-2 shrink-0 rounded-full ${dotColor}`} />
       </SidebarMenuButton>
