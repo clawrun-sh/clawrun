@@ -109,9 +109,9 @@ describe("writeSetupConfig — fresh deploy", () => {
   it("includes zeroclaw schema defaults we do not override", () => {
     const config = writeAndParse();
     const agent = config.agent as TOML.JsonMap;
-    // parallel_tools is a schema default we don't override
-    expect(agent.parallel_tools).toBe(
-      (schemaDefaults.agent as Record<string, unknown>).parallel_tools,
+    // safety_heartbeat_interval is a schema default we don't override
+    expect(agent.safety_heartbeat_interval).toBe(
+      (schemaDefaults.agent as Record<string, unknown>).safety_heartbeat_interval,
     );
   });
 

@@ -9,6 +9,7 @@ import type {
 } from "@clawrun/provider";
 import { CountBasedRetention, getProvider } from "@clawrun/provider";
 import type { Agent, CronJob } from "@clawrun/agent";
+import { parseSkillCommands } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 import { getStateStore } from "../storage/state.js";
@@ -674,6 +675,35 @@ export class SandboxLifecycleManager {
         secretKey,
         fromSnapshot: !!snapshotId,
       });
+
+      // Scan installed skills for allowed commands and inject into agent config.
+      // This covers both locally deployed skills and user-installed skills
+      // persisted in snapshots.
+      try {
+        const skillsDir = `${root}/agent/workspace/skills`;
+        const lsResult = await sandbox.runCommand("ls", [skillsDir]);
+        const lsOut = (await lsResult.stdout()).trim();
+        const skillDirs = lsOut.split("\n").filter(Boolean);
+
+        if (skillDirs.length > 0) {
+          let allCommands: string[] = [];
+          for (const dir of skillDirs) {
+            const buf = await sandbox.readFile(`${skillsDir}/${dir}/SKILL.md`);
+            if (buf) {
+              allCommands.push(...parseSkillCommands(buf.toString("utf-8")));
+            }
+          }
+          allCommands = [...new Set(allCommands)];
+          if (allCommands.length > 0) {
+            await this.agent.injectSkillCommands(sandbox, root, allCommands);
+            log.info(`Injected skill commands: [${allCommands.join(", ")}]`);
+          }
+        }
+      } catch (err) {
+        // Non-fatal — skills directory may not exist yet
+        const msg = err instanceof Error ? err.message : String(err);
+        log.info(`Skill command scan skipped: ${msg}`);
+      }
 
       // Apply network policy before starting services.
       if (networkPolicy !== "allow-all") {

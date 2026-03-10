@@ -38,6 +38,12 @@ vi.mock("@clawrun/agent", () => ({
     description = "GitHub CLI for managing repos, issues, and PRs";
     installDomains = ["github.com", "objects.githubusercontent.com", "api.github.com"];
   },
+  SkillsCliTool: class {
+    id = "skills-cli";
+    version = "1.4.4";
+    description = "Discover and install agent skills from the skills.sh registry";
+    installDomains = ["registry.npmjs.org", "github.com"];
+  },
 }));
 
 vi.mock("./messaging.js", () => ({
@@ -357,8 +363,8 @@ describe("ZeroclawAgent", () => {
       const agent = new ZeroclawAgent();
       const tools = agent.getAvailableTools();
 
-      expect(tools).toHaveLength(2);
-      expect(tools.map((t) => t.id)).toEqual(["agent-browser", "gh-cli"]);
+      expect(tools).toHaveLength(3);
+      expect(tools.map((t) => t.id)).toEqual(["agent-browser", "gh-cli", "skills-cli"]);
     });
   });
 

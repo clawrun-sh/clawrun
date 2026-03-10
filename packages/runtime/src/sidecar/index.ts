@@ -49,7 +49,7 @@ function main(): void {
   // Also add ~/.local/bin to PATH so the daemon can find tool binaries.
   if (config.tools && config.tools.length > 0) {
     const home = process.env.HOME ?? "/root";
-    config.daemon.env.PATH = `${home}/.local/bin:${process.env.PATH ?? ""}`;
+    config.daemon.env.PATH = `${home}/.clawrun/bin:${home}/.local/bin:${process.env.PATH ?? ""}`;
     for (const tool of config.tools) {
       if (tool.env) {
         for (const [key, value] of Object.entries(tool.env)) {

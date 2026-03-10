@@ -47,13 +47,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/
 import { Label } from "@clawrun/ui/components/ui/label";
 import type { MemoryEntryInfo } from "@clawrun/agent";
 import { Separator } from "@clawrun/ui/components/ui/separator";
-import { Brain, Fingerprint, MessageSquare, Plus, Search, Tag, Trash2, X } from "lucide-react";
+import { Brain, Clock, Fingerprint, MessageSquare, Plus, Search, Tag, Trash2, X } from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 import { timeAgo } from "@clawrun/ui/lib/time-ago";
 
 const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   conversation: MessageSquare,
   core: Fingerprint,
+};
+
+const sourceIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  cron: Clock,
 };
 
 function CategoryIcon({ category }: { category?: string }) {
@@ -95,17 +99,53 @@ const columns: ColumnDef<MemoryEntryInfo>[] = [
     header: "Category",
     cell: ({ row }) => {
       const category = row.getValue("category") as string | undefined;
-      return category ? (
-        <Badge variant="secondary" className="gap-1">
-          <CategoryIcon category={category} />
-          {category}
-        </Badge>
-      ) : null;
+      const source = row.original.source;
+      if (!category && !source) return null;
+      return (
+        <div className="flex items-center gap-1 overflow-hidden">
+          {category && (
+            <Badge variant="secondary" className="gap-1 shrink-0">
+              <CategoryIcon category={category} />
+              {category}
+            </Badge>
+          )}
+          {source && (() => {
+            const Icon = sourceIcons[source.type] ?? Tag;
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="gap-1 shrink-0">
+                    <Icon className="size-3 shrink-0" />
+                    {source.type}
+                  </Badge>
+                </TooltipTrigger>
+                {source.name && (
+                  <TooltipContent>
+                    {source.name}
+                    {source.id ? ` (${source.id})` : ""}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            );
+          })()}
+        </div>
+      );
     },
-    size: 120,
+    size: 200,
     filterFn: (row, id, filterValues: string[]) => {
       if (!filterValues?.length) return true;
       const val = row.getValue(id) as string | undefined;
+      return val != null && filterValues.includes(val);
+    },
+  },
+  {
+    id: "source",
+    accessorFn: (row) => row.source?.type,
+    header: "Source",
+    enableHiding: false,
+    filterFn: (row, _id, filterValues: string[]) => {
+      if (!filterValues?.length) return true;
+      const val = row.original.source?.type;
       return val != null && filterValues.includes(val);
     },
   },
@@ -172,7 +212,7 @@ export default function MemoryPage() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({ source: false });
   const [globalFilter, setGlobalFilter] = useState("");
 
   const [viewEntry, setViewEntry] = useState<MemoryEntryInfo | null>(null);
@@ -247,6 +287,9 @@ export default function MemoryPage() {
             </div>
             {table.getColumn("category") && (
               <DataTableFacetedFilter column={table.getColumn("category")} title="Category" />
+            )}
+            {table.getColumn("source") && (
+              <DataTableFacetedFilter column={table.getColumn("source")} title="Source" />
             )}
             {isFiltered && (
               <Button
@@ -350,15 +393,25 @@ export default function MemoryPage() {
               <DialogTitle className="font-mono text-sm break-all pr-8">
                 {viewEntry.key}
               </DialogTitle>
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 {viewEntry.category && (
                   <Badge variant="secondary" className="gap-1">
                     <CategoryIcon category={viewEntry.category} />
                     {viewEntry.category}
                   </Badge>
                 )}
+                {viewEntry.source && (() => {
+                  const Icon = sourceIcons[viewEntry.source.type] ?? Tag;
+                  return (
+                    <Badge variant="outline" className="gap-1">
+                      <Icon className="size-3.5 shrink-0" />
+                      {viewEntry.source.type}
+                      {viewEntry.source.name ? `: ${viewEntry.source.name}` : ""}
+                    </Badge>
+                  );
+                })()}
                 {viewEntry.timestamp && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {timeAgo(viewEntry.timestamp)}
                   </span>
                 )}

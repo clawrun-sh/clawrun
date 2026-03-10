@@ -3,7 +3,12 @@ import type { ZeroclawSandbox, CommandResult } from "./types.js";
 
 vi.mock("node:fs", () => ({
   readFileSync: vi.fn(() => Buffer.from("binary-content")),
-  readdirSync: vi.fn(() => ["IDENTITY.md", "BOOTSTRAP.md", "notes.txt"]),
+  readdirSync: vi.fn((dir: string) => {
+    if (dir.endsWith("/skills")) return ["agent-browser", "skills-cli"];
+    if (dir.endsWith("/agent-browser") || dir.endsWith("/skills-cli")) return ["SKILL.md"];
+    return ["IDENTITY.md", "BOOTSTRAP.md", "notes.txt"];
+  }),
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
 }));
 
 vi.mock("./binary.js", () => ({
@@ -18,7 +23,7 @@ vi.mock("./config-reader.js", () => ({
   readParsedConfig: vi.fn(() => ({ default_provider: "openrouter" })),
 }));
 
-import { readdirSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 
 interface SandboxFile {
   path: string;
@@ -157,33 +162,42 @@ describe("provision", () => {
     expect(secretFile!.content.toString()).toBe("my-secret-key");
   });
 
-  it("writes workspace .md files on fresh sandbox (not snapshot)", async () => {
+  it("writes workspace .md files and skills on fresh sandbox", async () => {
     const sandbox = mockSandbox();
     const opts = { ...defaultOpts(), fromSnapshot: false };
     await provision(sandbox as unknown as ZeroclawSandbox, opts);
 
-    const writeCall = sandbox.writeFiles.mock.calls.find((c) =>
-      c[0].some((f) => f.path.includes("workspace/")),
+    const allWrittenFiles = sandbox.writeFiles.mock.calls.flatMap((c) => c[0]);
+    const workspaceMdFiles = allWrittenFiles.filter(
+      (f) => f.path.includes("workspace/") && !f.path.includes("skills/"),
     );
-    expect(writeCall).toBeDefined();
-
-    const files = writeCall![0];
-    const mdFiles = files.filter((f) => f.path.includes("workspace/"));
     // readdirSync returns ["IDENTITY.md", "BOOTSTRAP.md", "notes.txt"]
     // Only .md files should be included
-    expect(mdFiles.length).toBe(2);
-    expect(mdFiles.some((f) => f.path.endsWith("IDENTITY.md"))).toBe(true);
-    expect(mdFiles.some((f) => f.path.endsWith("BOOTSTRAP.md"))).toBe(true);
+    expect(workspaceMdFiles.length).toBe(2);
+    expect(workspaceMdFiles.some((f) => f.path.endsWith("IDENTITY.md"))).toBe(true);
+    expect(workspaceMdFiles.some((f) => f.path.endsWith("BOOTSTRAP.md"))).toBe(true);
+
+    // Skills should also be written
+    const skillFiles = allWrittenFiles.filter((f) => f.path.includes("workspace/skills/"));
+    expect(skillFiles.some((f) => f.path.includes("agent-browser/SKILL.md"))).toBe(true);
+    expect(skillFiles.some((f) => f.path.includes("skills-cli/SKILL.md"))).toBe(true);
   });
 
-  it("skips workspace .md files on snapshot restore", async () => {
+  it("skips workspace .md files on snapshot restore but still writes skills", async () => {
     const sandbox = mockSandbox();
     const opts = { ...defaultOpts(), fromSnapshot: true };
     await provision(sandbox as unknown as ZeroclawSandbox, opts);
 
     const allWrittenFiles = sandbox.writeFiles.mock.calls.flatMap((c) => c[0]);
-    const workspaceFiles = allWrittenFiles.filter((f) => f.path.includes("workspace/"));
-    expect(workspaceFiles.length).toBe(0);
+    const workspaceMdFiles = allWrittenFiles.filter(
+      (f) => f.path.includes("workspace/") && !f.path.includes("skills/"),
+    );
+    expect(workspaceMdFiles.length).toBe(0);
+
+    // Skills should still be written even on snapshot restore
+    const skillFiles = allWrittenFiles.filter((f) => f.path.includes("workspace/skills/"));
+    expect(skillFiles.length).toBeGreaterThan(0);
+    expect(skillFiles.some((f) => f.path.includes("skills-cli/SKILL.md"))).toBe(true);
   });
 
   it("handles missing workspace directory gracefully", async () => {

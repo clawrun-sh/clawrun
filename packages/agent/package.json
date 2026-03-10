@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc && for f in src/tools/*/SKILL.md; do d=\"dist/tools/$(basename $(dirname $f))\"; mkdir -p \"$d\" && cp \"$f\" \"$d/\"; done 2>/dev/null || true",
+    "build": "tsc && for f in src/tools/*/SKILL.md; do d=\"dist/tools/$(basename $(dirname $f))\"; mkdir -p \"$d\" && cp \"$f\" \"$d/\"; done 2>/dev/null || true && for f in dist/tools/*/skill-finder.js; do [ -f \"$f\" ] && sed -i'' '1s;^;#!/usr/bin/env node\\n;' \"$f\"; done 2>/dev/null || true",
     "dev": "tsc --watch",
     "lint": "eslint src",
     "test": "vitest run",

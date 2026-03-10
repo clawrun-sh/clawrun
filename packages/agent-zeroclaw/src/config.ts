@@ -70,7 +70,6 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
       "git",
       // Package managers
       "npm",
-      "npx",
       "pnpm",
       "yarn",
       "pip",
@@ -95,8 +94,9 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
       "unzip",
       // Build
       "make",
-      // Browser automation (agent-browser binary)
-      "agent-browser",
+      // Tool-specific commands (agent-browser, gh, skills, etc.) are no longer
+      // hardcoded here. They are injected dynamically from installed skill
+      // SKILL.md files during sandbox startup. See lifecycle.ts → injectSkillCommands.
     ],
     // All tools available from all channels (web UI, Telegram, etc.).
     // ZeroClaw defaults exclude browser/shell for non-CLI channels.
@@ -151,6 +151,9 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
     trigger: "keywords",
   },
   security: { otp: { enabled: false } },
+  // Full mode inlines entire SKILL.md into the system prompt so smaller models
+  // (e.g. mistral-small) reliably activate skills and follow their instructions.
+  skills: { prompt_injection_mode: "full" },
 };
 
 /** Deep merge where config arrays win outright (no union/dedup). */

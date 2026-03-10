@@ -1237,7 +1237,8 @@ export async function streamMessageViaDaemon(
 export interface MemoryEntry {
   key: string;
   content: string;
-  category?: string;
+  /** Raw daemon value — may be a string or `{ custom: string }`. Normalized by fetchMemories. */
+  category?: unknown;
   /** Daemon returns `timestamp`, not `created_at`. */
   timestamp: string;
   session_id?: string | null;
@@ -1589,6 +1590,16 @@ export async function deleteCronJobVia(
   if (!res.ok) throw new Error(`Cron DELETE ${res.status}: ${res.statusText}`);
 }
 
+/** Normalize ZeroClaw's category field to a flat string. */
+function normalizeCategory(cat: unknown): string | undefined {
+  if (cat == null) return undefined;
+  if (typeof cat === "string") return cat;
+  if (typeof cat === "object" && "custom" in (cat as Record<string, unknown>)) {
+    return String((cat as Record<string, string>).custom);
+  }
+  return JSON.stringify(cat);
+}
+
 export async function fetchMemories(
   sandbox: SandboxHandle,
   query?: { query?: string; category?: string },
@@ -1598,12 +1609,25 @@ export async function fetchMemories(
   if (query?.query) params.query = query.query;
   if (query?.category) params.category = query.category;
   const entries = await fetchMemoryEntries(sandbox, params, opts);
-  return entries.map((e) => ({
-    key: e.key,
-    content: e.content,
-    category: e.category,
-    timestamp: e.timestamp,
-  }));
+  const cronPrefixRe = /^\[cron:(\S+)\s+([^\]]+)\]\s*/;
+  return entries.map((e) => {
+    let content = e.content;
+    let source: MemoryEntryInfo["source"];
+    const m = cronPrefixRe.exec(content);
+    if (m) {
+      content = content.slice(m[0].length);
+      source = { type: "cron", id: m[1], name: m[2] };
+    }
+    return {
+      key: e.key,
+      content,
+      // ZeroClaw returns category as either a plain string ("conversation")
+      // or an object ({ custom: "observation" }). Normalize to flat string.
+      category: normalizeCategory(e.category),
+      timestamp: e.timestamp,
+      source,
+    };
+  });
 }
 
 export async function postMemory(

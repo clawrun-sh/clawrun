@@ -122,6 +122,11 @@ export interface MemoryEntryInfo {
   content: string;
   category?: string;
   timestamp?: string;
+  source?: {
+    type: string; // "cron" | "user" | "webhook" | ...
+    id?: string; // e.g. cron job ID
+    name?: string; // e.g. cron job name
+  };
 }
 
 export interface CostInfo {
@@ -244,6 +249,14 @@ export interface Agent {
   readonly daemonPort: number;
 
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
+
+  /** Inject allowed commands derived from installed skills into agent config. */
+  injectSkillCommands(
+    sandbox: SandboxHandle,
+    root: string,
+    commands: string[],
+    opts?: { signal?: AbortSignal },
+  ): Promise<void>;
 
   /**
    * Return tools enabled in the agent config.

@@ -65,23 +65,25 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
     } catch {
       // No workspace dir — skip
     }
+  }
 
-    // Write skill directories
-    const skillsDir = join(opts.localAgentDir, "workspace", "skills");
-    try {
-      for (const skillName of readdirSync(skillsDir)) {
-        const skillDir = join(skillsDir, skillName);
-        if (!statSync(skillDir).isDirectory()) continue;
-        for (const file of readdirSync(skillDir)) {
-          coreFiles.push({
-            path: `${agentDir}/workspace/skills/${skillName}/${file}`,
-            content: readFileSync(join(skillDir, file)),
-          });
-        }
+  // Always write skill directories — skills are tool definitions managed by
+  // ClawRun, not user-editable content. New tools added between deploys must
+  // be available even when restoring from snapshot.
+  const skillsDir = join(opts.localAgentDir, "workspace", "skills");
+  try {
+    for (const skillName of readdirSync(skillsDir)) {
+      const skillDir = join(skillsDir, skillName);
+      if (!statSync(skillDir).isDirectory()) continue;
+      for (const file of readdirSync(skillDir)) {
+        coreFiles.push({
+          path: `${agentDir}/workspace/skills/${skillName}/${file}`,
+          content: readFileSync(join(skillDir, file)),
+        });
       }
-    } catch {
-      // No skills dir — skip
     }
+  } catch {
+    // No skills dir — skip
   }
 
   await sandbox.writeFiles(coreFiles);
