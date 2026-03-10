@@ -188,11 +188,12 @@ const columns: ColumnDef<MemoryEntryInfo>[] = [
             </TooltipTrigger>
             <TooltipContent>Delete memory</TooltipContent>
           </Tooltip>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete memory entry?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete &ldquo;{entry.key}&rdquo;. This action cannot be
+              <AlertDialogDescription className="break-all">
+                This will permanently delete &ldquo;
+                <span className="font-mono text-xs">{entry.key}</span>&rdquo;. This action cannot be
                 undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
