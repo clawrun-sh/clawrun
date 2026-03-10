@@ -1498,22 +1498,6 @@ export async function fetchAgentConfig(
   return (await res.json()) as AgentConfig;
 }
 
-export async function putAgentConfig(
-  sandbox: SandboxHandle,
-  content: string,
-  opts?: { signal?: AbortSignal },
-): Promise<void> {
-  const url = daemonBase(sandbox) + "/api/config";
-  log.info(`putAgentConfig url=${url}`);
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-    signal: opts?.signal,
-  });
-  if (!res.ok) throw new Error(`Config PUT ${res.status}: ${res.statusText}`);
-}
-
 export async function fetchRuntimeTools(
   sandbox: SandboxHandle,
   opts?: { signal?: AbortSignal },

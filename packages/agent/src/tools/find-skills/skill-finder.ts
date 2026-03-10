@@ -4,17 +4,17 @@
  * Wrapper around the `skills` CLI that forces ClawRun-specific flags.
  * Installed to ~/.clawrun/bin/skills, which shadows the real binary
  * via PATH ordering set by the sidecar.
- *
- * The real binary is resolved by scanning PATH entries after ~/.clawrun/bin/.
  */
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+const HOME = process.env.HOME ?? "/root";
+
 /** Find the real `skills` binary by scanning PATH, skipping ~/.clawrun/bin. */
 function findRealSkills(): string {
-  const clawrunBin = join(process.env.HOME ?? "/root", ".clawrun", "bin");
+  const clawrunBin = join(HOME, ".clawrun", "bin");
   const dirs = (process.env.PATH ?? "").split(":");
   for (const dir of dirs) {
     if (dir === clawrunBin) continue;
@@ -40,7 +40,7 @@ switch (subcommand) {
     });
     break;
   default:
-    // All other subcommands (find, list, etc.) pass through unchanged
+    // All other subcommands (find, list, check, update, etc.) pass through
     execFileSync(real, [subcommand, ...rest].filter(Boolean), {
       stdio: "inherit",
     });

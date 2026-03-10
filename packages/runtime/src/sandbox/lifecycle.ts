@@ -676,33 +676,24 @@ export class SandboxLifecycleManager {
         fromSnapshot: !!snapshotId,
       });
 
-      // Scan installed skills for allowed commands and inject into agent config.
-      // This covers both locally deployed skills and user-installed skills
-      // persisted in snapshots.
+      // Inject allowed commands from built-in tools into agent config.
+      // User-installed skill commands are already in config.toml (persisted in
+      // snapshot), and new runtime installs are handled by the skills wrapper.
       try {
-        const skillsDir = `${root}/agent/workspace/skills`;
-        const lsResult = await sandbox.runCommand("ls", [skillsDir]);
-        const lsOut = (await lsResult.stdout()).trim();
-        const skillDirs = lsOut.split("\n").filter(Boolean);
-
-        if (skillDirs.length > 0) {
-          let allCommands: string[] = [];
-          for (const dir of skillDirs) {
-            const buf = await sandbox.readFile(`${skillsDir}/${dir}/SKILL.md`);
-            if (buf) {
-              allCommands.push(...parseSkillCommands(buf.toString("utf-8")));
-            }
-          }
-          allCommands = [...new Set(allCommands)];
-          if (allCommands.length > 0) {
-            await this.agent.injectSkillCommands(sandbox, root, allCommands);
-            log.info(`Injected skill commands: [${allCommands.join(", ")}]`);
+        const allCommands: string[] = [];
+        for (const tool of this.agent.getAvailableTools()) {
+          if (tool.skillContent) {
+            allCommands.push(...parseSkillCommands(tool.skillContent));
           }
         }
+        const unique = [...new Set(allCommands)];
+        if (unique.length > 0) {
+          await this.agent.injectSkillCommands(sandbox, root, unique);
+          log.info(`Injected skill commands: [${unique.join(", ")}]`);
+        }
       } catch (err) {
-        // Non-fatal — skills directory may not exist yet
         const msg = err instanceof Error ? err.message : String(err);
-        log.info(`Skill command scan skipped: ${msg}`);
+        log.info(`Skill command injection skipped: ${msg}`);
       }
 
       // Apply network policy before starting services.

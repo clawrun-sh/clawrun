@@ -4,8 +4,8 @@ import type { ZeroclawSandbox, CommandResult } from "./types.js";
 vi.mock("node:fs", () => ({
   readFileSync: vi.fn(() => Buffer.from("binary-content")),
   readdirSync: vi.fn((dir: string) => {
-    if (dir.endsWith("/skills")) return ["agent-browser", "skills-cli"];
-    if (dir.endsWith("/agent-browser") || dir.endsWith("/skills-cli")) return ["SKILL.md"];
+    if (dir.endsWith("/skills")) return ["agent-browser", "find-skills"];
+    if (dir.endsWith("/agent-browser") || dir.endsWith("/find-skills")) return ["SKILL.md"];
     return ["IDENTITY.md", "BOOTSTRAP.md", "notes.txt"];
   }),
   statSync: vi.fn(() => ({ isDirectory: () => true })),
@@ -180,7 +180,7 @@ describe("provision", () => {
     // Skills should also be written
     const skillFiles = allWrittenFiles.filter((f) => f.path.includes("workspace/skills/"));
     expect(skillFiles.some((f) => f.path.includes("agent-browser/SKILL.md"))).toBe(true);
-    expect(skillFiles.some((f) => f.path.includes("skills-cli/SKILL.md"))).toBe(true);
+    expect(skillFiles.some((f) => f.path.includes("find-skills/SKILL.md"))).toBe(true);
   });
 
   it("skips workspace .md files on snapshot restore but still writes skills", async () => {
@@ -197,7 +197,7 @@ describe("provision", () => {
     // Skills should still be written even on snapshot restore
     const skillFiles = allWrittenFiles.filter((f) => f.path.includes("workspace/skills/"));
     expect(skillFiles.length).toBeGreaterThan(0);
-    expect(skillFiles.some((f) => f.path.includes("skills-cli/SKILL.md"))).toBe(true);
+    expect(skillFiles.some((f) => f.path.includes("find-skills/SKILL.md"))).toBe(true);
   });
 
   it("handles missing workspace directory gracefully", async () => {

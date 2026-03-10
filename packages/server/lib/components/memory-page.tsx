@@ -47,7 +47,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/
 import { Label } from "@clawrun/ui/components/ui/label";
 import type { MemoryEntryInfo } from "@clawrun/agent";
 import { Separator } from "@clawrun/ui/components/ui/separator";
-import { Brain, Clock, Fingerprint, MessageSquare, Plus, Search, Tag, Trash2, X } from "lucide-react";
+import {
+  Brain,
+  Clock,
+  Fingerprint,
+  MessageSquare,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  X,
+} from "lucide-react";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 import { timeAgo } from "@clawrun/ui/lib/time-ago";
 
@@ -109,25 +119,26 @@ const columns: ColumnDef<MemoryEntryInfo>[] = [
               {category}
             </Badge>
           )}
-          {source && (() => {
-            const Icon = sourceIcons[source.type] ?? Tag;
-            return (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className="gap-1 shrink-0">
-                    <Icon className="size-3 shrink-0" />
-                    {source.type}
-                  </Badge>
-                </TooltipTrigger>
-                {source.name && (
-                  <TooltipContent>
-                    {source.name}
-                    {source.id ? ` (${source.id})` : ""}
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            );
-          })()}
+          {source &&
+            (() => {
+              const Icon = sourceIcons[source.type] ?? Tag;
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="gap-1 shrink-0">
+                      <Icon className="size-3 shrink-0" />
+                      {source.type}
+                    </Badge>
+                  </TooltipTrigger>
+                  {source.name && (
+                    <TooltipContent>
+                      {source.name}
+                      {source.id ? ` (${source.id})` : ""}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })()}
         </div>
       );
     },
@@ -400,16 +411,17 @@ export default function MemoryPage() {
                     {viewEntry.category}
                   </Badge>
                 )}
-                {viewEntry.source && (() => {
-                  const Icon = sourceIcons[viewEntry.source.type] ?? Tag;
-                  return (
-                    <Badge variant="outline" className="gap-1">
-                      <Icon className="size-3.5 shrink-0" />
-                      {viewEntry.source.type}
-                      {viewEntry.source.name ? `: ${viewEntry.source.name}` : ""}
-                    </Badge>
-                  );
-                })()}
+                {viewEntry.source &&
+                  (() => {
+                    const Icon = sourceIcons[viewEntry.source.type] ?? Tag;
+                    return (
+                      <Badge variant="outline" className="gap-1">
+                        <Icon className="size-3.5 shrink-0" />
+                        {viewEntry.source.type}
+                        {viewEntry.source.name ? `: ${viewEntry.source.name}` : ""}
+                      </Badge>
+                    );
+                  })()}
                 {viewEntry.timestamp && (
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {timeAgo(viewEntry.timestamp)}

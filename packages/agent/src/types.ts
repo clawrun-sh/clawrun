@@ -390,13 +390,6 @@ export interface Agent {
     opts?: { signal?: AbortSignal },
   ): Promise<AgentConfig>;
 
-  setConfig(
-    sandbox: SandboxHandle,
-    root: string,
-    content: string,
-    opts?: { signal?: AbortSignal },
-  ): Promise<void>;
-
   listTools(
     sandbox: SandboxHandle,
     root: string,

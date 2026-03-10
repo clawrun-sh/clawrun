@@ -14,15 +14,15 @@ const WRAPPER_JS_B64 = Buffer.from(
 ).toString("base64");
 
 /**
- * Vercel Skills CLI for discovering and installing agent skills.
+ * Find Skills — discover and install agent skills from skills.sh.
  *
  * Installs the real `skills` binary via npm, then drops a wrapper script
  * at `~/.clawrun/bin/skills` that shadows it via PATH ordering.
  * The wrapper forces `-a openclaw -y --copy` on `add`/`install` commands.
  */
-export class SkillsCliTool implements Tool {
-  readonly id = "skills-cli";
-  readonly name = "Skills CLI";
+export class FindSkillsTool implements Tool {
+  readonly id = "find-skills";
+  readonly name = "Find Skills";
   readonly version = SKILLS_VERSION;
   readonly description = "Discover and install agent skills from the skills.sh registry";
   readonly installDomains = ["registry.npmjs.org", "github.com"];

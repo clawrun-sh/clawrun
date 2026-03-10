@@ -74,7 +74,10 @@ describe("writeSetupConfig — fresh deploy", () => {
     const schemaCmds = (schemaDefaults.autonomy as Record<string, unknown>)
       .allowed_commands as string[];
     expect(cmds).not.toEqual(schemaCmds);
-    expect(cmds).toContain("agent-browser");
+    // Base commands are hardcoded; tool-specific commands (agent-browser, gh, skills)
+    // are injected dynamically at boot from Tool.skillContent.
+    expect(cmds).toContain("git");
+    expect(cmds).toContain("make");
   });
 
   it("clears non_cli_excluded_tools so all tools work from all channels", () => {

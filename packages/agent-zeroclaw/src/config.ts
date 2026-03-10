@@ -94,9 +94,10 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
       "unzip",
       // Build
       "make",
-      // Tool-specific commands (agent-browser, gh, skills, etc.) are no longer
-      // hardcoded here. They are injected dynamically from installed skill
-      // SKILL.md files during sandbox startup. See lifecycle.ts → injectSkillCommands.
+      // Tool-specific commands (agent-browser, gh, skills, firecrawl, etc.) are
+      // injected dynamically from SKILL.md allowed-tools frontmatter:
+      // - At boot: lifecycle.ts parses built-in Tool.skillContent + workspace skills
+      // - At runtime: skills wrapper patches config after `skills add`
     ],
     // All tools available from all channels (web UI, Telegram, etc.).
     // ZeroClaw defaults exclude browser/shell for non-CLI channels.

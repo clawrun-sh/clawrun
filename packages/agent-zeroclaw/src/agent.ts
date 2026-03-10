@@ -38,7 +38,7 @@ import type {
 } from "@clawrun/agent";
 import type { UIMessage } from "ai";
 import type { Tool } from "@clawrun/agent";
-import { AgentBrowserTool, GhCliTool, SkillsCliTool } from "@clawrun/agent";
+import { AgentBrowserTool, GhCliTool, FindSkillsTool } from "@clawrun/agent";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("agent:zeroclaw");
@@ -51,7 +51,6 @@ import {
   getThreadViaDaemon,
   fetchAgentStatus,
   fetchAgentConfig,
-  putAgentConfig,
   fetchRuntimeTools,
   fetchCronJobs,
   postCronJob,
@@ -113,15 +112,13 @@ export class ZeroclawAgent implements Agent {
     autonomy.allowed_commands = merged;
     config.autonomy = autonomy;
 
-    await sandbox.writeFiles([
-      { path: configPath, content: Buffer.from(TOML.stringify(config)) },
-    ]);
+    await sandbox.writeFiles([{ path: configPath, content: Buffer.from(TOML.stringify(config)) }]);
 
     log.info(`Injected ${commands.length} skill commands into config (total: ${merged.length})`);
   }
 
   getAvailableTools(): Tool[] {
-    return [new AgentBrowserTool(), new GhCliTool(), new SkillsCliTool()];
+    return [new AgentBrowserTool(), new GhCliTool(), new FindSkillsTool()];
   }
 
   getEnabledTools(agentDir: string): Tool[] {
@@ -330,18 +327,6 @@ export class ZeroclawAgent implements Agent {
       return { format: "toml", content: "" };
     }
     return fetchAgentConfig(sandbox, opts);
-  }
-
-  async setConfig(
-    sandbox: SandboxHandle,
-    _root: string,
-    content: string,
-    opts?: { signal?: AbortSignal },
-  ): Promise<void> {
-    if (typeof sandbox.domain !== "function") {
-      throw new Error("Sandbox domain unavailable");
-    }
-    await putAgentConfig(sandbox, content, opts);
   }
 
   async listTools(
