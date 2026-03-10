@@ -40,11 +40,22 @@ export const channelInfoSchema = z.object({
   apiDomains: z.array(z.string()).default([]),
 });
 
+// --- Cost ---
+
+export const costSetupSchema = z.object({
+  enabled: z.boolean(),
+  inputPerMillion: z.number().min(0),
+  outputPerMillion: z.number().min(0),
+  dailyLimitUsd: z.number().min(0),
+  monthlyLimitUsd: z.number().min(0),
+});
+
 // --- Combined setup data ---
 
 export const agentSetupDataSchema = z.object({
   provider: providerSetupSchema,
   channels: z.record(z.string(), z.record(z.string(), z.string())),
+  cost: costSetupSchema.optional(),
 });
 
 // --- Derived types ---
@@ -54,4 +65,5 @@ export type ProviderSetup = z.infer<typeof providerSetupSchema>;
 export type ChannelSetupField = z.infer<typeof channelSetupFieldSchema>;
 export type ChannelInfo = z.infer<typeof channelInfoSchema>;
 export type CuratedModel = z.infer<typeof curatedModelSchema>;
+export type CostSetupData = z.infer<typeof costSetupSchema>;
 export type AgentSetupData = z.infer<typeof agentSetupDataSchema>;

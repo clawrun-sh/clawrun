@@ -54,8 +54,8 @@ import { ClawRunClient } from "@clawrun/sdk";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
 import { printBanner } from "../banner.js";
-import { promptProvider, promptChannels } from "../setup/index.js";
-import type { ChannelSetupResult } from "../setup/index.js";
+import { promptProvider, promptChannels, promptCost } from "../setup/index.js";
+import type { ChannelSetupResult, CostSetup } from "../setup/index.js";
 
 function generateInstanceName(): string {
   return `clawrun-${humanId({ separator: "-", capitalize: false })}`;
@@ -355,6 +355,12 @@ async function handleNewInstance(
     `Provider: ${chalk.green(providerResult.provider)} | Model: ${chalk.green(providerResult.model)}`,
   );
 
+  // Cost management
+  let costSetup: CostSetup | undefined;
+  if (!options.yes) {
+    costSetup = await promptCost(providerResult.provider, providerResult.model);
+  }
+
   // Channel setup
   let channelSetup: ChannelSetupResult = { channels: {}, channelNames: [] };
   if (!options.yes) {
@@ -372,10 +378,11 @@ async function handleNewInstance(
     selectedTools = agent.getAvailableTools();
   }
 
-  // Write agent config (provider + channels)
+  // Write agent config (provider + channels + cost)
   agent.writeSetupConfig(agentConfigDir, {
     provider: providerResult,
     channels: channelSetup.channels,
+    cost: costSetup,
   });
 
   // Seed workspace template files into agent dir (only missing files)
@@ -657,26 +664,56 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       clack.log.success(
         `Provider: ${chalk.green(result.provider)} | Model: ${chalk.green(result.model)}`,
       );
+
+      // Cost management — prompt with existing values as defaults
+      const costSetup = await promptCost(result.provider, result.model, existingSetup?.cost);
+
       // Write updated config
       agent.writeSetupConfig(agentConfigDir, {
         provider: result,
         channels: existingSetup?.channels ?? {},
+        cost: costSetup,
       });
+    } else {
+      // Provider unchanged — still offer to reconfigure cost
+      const currentProvider = existingSetup?.provider;
+      if (currentProvider?.provider && currentProvider?.model) {
+        const reconfigureCost = await clack.confirm({
+          message: "Reconfigure cost management?",
+          initialValue: false,
+        });
+
+        if (!clack.isCancel(reconfigureCost) && reconfigureCost) {
+          const costSetup = await promptCost(
+            currentProvider.provider,
+            currentProvider.model,
+            existingSetup?.cost,
+          );
+          const currentSetup = agent.readSetup(agentConfigDir);
+          const currentProviderSetup = currentSetup?.provider as {
+            provider: string;
+            apiKey: string;
+            model: string;
+          };
+          agent.writeSetupConfig(agentConfigDir, {
+            provider: currentProviderSetup,
+            channels: currentSetup?.channels ?? {},
+            cost: costSetup,
+          });
+        }
+      }
     }
 
     const channelResult = await promptChannels(agent, existingSetup?.channels, name);
     if (Object.keys(channelResult.channels).length > 0) {
       const currentSetup = agent.readSetup(agentConfigDir);
+      const currentProviderSetup = currentSetup?.provider as {
+        provider: string;
+        apiKey: string;
+        model: string;
+      };
       agent.writeSetupConfig(agentConfigDir, {
-        provider: (currentSetup?.provider as {
-          provider: string;
-          apiKey: string;
-          model: string;
-        }) ?? {
-          provider: "openrouter",
-          apiKey: "",
-          model: "anthropic/claude-sonnet-4-6",
-        },
+        provider: currentProviderSetup,
         channels: channelResult.channels,
       });
 

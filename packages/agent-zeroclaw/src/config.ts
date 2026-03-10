@@ -197,6 +197,40 @@ export function writeSetupConfig(
     ...(data.provider.apiUrl ? { api_url: data.provider.apiUrl } : {}),
   } as Partial<ZeroClawConfig>) as Partial<ZeroClawConfig>;
 
+  // Write cost config if provided
+  if (data.cost) {
+    if (data.cost.enabled) {
+      const costSection: Record<string, unknown> = {
+        enabled: true,
+        daily_limit_usd: data.cost.dailyLimitUsd,
+        monthly_limit_usd: data.cost.monthlyLimitUsd,
+        enforcement: { mode: "warn" },
+        prices: {
+          [data.provider.model]: {
+            input: data.cost.inputPerMillion,
+            output: data.cost.outputPerMillion,
+          },
+        },
+      };
+      // Preserve any existing price entries for other models
+      const existingCost = (existing as Record<string, unknown>).cost as
+        | Record<string, unknown>
+        | undefined;
+      if (existingCost?.prices && typeof existingCost.prices === "object") {
+        costSection.prices = {
+          ...(existingCost.prices as Record<string, unknown>),
+          [data.provider.model]: {
+            input: data.cost.inputPerMillion,
+            output: data.cost.outputPerMillion,
+          },
+        };
+      }
+      (config as Record<string, unknown>).cost = costSection;
+    } else {
+      (config as Record<string, unknown>).cost = { enabled: false };
+    }
+  }
+
   // Merge channels into channels_config.
   if (Object.keys(data.channels).length > 0) {
     const cc: Record<string, unknown> = {
@@ -241,6 +275,13 @@ export function writeSetupConfig(
 export function readSetup(agentDir: string): {
   provider?: Partial<ProviderSetup>;
   channels?: Record<string, Record<string, string>>;
+  cost?: {
+    enabled?: boolean;
+    inputPerMillion?: number;
+    outputPerMillion?: number;
+    dailyLimitUsd?: number;
+    monthlyLimitUsd?: number;
+  };
 } | null {
   if (!existsSync(join(agentDir, "config.toml"))) return null;
 
@@ -270,7 +311,35 @@ export function readSetup(agentDir: string): {
       }
     }
 
-    return { provider, channels };
+    // Read cost config
+    let cost:
+      | {
+          enabled?: boolean;
+          inputPerMillion?: number;
+          outputPerMillion?: number;
+          dailyLimitUsd?: number;
+          monthlyLimitUsd?: number;
+        }
+      | undefined;
+
+    const costConfig = parsed.cost;
+    if (costConfig) {
+      cost = {
+        enabled: costConfig.enabled,
+        dailyLimitUsd: costConfig.daily_limit_usd,
+        monthlyLimitUsd: costConfig.monthly_limit_usd,
+      };
+      // Read model pricing for the current model
+      if (costConfig.prices && parsed.default_model) {
+        const modelPrice = costConfig.prices[parsed.default_model];
+        if (modelPrice) {
+          cost.inputPerMillion = modelPrice.input;
+          cost.outputPerMillion = modelPrice.output;
+        }
+      }
+    }
+
+    return { provider, channels, cost };
   } catch {
     return null;
   }

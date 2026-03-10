@@ -14,6 +14,7 @@ export type {
   ChannelSetupField,
   ChannelInfo,
   CuratedModel,
+  CostSetupData,
   AgentSetupData,
 } from "./schemas.js";
 
@@ -356,6 +357,13 @@ export interface Agent {
   readSetup(agentDir: string): {
     provider?: Partial<ProviderSetup>;
     channels?: Record<string, Record<string, string>>;
+    cost?: {
+      enabled?: boolean;
+      inputPerMillion?: number;
+      outputPerMillion?: number;
+      dailyLimitUsd?: number;
+      monthlyLimitUsd?: number;
+    };
   } | null;
 
   /** Return tools enabled in the agent config (for install-time domain checks). */

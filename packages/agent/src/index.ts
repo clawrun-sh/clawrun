@@ -12,6 +12,7 @@ export type {
   ChannelSetupField,
   ChannelInfo,
   CuratedModel,
+  CostSetupData,
   AgentSetupData,
   ThreadInfo,
   AgentStatus,
@@ -44,7 +45,12 @@ export { runTools } from "./tools.js";
 export { AgentBrowserTool, GhCliTool, FindSkillsTool } from "./tools/index.js";
 export type { ReleaseSpec } from "./tools/installer.js";
 export { releaseInstallSteps, releaseCheckCommand, githubReleaseUrl } from "./tools/installer.js";
-export { agentSetupDataSchema, channelInfoSchema, providerSetupSchema } from "./schemas.js";
+export {
+  agentSetupDataSchema,
+  costSetupSchema,
+  channelInfoSchema,
+  providerSetupSchema,
+} from "./schemas.js";
 export { createAgent, registerAgentFactory } from "./registry.js";
 export { baseWorkspaceDir } from "./workspace.js";
 export { parseSkillCommands, scanSkillsDirectory } from "./skill-commands.js";
