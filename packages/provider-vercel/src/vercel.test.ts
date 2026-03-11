@@ -11,7 +11,8 @@ const mockSandboxCreate = vi.fn();
 const mockSandboxGet = vi.fn();
 const mockSnapshotList = vi.fn();
 const mockSnapshotGet = vi.fn();
-const mockGetAuth = vi.fn();
+const mockCachedGenerateCredentials = vi.fn();
+const mockGenerateCredentials = vi.fn();
 
 vi.mock("@vercel/sandbox", () => ({
   Sandbox: {
@@ -25,8 +26,9 @@ vi.mock("@vercel/sandbox", () => ({
   },
 }));
 
-vi.mock("@vercel/sandbox/dist/auth/file.js", () => ({
-  getAuth: () => mockGetAuth(),
+vi.mock("@vercel/sandbox/dist/utils/dev-credentials.js", () => ({
+  cachedGenerateCredentials: (...args: unknown[]) => mockCachedGenerateCredentials(...args),
+  generateCredentials: (...args: unknown[]) => mockGenerateCredentials(...args),
 }));
 
 import { VercelSandboxProvider } from "./vercel.js";
@@ -58,16 +60,22 @@ afterEach(() => {
 });
 
 describe("credential resolution", () => {
-  it("resolves credentials when project.json and auth token are available", () => {
+  it("resolves credentials when project.json is available", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
+    await provider.list();
 
-    // Verify credentials are set by making a list() call
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
+    expect(mockCachedGenerateCredentials).toHaveBeenCalledWith({
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
     expect(mockSandboxList).toHaveBeenCalledWith({
       token: "tok_123",
       projectId: "prj_abc",
@@ -75,66 +83,37 @@ describe("credential resolution", () => {
     });
   });
 
-  it("returns undefined credentials when project.json is missing", () => {
+  it("returns undefined credentials when project.json is missing", async () => {
     const dir = join(tempDir, "no-vercel-dir");
     mkdirSync(dir, { recursive: true });
-    // No .vercel/project.json created
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
+    await provider.list();
 
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
-    // Should call with undefined (no credentials) — triggers withScope fallback
+    expect(mockCachedGenerateCredentials).not.toHaveBeenCalled();
     expect(mockSandboxList).toHaveBeenCalledWith(undefined);
   });
 
-  it("returns undefined credentials when projectId is missing from project.json", () => {
+  it("returns undefined credentials when projectId is missing from project.json", async () => {
     const dir = createTempProjectDir({ orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
+    await provider.list();
 
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
+    expect(mockCachedGenerateCredentials).not.toHaveBeenCalled();
     expect(mockSandboxList).toHaveBeenCalledWith(undefined);
   });
 
-  it("returns undefined credentials when orgId is missing from project.json", () => {
+  it("returns undefined credentials when orgId is missing from project.json", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
+    await provider.list();
 
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
-    expect(mockSandboxList).toHaveBeenCalledWith(undefined);
-  });
-
-  it("returns undefined credentials when getAuth returns null", () => {
-    const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue(null);
-
-    const provider = new VercelSandboxProvider({ projectDir: dir });
-
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
-    expect(mockSandboxList).toHaveBeenCalledWith(undefined);
-  });
-
-  it("returns undefined credentials when getAuth returns object without token", () => {
-    const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ refreshToken: "ref_456" });
-
-    const provider = new VercelSandboxProvider({ projectDir: dir });
-
-    mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
-    provider.list();
-
+    expect(mockCachedGenerateCredentials).not.toHaveBeenCalled();
     expect(mockSandboxList).toHaveBeenCalledWith(undefined);
   });
 });
@@ -142,7 +121,11 @@ describe("credential resolution", () => {
 describe("SDK call scoping — credentials vs withScope", () => {
   it("passes credentials directly to Sandbox.list when resolved", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
     mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
@@ -157,7 +140,11 @@ describe("SDK call scoping — credentials vs withScope", () => {
 
   it("passes credentials directly to Sandbox.get when resolved", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
     mockSandboxGet.mockResolvedValue({
       sandboxId: "sbx_1",
       status: "running",
@@ -178,7 +165,11 @@ describe("SDK call scoping — credentials vs withScope", () => {
 
   it("passes credentials to Sandbox.create when resolved", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
     mockSandboxCreate.mockResolvedValue({
       sandboxId: "sbx_new",
       status: "running",
@@ -199,9 +190,9 @@ describe("SDK call scoping — credentials vs withScope", () => {
     );
   });
 
-  it("falls back to withScope (chdir) when credentials not resolved", async () => {
-    const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue(null); // no token → no credentials
+  it("falls back to withScope (chdir) when scope not resolved", async () => {
+    const dir = join(tempDir, "no-vercel-dir");
+    mkdirSync(dir, { recursive: true });
     mockSandboxList.mockResolvedValue({ json: { sandboxes: [] } });
 
     const origCwd = process.cwd();
@@ -230,7 +221,14 @@ describe("concurrent list calls — different projects get different credentials
   it("two providers with different project dirs pass different credentials", async () => {
     const dirA = createTempProjectDir({ projectId: "prj_A", orgId: "team_A" });
     const dirB = createTempProjectDir({ projectId: "prj_B", orgId: "team_B" });
-    mockGetAuth.mockReturnValue({ token: "tok_shared" });
+
+    mockCachedGenerateCredentials.mockImplementation(
+      async (opts: { teamId: string; projectId: string }) => ({
+        token: "tok_shared",
+        projectId: opts.projectId,
+        teamId: opts.teamId,
+      }),
+    );
 
     mockSandboxList.mockResolvedValue({
       json: {
@@ -250,7 +248,7 @@ describe("concurrent list calls — different projects get different credentials
     const providerA = new VercelSandboxProvider({ projectDir: dirA });
     const providerB = new VercelSandboxProvider({ projectDir: dirB });
 
-    // Call concurrently — the original bug
+    // Call concurrently
     await Promise.all([providerA.list(), providerB.list()]);
 
     expect(mockSandboxList).toHaveBeenCalledTimes(2);
@@ -270,7 +268,11 @@ describe("concurrent list calls — different projects get different credentials
 describe("deleteSnapshot", () => {
   it("deletes a snapshot normally", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
 
     const mockDelete = vi.fn().mockResolvedValue(undefined);
     mockSnapshotGet.mockResolvedValue({ delete: mockDelete });
@@ -289,24 +291,93 @@ describe("deleteSnapshot", () => {
 
   it("treats 'expired or deleted' as success", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
 
     const err = new Error("not found") as Error & { text?: string };
     err.text = "snapshot has expired or deleted";
     mockSnapshotGet.mockRejectedValue(err);
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
-    // Should not throw
     await expect(provider.deleteSnapshot(snapshotId("snap_old"))).resolves.toBeUndefined();
   });
 
   it("rethrows non-expiry errors", async () => {
     const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
-    mockGetAuth.mockReturnValue({ token: "tok_123" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
 
     mockSnapshotGet.mockRejectedValue(new Error("network error"));
 
     const provider = new VercelSandboxProvider({ projectDir: dir });
     await expect(provider.deleteSnapshot(snapshotId("snap_1"))).rejects.toThrow("network error");
+  });
+});
+
+describe("401 retry with token refresh", () => {
+  it("retries with fresh credentials on 401", async () => {
+    const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_stale",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+    mockGenerateCredentials.mockResolvedValue({
+      token: "tok_fresh",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+
+    const err401 = new Error("API request failed with status 401") as Error & { status?: number };
+    err401.status = 401;
+
+    // First call rejects with 401, second succeeds
+    mockSandboxList
+      .mockRejectedValueOnce(err401)
+      .mockResolvedValueOnce({ json: { sandboxes: [] } });
+
+    const provider = new VercelSandboxProvider({ projectDir: dir });
+    await provider.list();
+
+    expect(mockSandboxList).toHaveBeenCalledTimes(2);
+    // First call used stale token
+    expect(mockSandboxList).toHaveBeenNthCalledWith(1, {
+      token: "tok_stale",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+    // Retry used fresh token from generateCredentials
+    expect(mockSandboxList).toHaveBeenNthCalledWith(2, {
+      token: "tok_fresh",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+    expect(mockGenerateCredentials).toHaveBeenCalledWith({
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+  });
+
+  it("does not retry non-401 errors", async () => {
+    const dir = createTempProjectDir({ projectId: "prj_abc", orgId: "team_xyz" });
+    mockCachedGenerateCredentials.mockResolvedValue({
+      token: "tok_123",
+      projectId: "prj_abc",
+      teamId: "team_xyz",
+    });
+
+    mockSandboxList.mockRejectedValue(new Error("network error"));
+
+    const provider = new VercelSandboxProvider({ projectDir: dir });
+    await expect(provider.list()).rejects.toThrow("network error");
+
+    expect(mockSandboxList).toHaveBeenCalledTimes(1);
+    expect(mockGenerateCredentials).not.toHaveBeenCalled();
   });
 });

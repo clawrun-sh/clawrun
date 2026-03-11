@@ -41,7 +41,7 @@ export async function startAgentChat(
     process.exit(1);
   }
 
-  await startChatTUI(instanceName, conn.instance, sandboxId, {
+  await startChatTUI(instanceName, conn.instance, sandboxId, config, {
     initialMessage: opts?.initialMessage,
   });
 }

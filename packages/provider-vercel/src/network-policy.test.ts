@@ -10,7 +10,7 @@ const mockSandboxList = vi.fn();
 const mockSandboxGet = vi.fn();
 const mockSnapshotList = vi.fn();
 const mockSnapshotGet = vi.fn();
-const mockGetAuth = vi.fn();
+const mockCachedGenerateCredentials = vi.fn();
 const mockUpdateNetworkPolicy = vi.fn();
 
 vi.mock("@vercel/sandbox", () => ({
@@ -25,8 +25,9 @@ vi.mock("@vercel/sandbox", () => ({
   },
 }));
 
-vi.mock("@vercel/sandbox/dist/auth/file.js", () => ({
-  getAuth: () => mockGetAuth(),
+vi.mock("@vercel/sandbox/dist/utils/dev-credentials.js", () => ({
+  cachedGenerateCredentials: (...args: unknown[]) => mockCachedGenerateCredentials(...args),
+  generateCredentials: (...args: unknown[]) => mockCachedGenerateCredentials(...args),
 }));
 
 import { VercelSandboxProvider } from "./vercel.js";
@@ -48,7 +49,11 @@ function createTempProjectDir(): string {
 
 function createProviderWithCreds(): VercelSandboxProvider {
   const dir = createTempProjectDir();
-  mockGetAuth.mockReturnValue({ token: "tok_123" });
+  mockCachedGenerateCredentials.mockResolvedValue({
+    token: "tok_123",
+    projectId: "prj_abc",
+    teamId: "team_xyz",
+  });
   return new VercelSandboxProvider({ projectDir: dir });
 }
 

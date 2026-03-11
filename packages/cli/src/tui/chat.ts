@@ -3,6 +3,7 @@ import {
   ProcessTerminal,
   Container,
   TruncatedText,
+  Text,
   Editor,
   Markdown,
   Spacer,
@@ -15,8 +16,9 @@ import {
   getImageDimensions,
   imageFallback,
 } from "@mariozechner/pi-tui";
+import chalk from "chalk";
 import { randomUUID } from "node:crypto";
-import type { ClawRunInstance } from "@clawrun/sdk";
+import type { ClawRunInstance, ClawRunConfigWithSecrets } from "@clawrun/sdk";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 
 // ---------------------------------------------------------------------------
@@ -81,15 +83,49 @@ export async function startChatTUI(
   instanceName: string,
   instance: ClawRunInstance,
   sandboxId: string,
+  config: ClawRunConfigWithSecrets,
   opts?: { initialMessage?: string },
 ): Promise<void> {
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal);
   const threadId = randomUUID().replaceAll("-", "_");
 
-  // --- header ---------------------------------------------------------------
-  const header = new TruncatedText(colors.accent(instanceName) + colors.dim(` · ${sandboxId}`));
-  tui.addChild(header);
+  // --- startup info box -----------------------------------------------------
+  const logo = [
+    "  ▄▄▄███▀   ",
+    "▄█████▀     ",
+    "██████    ▄▄█",
+    "██████▄▄▄████▀",
+    "████████████▀ ",
+    "▀█████████▀   ",
+    "  ▀▀▀▀▀▀",
+  ];
+
+  const infoLines = [
+    "",
+    chalk.bold.hex("#8abeb7")("CLAWRUN"),
+    "",
+    `${chalk.dim("Instance")}  ${chalk.white(instanceName)}`,
+    `${chalk.dim("Sandbox")}   ${chalk.white(sandboxId)}`,
+    `${chalk.dim("Agent")}     ${chalk.white(config.agent.name)}`,
+    `${chalk.dim("Provider")}  ${chalk.white(config.instance.provider)}`,
+    `${chalk.dim("vCPUs")}     ${chalk.white(String(config.sandbox.resources.vcpus))}`,
+    "",
+  ];
+
+  // Merge logo and info side by side
+  const logoWidth = 16;
+  const maxLines = Math.max(logo.length, infoLines.length);
+  const merged: string[] = [];
+  for (let i = 0; i < maxLines; i++) {
+    const l = i < logo.length ? logo[i]! : "";
+    const r = i < infoLines.length ? infoLines[i]! : "";
+    merged.push(chalk.hex("#8abeb7")(l.padEnd(logoWidth)) + r);
+  }
+
+  const startupBox = new Text(merged.join("\n"), 2, 1);
+  tui.addChild(startupBox);
+  tui.addChild(new Spacer(1));
 
   // --- chat container -------------------------------------------------------
   const chatContainer = new Container();
