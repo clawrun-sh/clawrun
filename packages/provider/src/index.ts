@@ -1,8 +1,9 @@
-export { PROVIDER_IDS, sandboxId, snapshotId } from "./types.js";
+export { PROVIDER_IDS, sandboxId, snapshotId, ACTIVE_SANDBOX_STATUSES } from "./types.js";
 export type {
   ProviderId,
   SandboxId,
   SnapshotId,
+  SandboxStatus,
   RunCommandOptions,
   CommandResult,
   ManagedSandbox,

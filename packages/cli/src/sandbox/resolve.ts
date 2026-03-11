@@ -1,14 +1,15 @@
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
 import type { ClawRunInstance, SandboxEntry } from "@clawrun/sdk";
+import { ACTIVE_SANDBOX_STATUSES } from "@clawrun/provider";
 
 type SandboxId = SandboxEntry["id"];
 
-/** Find the running sandbox ID, or null. */
+/** Find an active sandbox ID, or null. */
 export async function getRunningId(instance: ClawRunInstance): Promise<SandboxId | null> {
   const sandboxes = await instance.sandbox.list();
-  const running = sandboxes.find((s) => s.status === "running");
-  return running?.id ?? null;
+  const active = sandboxes.find((s) => ACTIVE_SANDBOX_STATUSES.has(s.status));
+  return active?.id ?? null;
 }
 
 /** Start a sandbox (wake from snapshot if needed), then poll until one is running. */
@@ -24,12 +25,17 @@ async function ensureRunning(
       spinner.stop(chalk.red(`Start failed: ${result.error}`));
       process.exit(1);
     }
+    // Server returned the sandbox ID — use it directly instead of polling
+    if (result.sandboxId) {
+      return result.sandboxId;
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     spinner.stop(chalk.red(`Failed to reach deployment: ${msg}`));
     process.exit(1);
   }
 
+  // Fallback: poll until a sandbox is active (shouldn't normally be needed)
   const POLL_INTERVAL_MS = 3_000;
   const POLL_TIMEOUT_MS = 90_000;
   const deadline = Date.now() + POLL_TIMEOUT_MS;

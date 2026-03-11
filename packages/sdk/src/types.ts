@@ -1,5 +1,5 @@
 import type { ClawRunConfig } from "@clawrun/runtime";
-import type { ProviderId, SandboxId } from "@clawrun/provider";
+import type { ProviderId, SandboxId, SandboxStatus } from "@clawrun/provider";
 import type { UIMessage, UIMessageChunk } from "ai";
 
 // Re-export so consumers don't need to depend on @clawrun/runtime
@@ -184,7 +184,7 @@ export interface ChatStream {
 
 export interface SandboxEntry {
   id: SandboxId;
-  status: string;
+  status: SandboxStatus;
   createdAt: number;
   memory: number;
   vcpus: number;

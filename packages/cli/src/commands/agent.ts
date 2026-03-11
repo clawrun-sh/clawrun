@@ -33,7 +33,7 @@ export async function startAgentChat(
   s.start("Connecting to sandbox...");
   let sandboxId: string;
   try {
-    sandboxId = await resolveRunningId(conn.instance);
+    sandboxId = await resolveRunningId(conn.instance, s);
     s.stop(`Connected to sandbox ${chalk.dim(sandboxId)}`);
   } catch (err) {
     s.stop(chalk.red("Failed to connect to sandbox"));

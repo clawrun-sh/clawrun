@@ -130,14 +130,18 @@ let _provider: SandboxProvider;
 let _agent: Agent;
 let _stateStore: StateStore;
 
-vi.mock("@clawrun/provider", () => ({
-  getProvider: vi.fn(() => _provider),
-  CountBasedRetention: vi.fn().mockImplementation(() => ({
-    selectForDeletion: vi.fn().mockReturnValue([]),
-  })),
-  sandboxId: (id: string) => id,
-  snapshotId: (id: string) => id,
-}));
+vi.mock("@clawrun/provider", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@clawrun/provider")>();
+  return {
+    ...orig,
+    getProvider: vi.fn(() => _provider),
+    CountBasedRetention: vi.fn().mockImplementation(() => ({
+      selectForDeletion: vi.fn().mockReturnValue([]),
+    })),
+    sandboxId: (id: string) => id,
+    snapshotId: (id: string) => id,
+  };
+});
 
 vi.mock("../agents/registry.js", () => ({
   getAgent: vi.fn(() => _agent),
@@ -1760,11 +1764,11 @@ describe("forceRestart() edge cases", () => {
 
 describe("heartbeat() edge cases", () => {
   it("failed sandbox exists (not running, no stoppedAt) — does NOT trigger first boot", async () => {
-    // A sandbox exists with status "error" — hasEverRun is false (not running, no stoppedAt),
+    // A sandbox exists with status "failed" — hasEverRun is false (not running, no stoppedAt),
     // but sandboxes.length > 0, so first-boot check fails
     const errored = mockSandboxInfo({
       id: sandboxId("sbx-err"),
-      status: "error",
+      status: "failed",
       stoppedAt: undefined,
     });
     vi.mocked(_provider.list).mockResolvedValue([errored]);

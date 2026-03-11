@@ -7,7 +7,7 @@ import type {
   SandboxId,
   SnapshotId,
 } from "@clawrun/provider";
-import { CountBasedRetention, getProvider } from "@clawrun/provider";
+import { CountBasedRetention, getProvider, ACTIVE_SANDBOX_STATUSES } from "@clawrun/provider";
 import type { Agent, CronJob } from "@clawrun/agent";
 import { parseSkillCommands } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
@@ -150,7 +150,7 @@ export class SandboxLifecycleManager {
   }
 
   private isActive(s: SandboxInfo): boolean {
-    return s.status === "running" || s.status === "pending";
+    return ACTIVE_SANDBOX_STATUSES.has(s.status);
   }
 
   /** Stop the given sandboxes. Re-fetches each to get current status. */

@@ -54,11 +54,26 @@ export interface CommandResult {
   stderr(): Promise<string>;
 }
 
+// --- Sandbox status ---
+
+/** Sandbox lifecycle statuses (mirrors Vercel Sandbox SDK). */
+export type SandboxStatus =
+  | "aborted"
+  | "failed"
+  | "pending"
+  | "running"
+  | "snapshotting"
+  | "stopped"
+  | "stopping";
+
+/** Statuses that indicate a sandbox is active (booting or running). */
+export const ACTIVE_SANDBOX_STATUSES: ReadonlySet<SandboxStatus> = new Set(["pending", "running"]);
+
 // --- Sandbox instance ---
 
 export interface ManagedSandbox {
   readonly id: SandboxId;
-  readonly status: string;
+  readonly status: SandboxStatus;
   /** Current timeout in ms (includes extensions). */
   readonly timeout: number;
   /** Epoch ms when sandbox was created. */
@@ -84,7 +99,7 @@ export interface SnapshotRef {
 
 export interface SandboxInfo {
   id: SandboxId;
-  status: string;
+  status: SandboxStatus;
   createdAt: number;
   startedAt?: number;
   stoppedAt?: number;

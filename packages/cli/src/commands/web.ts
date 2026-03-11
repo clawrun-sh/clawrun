@@ -1,16 +1,9 @@
 import { command } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import { execFile } from "node:child_process";
 import { instance } from "../args/instance.js";
 import { connectInstance } from "../connect-instance.js";
-
-/** Open a URL in the default browser (cross-platform). */
-function openBrowser(url: string): void {
-  const cmd =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  execFile(cmd, [url]);
-}
+import { openBrowser } from "../open-browser.js";
 
 export const web = command({
   name: "web",

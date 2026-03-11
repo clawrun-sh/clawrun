@@ -38,6 +38,7 @@ import {
   type CommandResult,
   type SnapshotRef,
   type NetworkPolicy,
+  type SandboxStatus,
   type ProviderOptions,
 } from "@clawrun/provider";
 
@@ -48,8 +49,8 @@ class VercelManagedSandbox implements ManagedSandbox {
     return sandboxId(this.sandbox.sandboxId);
   }
 
-  get status(): string {
-    return this.sandbox.status as string;
+  get status(): SandboxStatus {
+    return this.sandbox.status as SandboxStatus;
   }
 
   get timeout(): number {

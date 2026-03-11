@@ -34,7 +34,7 @@ function makeSandbox(overrides: Partial<SandboxEntry> = {}): SandboxEntry {
 
 function makeInstance(sandboxes: SandboxEntry[]): ClawRunInstance {
   const listFn = vi.fn().mockResolvedValue(sandboxes);
-  const startFn = vi.fn().mockResolvedValue({ status: "running" });
+  const startFn = vi.fn().mockResolvedValue({ status: "running", sandboxId: "sbx_started" });
   return {
     sandbox: {
       list: listFn,
@@ -96,6 +96,21 @@ describe("getRunningId", () => {
     expect(await getRunningId(instance)).toBe("sbx_2");
   });
 
+  it("returns a pending sandbox id", async () => {
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "stopped" }),
+      makeSandbox({ id: "sbx_2" as SandboxEntry["id"], status: "pending" }),
+    ]);
+    expect(await getRunningId(instance)).toBe("sbx_2");
+  });
+
+  it("ignores non-active statuses like stopping", async () => {
+    const instance = makeInstance([
+      makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "stopping" }),
+    ]);
+    expect(await getRunningId(instance)).toBeNull();
+  });
+
   it("returns the first running sandbox when multiple are running", async () => {
     const instance = makeInstance([
       makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "running" }),
@@ -120,27 +135,39 @@ describe("resolveRunningId", () => {
     expect(instance.start).not.toHaveBeenCalled();
   });
 
-  it("calls instance.start() when no sandbox is running", async () => {
+  it("calls instance.start() and uses returned sandboxId directly", async () => {
     const instance = makeInstance([]);
-    (instance.sandbox.list as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce([]) // initial check
-      .mockResolvedValueOnce([
-        makeSandbox({ id: "sbx_woke" as SandboxEntry["id"], status: "running" }),
-      ]); // after start
+    (instance.sandbox.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (instance.start as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "running",
+      sandboxId: "sbx_woke",
+    });
 
     const id = await resolveRunningId(instance, mockSpinner as never);
 
     expect(id).toBe("sbx_woke");
     expect(instance.start).toHaveBeenCalled();
+    // Should NOT have polled — sandboxId came from start result
+    expect(instance.sandbox.list).toHaveBeenCalledTimes(1); // only the initial check
+  });
+
+  it("falls back to polling when start returns no sandboxId", async () => {
+    const instance = makeInstance([]);
+    (instance.start as ReturnType<typeof vi.fn>).mockResolvedValue({ status: "running" });
+    (instance.sandbox.list as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([]) // initial check
+      .mockResolvedValueOnce([
+        makeSandbox({ id: "sbx_polled" as SandboxEntry["id"], status: "running" }),
+      ]);
+
+    const id = await resolveRunningId(instance, mockSpinner as never);
+
+    expect(id).toBe("sbx_polled");
   });
 
   it("uses the caller's spinner instead of creating a new one", async () => {
     const instance = makeInstance([]);
-    (instance.sandbox.list as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        makeSandbox({ id: "sbx_1" as SandboxEntry["id"], status: "running" }),
-      ]);
+    (instance.sandbox.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     await resolveRunningId(instance, mockSpinner as never);
 

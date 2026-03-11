@@ -118,6 +118,7 @@ export type {
   ProviderId,
   SandboxId,
   SnapshotId,
+  SandboxStatus,
   LogsOptions,
   PlatformProvider,
   PlatformTier,

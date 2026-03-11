@@ -21,6 +21,8 @@ import { randomUUID } from "node:crypto";
 import type { ClawRunInstance, ClawRunConfigWithSecrets } from "@clawrun/sdk";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
 import { version } from "../pkg.js";
+import { openBrowser } from "../open-browser.js";
+import { generateQR } from "../qr.js";
 
 // ---------------------------------------------------------------------------
 // Image extraction from markdown data URIs
@@ -146,7 +148,10 @@ export async function startChatTUI(
     new CombinedAutocompleteProvider(
       [
         { name: "clear", description: "Clear chat history" },
+        { name: "cron", description: "List cron jobs" },
         { name: "exit", description: "Exit the chat" },
+        { name: "invite", description: "Generate an invite link" },
+        { name: "web", description: "Open web chat in browser" },
       ],
       process.cwd(),
     ),
@@ -381,6 +386,59 @@ export async function startChatTUI(
     tui.requestRender();
   }
 
+  // --- slash command handlers ------------------------------------------------
+
+  function addSystemMessage(text: string) {
+    const msg = new Container();
+    msg.addChild(new Spacer(1));
+    msg.addChild(new Markdown(text, 1, 0, markdownTheme));
+    chatContainer.addChild(msg);
+    tui.requestRender();
+  }
+
+  async function handleWeb() {
+    addSystemMessage(colors.dim("Opening web chat..."));
+    try {
+      const result = await instance.createInvite();
+      openBrowser(result.url);
+      addSystemMessage(`Opened in browser. Link expires in 10 minutes.`);
+    } catch (err) {
+      addSystemMessage(colors.error(`Failed: ${err instanceof Error ? err.message : String(err)}`));
+    }
+  }
+
+  async function handleInvite() {
+    addSystemMessage(colors.dim("Generating invite link..."));
+    try {
+      const result = await instance.createInvite();
+      const qr = await generateQR(result.url);
+      addSystemMessage(
+        `**Invite link** (expires in 10 minutes)\n\n${result.url}\n\n\`\`\`\n${qr}\`\`\``,
+      );
+    } catch (err) {
+      addSystemMessage(colors.error(`Failed: ${err instanceof Error ? err.message : String(err)}`));
+    }
+  }
+
+  async function handleCron() {
+    addSystemMessage(colors.dim("Fetching cron jobs..."));
+    try {
+      const result = await instance.listCronJobs();
+      const jobs = result.jobs;
+      if (!jobs || jobs.length === 0) {
+        addSystemMessage("No cron jobs configured.");
+        return;
+      }
+      const lines = jobs.map(
+        (j) =>
+          `- \`${j.schedule ?? j.id}\` — ${j.name ?? j.command}${j.enabled === false ? " *(disabled)*" : ""}`,
+      );
+      addSystemMessage(`**Cron jobs** (${jobs.length})\n\n${lines.join("\n")}`);
+    } catch (err) {
+      addSystemMessage(colors.error(`Failed: ${err instanceof Error ? err.message : String(err)}`));
+    }
+  }
+
   // --- submit handler -------------------------------------------------------
 
   editor.onSubmit = (value: string) => {
@@ -397,6 +455,21 @@ export async function startChatTUI(
     if (trimmed === "/exit") {
       editor.setText("");
       cleanup();
+      return;
+    }
+    if (trimmed === "/web") {
+      editor.setText("");
+      handleWeb();
+      return;
+    }
+    if (trimmed === "/invite") {
+      editor.setText("");
+      handleInvite();
+      return;
+    }
+    if (trimmed === "/cron") {
+      editor.setText("");
+      handleCron();
       return;
     }
 

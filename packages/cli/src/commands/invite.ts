@@ -1,9 +1,9 @@
 import { command, option, optional, string } from "cmd-ts";
 import chalk from "chalk";
 import * as clack from "@clack/prompts";
-import qrcode from "qrcode-terminal";
 import { instance } from "../args/instance.js";
 import { connectInstance } from "../connect-instance.js";
+import { generateQR } from "../qr.js";
 
 /** Maximum token lifetime: 7 days. */
 const MAX_TTL_MINUTES = 7 * 24 * 60;
@@ -84,8 +84,7 @@ export const invite = command({
     clack.log.info(`Expires in ${label}\n\n${chalk.underline(url)}`);
 
     // Render QR code to terminal
-    qrcode.generate(url, { small: true }, (code: string) => {
-      console.log(code);
-    });
+    const qr = await generateQR(url);
+    console.log(qr);
   },
 });
