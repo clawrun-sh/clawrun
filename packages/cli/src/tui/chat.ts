@@ -20,6 +20,7 @@ import chalk from "chalk";
 import { randomUUID } from "node:crypto";
 import type { ClawRunInstance, ClawRunConfigWithSecrets } from "@clawrun/sdk";
 import { editorTheme, markdownTheme, userMessageStyle, colors } from "./theme.js";
+import { version } from "../pkg.js";
 
 // ---------------------------------------------------------------------------
 // Image extraction from markdown data URIs
@@ -92,25 +93,29 @@ export async function startChatTUI(
 
   // --- startup info box -----------------------------------------------------
   const logo = [
-    "  ▄▄▄███▀   ",
-    "▄█████▀     ",
-    "██████    ▄▄█",
+    "",
+    "    ▄▄▄███▀   ",
+    "  ▄█████▀     ",
+    " ██████    ▄▄█",
     "██████▄▄▄████▀",
     "████████████▀ ",
     "▀█████████▀   ",
-    "  ▀▀▀▀▀▀",
+    "  ▀▀▀▀▀▀     ",
   ];
 
   const infoLines = [
     "",
-    chalk.bold.hex("#8abeb7")("CLAWRUN"),
+    chalk.bold.hex("#8abeb7")("CLAWRUN") +
+      " " +
+      chalk.dim(`v${version}`) +
+      chalk.dim(" · ") +
+      chalk.dim.underline("https://clawrun.sh"),
     "",
     `${chalk.dim("Instance")}  ${chalk.white(instanceName)}`,
     `${chalk.dim("Sandbox")}   ${chalk.white(sandboxId)}`,
     `${chalk.dim("Agent")}     ${chalk.white(config.agent.name)}`,
     `${chalk.dim("Provider")}  ${chalk.white(config.instance.provider)}`,
     `${chalk.dim("vCPUs")}     ${chalk.white(String(config.sandbox.resources.vcpus))}`,
-    "",
   ];
 
   // Merge logo and info side by side
