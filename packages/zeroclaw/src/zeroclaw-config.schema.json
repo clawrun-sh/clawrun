@@ -8,45 +8,10 @@
       "description": "Agent orchestration settings (`[agent]`).",
       "$ref": "#/$defs/AgentConfig",
       "default": {
-        "allowed_tools": [],
-        "compact_context": true,
-        "denied_tools": [],
-        "loop_detection_failure_streak": 3,
-        "loop_detection_no_progress_threshold": 3,
-        "loop_detection_ping_pong_cycles": 2,
+        "compact_context": false,
         "max_history_messages": 50,
-        "max_tool_iterations": 20,
+        "max_tool_iterations": 10,
         "parallel_tools": false,
-        "safety_heartbeat_interval": 5,
-        "safety_heartbeat_turn_interval": 10,
-        "session": {
-          "backend": "none",
-          "max_messages": 50,
-          "strategy": "per-sender",
-          "ttl_seconds": 3600
-        },
-        "subagents": {
-          "auto_activate": true,
-          "enabled": true,
-          "inflight_penalty": 10,
-          "load_window_secs": 180,
-          "max_concurrent": 10,
-          "queue_poll_ms": 200,
-          "queue_wait_ms": 15000,
-          "recent_failure_penalty": 16,
-          "recent_selection_penalty": 3,
-          "strategy": "adaptive"
-        },
-        "teams": {
-          "auto_activate": true,
-          "enabled": true,
-          "inflight_penalty": 8,
-          "load_window_secs": 120,
-          "max_agents": 32,
-          "recent_failure_penalty": 12,
-          "recent_selection_penalty": 2,
-          "strategy": "adaptive"
-        },
         "tool_dispatcher": "auto"
       }
     },
@@ -58,17 +23,8 @@
       },
       "default": {}
     },
-    "agents_ipc": {
-      "description": "Inter-process agent communication (`[agents_ipc]`).",
-      "$ref": "#/$defs/AgentsIpcConfig",
-      "default": {
-        "db_path": "~/.zeroclaw/agents.db",
-        "enabled": false,
-        "staleness_secs": 300
-      }
-    },
     "api_key": {
-      "description": "API key for the selected provider. Always overridden by `ZEROCLAW_API_KEY` env var.\n`API_KEY` env var is only used as fallback when no config key is set.",
+      "description": "API key for the selected provider. Overridden by `ZEROCLAW_API_KEY` or `API_KEY` env vars.",
       "type": ["string", "null"]
     },
     "api_url": {
@@ -79,16 +35,10 @@
       "description": "Autonomy and security policy configuration (`[autonomy]`).",
       "$ref": "#/$defs/AutonomyConfig",
       "default": {
-        "allow_sensitive_file_reads": false,
-        "allow_sensitive_file_writes": false,
         "allowed_commands": [
           "git",
           "npm",
           "cargo",
-          "mkdir",
-          "touch",
-          "cp",
-          "mv",
           "ls",
           "cat",
           "grep",
@@ -104,7 +54,6 @@
         "always_ask": [],
         "auto_approve": ["file_read", "memory_recall"],
         "block_high_risk_commands": true,
-        "command_context_rules": [],
         "forbidden_paths": [
           "/etc",
           "/root",
@@ -120,45 +69,15 @@
           "/sys",
           "/var",
           "/tmp",
-          "/mnt",
           "~/.ssh",
           "~/.gnupg",
           "~/.aws",
           "~/.config"
         ],
         "level": "supervised",
-        "max_actions_per_hour": 100,
-        "max_cost_per_day_cents": 1000,
-        "non_cli_approval_approvers": [],
-        "non_cli_excluded_tools": [
-          "shell",
-          "process",
-          "file_write",
-          "file_edit",
-          "git_operations",
-          "browser",
-          "browser_open",
-          "http_request",
-          "schedule",
-          "cron_add",
-          "cron_remove",
-          "cron_update",
-          "cron_run",
-          "memory_store",
-          "memory_forget",
-          "proxy_config",
-          "web_search_config",
-          "web_access_config",
-          "model_routing_config",
-          "channel_ack_config",
-          "pushover",
-          "composio",
-          "delegate",
-          "screenshot",
-          "image_info"
-        ],
-        "non_cli_natural_language_approval_mode": "direct",
-        "non_cli_natural_language_approval_mode_by_channel": {},
+        "max_actions_per_hour": 20,
+        "max_cost_per_day_cents": 500,
+        "non_cli_excluded_tools": [],
         "require_approval_for_medium_risk": true,
         "shell_env_passthrough": [],
         "workspace_only": true
@@ -168,13 +87,8 @@
       "description": "Browser automation configuration (`[browser]`).",
       "$ref": "#/$defs/BrowserConfig",
       "default": {
-        "agent_browser_command": "agent-browser",
-        "agent_browser_extra_args": [],
-        "agent_browser_timeout_ms": 30000,
         "allowed_domains": [],
-        "auto_backend_priority": [],
         "backend": "agent_browser",
-        "browser_open": "default",
         "computer_use": {
           "allow_remote_endpoint": false,
           "api_key": null,
@@ -195,21 +109,12 @@
       "description": "Channel configurations: Telegram, Discord, Slack, etc. (`[channels_config]`).",
       "$ref": "#/$defs/ChannelsConfig",
       "default": {
-        "ack_reaction": {
-          "discord": null,
-          "feishu": null,
-          "lark": null,
-          "telegram": null
-        },
-        "acp": null,
-        "bluebubbles": null,
         "clawdtalk": null,
         "cli": true,
         "dingtalk": null,
         "discord": null,
         "email": null,
         "feishu": null,
-        "github": null,
         "imessage": null,
         "irc": null,
         "lark": null,
@@ -217,7 +122,6 @@
         "matrix": null,
         "mattermost": null,
         "message_timeout_secs": 300,
-        "napcat": null,
         "nextcloud_talk": null,
         "nostr": null,
         "qq": null,
@@ -238,18 +142,6 @@
         "entity_id": "default"
       }
     },
-    "coordination": {
-      "description": "Delegate coordination runtime configuration (`[coordination]`).",
-      "$ref": "#/$defs/CoordinationConfig",
-      "default": {
-        "enabled": true,
-        "lead_agent": "delegate-lead",
-        "max_context_entries": 512,
-        "max_dead_letters": 256,
-        "max_inbox_messages_per_agent": 256,
-        "max_seen_message_ids": 4096
-      }
-    },
     "cost": {
       "description": "Cost tracking and budget enforcement configuration (`[cost]`).",
       "$ref": "#/$defs/CostConfig",
@@ -257,11 +149,6 @@
         "allow_override": false,
         "daily_limit_usd": 10.0,
         "enabled": false,
-        "enforcement": {
-          "mode": "warn",
-          "reserve_percent": 10,
-          "route_down_model": "hint:fast"
-        },
         "monthly_limit_usd": 100.0,
         "prices": {
           "anthropic/claude-3-haiku": {
@@ -323,21 +210,8 @@
     "default_temperature": {
       "description": "Default model temperature (0.0–2.0). Default: `0.7`.",
       "type": "number",
-      "format": "double"
-    },
-    "economic": {
-      "description": "Economic agent survival tracking (`[economic]`).\nTracks balance, token costs, work income, and survival status.",
-      "$ref": "#/$defs/EconomicConfig",
-      "default": {
-        "data_path": null,
-        "enabled": false,
-        "initial_balance": 1000.0,
-        "min_evaluation_threshold": 0.6,
-        "token_pricing": {
-          "input_price_per_million": 3.0,
-          "output_price_per_million": 15.0
-        }
-      }
+      "format": "double",
+      "default": 0.7
     },
     "embedding_routes": {
       "description": "Embedding routing rules — route `hint:<name>` to specific provider+model combos.",
@@ -355,11 +229,6 @@
         "host": "127.0.0.1",
         "idempotency_max_keys": 10000,
         "idempotency_ttl_secs": 300,
-        "node_control": {
-          "allowed_node_ids": [],
-          "auth_token": null,
-          "enabled": false
-        },
         "pair_rate_limit_per_minute": 10,
         "paired_tokens": [],
         "port": 42617,
@@ -367,18 +236,6 @@
         "require_pairing": true,
         "trust_forwarded_headers": false,
         "webhook_rate_limit_per_minute": 60
-      }
-    },
-    "goal_loop": {
-      "description": "Goal loop configuration for autonomous long-term goal execution (`[goal_loop]`).",
-      "$ref": "#/$defs/GoalLoopConfig",
-      "default": {
-        "channel": null,
-        "enabled": false,
-        "interval_minutes": 10,
-        "max_steps_per_cycle": 3,
-        "step_timeout_secs": 120,
-        "target": null
       }
     },
     "hardware": {
@@ -397,10 +254,8 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]`).",
       "$ref": "#/$defs/HeartbeatConfig",
       "default": {
-        "dedupe_window_minutes": 0,
         "enabled": false,
         "interval_minutes": 30,
-        "max_tasks_per_tick": 3,
         "message": null,
         "target": null,
         "to": null
@@ -411,9 +266,7 @@
       "$ref": "#/$defs/HooksConfig",
       "default": {
         "builtin": {
-          "boot_script": false,
-          "command_logger": false,
-          "session_memory": false
+          "command_logger": false
         },
         "enabled": true
       }
@@ -423,11 +276,9 @@
       "$ref": "#/$defs/HttpRequestConfig",
       "default": {
         "allowed_domains": [],
-        "credential_profiles": {},
         "enabled": false,
         "max_response_size": 1000000,
-        "timeout_secs": 30,
-        "user_agent": "ZeroClaw/1.0"
+        "timeout_secs": 30
       }
     },
     "identity": {
@@ -436,16 +287,7 @@
       "default": {
         "aieos_inline": null,
         "aieos_path": null,
-        "extra_files": [],
         "format": "openclaw"
-      }
-    },
-    "mcp": {
-      "description": "External MCP server connections (`[mcp]`).",
-      "$ref": "#/$defs/McpConfig",
-      "default": {
-        "enabled": false,
-        "servers": []
       }
     },
     "memory": {
@@ -476,7 +318,6 @@
         "response_cache_ttl_minutes": 60,
         "snapshot_enabled": false,
         "snapshot_on_hygiene": false,
-        "sqlite_journal_mode": "wal",
         "sqlite_open_timeout_secs": null,
         "vector_weight": 0.7
       }
@@ -496,11 +337,6 @@
       "items": {
         "$ref": "#/$defs/ModelRouteConfig"
       }
-    },
-    "model_support_vision": {
-      "description": "Vision support override for the active provider/model.\n- `None` (default): use provider's built-in default\n- `Some(true)`: force vision support on (e.g. Ollama running llava)\n- `Some(false)`: force vision support off",
-      "type": ["boolean", "null"],
-      "default": null
     },
     "multimodal": {
       "description": "Multimodal (image) handling configuration (`[multimodal]`).",
@@ -532,37 +368,6 @@
         "enabled": false
       }
     },
-    "plugins": {
-      "description": "Plugin system configuration (discovery, loading, per-plugin config).",
-      "$ref": "#/$defs/PluginsConfig",
-      "default": {
-        "allow": [],
-        "deny": [],
-        "enabled": true,
-        "entries": {},
-        "load_paths": []
-      }
-    },
-    "provider": {
-      "description": "Provider-specific behavior overrides (`[provider]`).",
-      "$ref": "#/$defs/ProviderConfig",
-      "default": {
-        "reasoning_level": null,
-        "transport": null
-      }
-    },
-    "provider_api": {
-      "description": "Optional API protocol mode for `custom:` providers.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ProviderApiMode"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
     "proxy": {
       "description": "Proxy configuration for outbound HTTP/HTTPS/SOCKS5 traffic (`[proxy]`).",
       "$ref": "#/$defs/ProxyConfig",
@@ -591,37 +396,12 @@
         "api_keys": [],
         "channel_initial_backoff_secs": 2,
         "channel_max_backoff_secs": 60,
-        "fallback_api_keys": {},
         "fallback_providers": [],
         "model_fallbacks": {},
         "provider_backoff_ms": 500,
         "provider_retries": 2,
         "scheduler_poll_secs": 15,
         "scheduler_retries": 2
-      }
-    },
-    "research": {
-      "description": "Research phase configuration (`[research]`). Proactive information gathering.",
-      "$ref": "#/$defs/ResearchPhaseConfig",
-      "default": {
-        "enabled": false,
-        "keywords": [
-          "find",
-          "search",
-          "check",
-          "investigate",
-          "look",
-          "research",
-          "найди",
-          "проверь",
-          "исследуй",
-          "поищи"
-        ],
-        "max_iterations": 5,
-        "min_message_length": 50,
-        "show_progress": true,
-        "system_prompt_prefix": "",
-        "trigger": "never"
       }
     },
     "runtime": {
@@ -638,26 +418,7 @@
           "read_only_rootfs": true
         },
         "kind": "native",
-        "reasoning_enabled": null,
-        "reasoning_level": null,
-        "wasm": {
-          "allow_workspace_read": false,
-          "allow_workspace_write": false,
-          "allowed_hosts": [],
-          "fuel_limit": 1000000,
-          "max_module_size_mb": 50,
-          "memory_limit_mb": 64,
-          "security": {
-            "capability_escalation_mode": "deny",
-            "module_hash_policy": "warn",
-            "module_sha256": {},
-            "reject_symlink_modules": true,
-            "reject_symlink_tools_dir": true,
-            "require_workspace_relative_tools_dir": true,
-            "strict_host_validation": true
-          },
-          "tools_dir": "tools/wasm"
-        }
+        "reasoning_enabled": null
       }
     },
     "scheduler": {
@@ -686,7 +447,6 @@
           "max_size_mb": 100,
           "sign_events": false
         },
-        "canary_tokens": true,
         "estop": {
           "enabled": false,
           "require_otp_to_resume": true,
@@ -694,27 +454,12 @@
         },
         "otp": {
           "cache_valid_secs": 300,
-          "challenge_delivery": "dm",
-          "challenge_max_attempts": 3,
-          "challenge_timeout_secs": 120,
-          "enabled": true,
+          "enabled": false,
           "gated_actions": ["shell", "file_write", "browser_open", "browser", "memory_forget"],
           "gated_domain_categories": [],
           "gated_domains": [],
           "method": "totp",
           "token_ttl_secs": 30
-        },
-        "outbound_leak_guard": {
-          "action": "redact",
-          "enabled": true,
-          "sensitivity": 0.7
-        },
-        "perplexity_filter": {
-          "enable_perplexity_filter": false,
-          "min_prompt_chars": 32,
-          "perplexity_threshold": 18.0,
-          "suffix_window_chars": 64,
-          "symbol_ratio_threshold": 0.2
         },
         "resources": {
           "max_cpu_time_seconds": 60,
@@ -722,94 +467,10 @@
           "max_subprocesses": 10,
           "memory_monitoring": true
         },
-        "roles": [],
         "sandbox": {
           "backend": "auto",
           "enabled": null,
           "firejail_args": []
-        },
-        "semantic_guard": false,
-        "semantic_guard_collection": "semantic_guard",
-        "semantic_guard_threshold": 0.82,
-        "syscall_anomaly": {
-          "alert_cooldown_secs": 20,
-          "alert_on_unknown_syscall": true,
-          "baseline_syscalls": [
-            "read",
-            "write",
-            "open",
-            "openat",
-            "close",
-            "stat",
-            "fstat",
-            "newfstatat",
-            "lseek",
-            "mmap",
-            "mprotect",
-            "munmap",
-            "brk",
-            "rt_sigaction",
-            "rt_sigprocmask",
-            "ioctl",
-            "fcntl",
-            "access",
-            "pipe2",
-            "dup",
-            "dup2",
-            "dup3",
-            "epoll_create1",
-            "epoll_ctl",
-            "epoll_wait",
-            "poll",
-            "ppoll",
-            "select",
-            "futex",
-            "clock_gettime",
-            "nanosleep",
-            "getpid",
-            "gettid",
-            "set_tid_address",
-            "set_robust_list",
-            "clone",
-            "clone3",
-            "fork",
-            "execve",
-            "wait4",
-            "exit",
-            "exit_group",
-            "socket",
-            "connect",
-            "accept",
-            "accept4",
-            "listen",
-            "sendto",
-            "recvfrom",
-            "sendmsg",
-            "recvmsg",
-            "getsockname",
-            "getpeername",
-            "setsockopt",
-            "getsockopt",
-            "getrandom",
-            "statx"
-          ],
-          "enabled": true,
-          "log_path": "syscall-anomalies.log",
-          "max_alerts_per_minute": 30,
-          "max_denied_events_per_minute": 5,
-          "max_total_events_per_minute": 120,
-          "strict_mode": false
-        },
-        "url_access": {
-          "allow_cidrs": [],
-          "allow_domains": [],
-          "allow_loopback": false,
-          "approved_domains": [],
-          "block_private_ip": true,
-          "domain_allowlist": [],
-          "domain_blocklist": [],
-          "enforce_domain_allowlist": false,
-          "require_first_visit_approval": false
         }
       }
     },
@@ -817,12 +478,9 @@
       "description": "Skills loading and community repository behavior (`[skills]`).",
       "$ref": "#/$defs/SkillsConfig",
       "default": {
-        "allow_scripts": false,
-        "clawhub_token": null,
         "open_skills_dir": null,
         "open_skills_enabled": false,
-        "prompt_injection_mode": "compact",
-        "trusted_skill_roots": []
+        "prompt_injection_mode": "full"
       }
     },
     "storage": {
@@ -835,8 +493,7 @@
             "db_url": null,
             "provider": "",
             "schema": "public",
-            "table": "memories",
-            "tls": false
+            "table": "memories"
           }
         }
       }
@@ -845,12 +502,26 @@
       "description": "Voice transcription configuration (Whisper API via Groq).",
       "$ref": "#/$defs/TranscriptionConfig",
       "default": {
-        "api_key": null,
         "api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
         "enabled": false,
         "language": null,
         "max_duration_secs": 120,
         "model": "whisper-large-v3-turbo"
+      }
+    },
+    "tts": {
+      "description": "Text-to-Speech configuration (`[tts]`).",
+      "$ref": "#/$defs/TtsConfig",
+      "default": {
+        "default_format": "mp3",
+        "default_provider": "openai",
+        "default_voice": "alloy",
+        "edge": null,
+        "elevenlabs": null,
+        "enabled": false,
+        "google": null,
+        "max_text_length": 4096,
+        "openai": null
       }
     },
     "tunnel": {
@@ -864,398 +535,38 @@
         "tailscale": null
       }
     },
-    "wasm": {
-      "description": "WASM plugin engine configuration (`[wasm]` section).",
-      "$ref": "#/$defs/WasmConfig",
-      "default": {
-        "enabled": true,
-        "fuel_limit": 1000000000,
-        "memory_limit_mb": 64,
-        "registry_url": "https://zeromarket.vercel.app/api"
-      }
-    },
     "web_fetch": {
       "description": "Web fetch tool configuration (`[web_fetch]`).",
       "$ref": "#/$defs/WebFetchConfig",
       "default": {
         "allowed_domains": ["*"],
-        "api_key": null,
-        "api_url": null,
         "blocked_domains": [],
         "enabled": false,
         "max_response_size": 500000,
-        "provider": "fast_html2md",
-        "timeout_secs": 30,
-        "user_agent": "ZeroClaw/1.0"
+        "timeout_secs": 30
       }
     },
     "web_search": {
       "description": "Web search tool configuration (`[web_search]`).",
       "$ref": "#/$defs/WebSearchConfig",
       "default": {
-        "api_key": null,
-        "api_url": null,
         "brave_api_key": null,
-        "country": null,
-        "domain_filter": [],
         "enabled": false,
-        "exa_api_key": null,
-        "exa_include_text": false,
-        "exa_search_type": "auto",
-        "fallback_providers": [],
-        "jina_api_key": null,
-        "jina_site_filters": [],
-        "language_filter": [],
         "max_results": 5,
-        "max_tokens": null,
-        "max_tokens_per_page": null,
-        "perplexity_api_key": null,
         "provider": "duckduckgo",
-        "recency_filter": null,
-        "retries_per_provider": 0,
-        "retry_backoff_ms": 250,
-        "timeout_secs": 15,
-        "user_agent": "ZeroClaw/1.0"
+        "timeout_secs": 15
       }
     }
   },
-  "required": ["default_temperature"],
   "$defs": {
-    "AckReactionChannelsConfig": {
-      "description": "ACK reaction policy table under `[channels_config.ack_reaction]`.",
-      "type": "object",
-      "properties": {
-        "discord": {
-          "description": "Discord ACK reaction policy.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AckReactionConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "feishu": {
-          "description": "Feishu ACK reaction policy.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AckReactionConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "lark": {
-          "description": "Lark ACK reaction policy.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AckReactionConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "telegram": {
-          "description": "Telegram ACK reaction policy.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AckReactionConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      }
-    },
-    "AckReactionChatType": {
-      "description": "Chat context selector for ACK emoji reaction rules.",
-      "oneOf": [
-        {
-          "description": "Direct/private chat context.",
-          "type": "string",
-          "const": "direct"
-        },
-        {
-          "description": "Group/channel chat context.",
-          "type": "string",
-          "const": "group"
-        }
-      ]
-    },
-    "AckReactionConfig": {
-      "description": "Per-channel ACK emoji reaction policy.",
-      "type": "object",
-      "properties": {
-        "emojis": {
-          "description": "Default emoji pool. When empty, channel built-in defaults are used.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enabled": {
-          "description": "Global enable switch for ACK reactions on this channel.",
-          "type": "boolean",
-          "default": true
-        },
-        "rules": {
-          "description": "Conditional rules evaluated in order.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/AckReactionRuleConfig"
-          }
-        },
-        "sample_rate": {
-          "description": "Probabilistic gate in `[0.0, 1.0]` applied to default fallback selection.\nRule-level `sample_rate` overrides this for matched rules.",
-          "type": "number",
-          "format": "double",
-          "default": 1.0
-        },
-        "strategy": {
-          "description": "Default emoji selection strategy.",
-          "$ref": "#/$defs/AckReactionStrategy",
-          "default": "random"
-        }
-      }
-    },
-    "AckReactionRuleAction": {
-      "description": "Rule action for ACK reaction matching.",
-      "oneOf": [
-        {
-          "description": "React using the configured emoji pool.",
-          "type": "string",
-          "const": "react"
-        },
-        {
-          "description": "Suppress ACK reactions when this rule matches.",
-          "type": "string",
-          "const": "suppress"
-        }
-      ]
-    },
-    "AckReactionRuleConfig": {
-      "description": "Conditional ACK emoji reaction rule.",
-      "type": "object",
-      "properties": {
-        "action": {
-          "description": "Rule action (`react` or `suppress`).",
-          "$ref": "#/$defs/AckReactionRuleAction",
-          "default": "react"
-        },
-        "chat_ids": {
-          "description": "Match only for these chat/channel IDs. `*` matches any chat.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "chat_types": {
-          "description": "Match only for selected chat types; empty means no chat-type constraint.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/AckReactionChatType"
-          }
-        },
-        "contains_all": {
-          "description": "Match only when message contains all keywords (case-insensitive).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "contains_any": {
-          "description": "Match when message contains any keyword (case-insensitive).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "contains_none": {
-          "description": "Match only when message contains none of these keywords (case-insensitive).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "emojis": {
-          "description": "Emoji pool used when this rule matches.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enabled": {
-          "description": "Rule enable switch.",
-          "type": "boolean",
-          "default": true
-        },
-        "locale_any": {
-          "description": "Match only for selected locale tags; supports prefix matching (`zh`, `zh_cn`).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "regex_all": {
-          "description": "Match only when all regex patterns match message text.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "regex_any": {
-          "description": "Match when any regex pattern matches message text.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "regex_none": {
-          "description": "Match only when none of these regex patterns match message text.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "sample_rate": {
-          "description": "Optional probabilistic gate in `[0.0, 1.0]` for this rule.\nWhen omitted, falls back to channel-level `sample_rate`.",
-          "type": ["number", "null"],
-          "format": "double",
-          "default": null
-        },
-        "sender_ids": {
-          "description": "Match only for these sender IDs. `*` matches any sender.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "strategy": {
-          "description": "Per-rule strategy override (falls back to parent strategy when omitted).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AckReactionStrategy"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      }
-    },
-    "AckReactionStrategy": {
-      "description": "Reaction selection strategy for ACK emoji pools.",
-      "oneOf": [
-        {
-          "description": "Select uniformly from the available emoji pool.",
-          "type": "string",
-          "const": "random"
-        },
-        {
-          "description": "Always select the first emoji in the available pool.",
-          "type": "string",
-          "const": "first"
-        }
-      ]
-    },
-    "AcpConfig": {
-      "description": "ACP (Agent Client Protocol) channel configuration.\n\nEnables ZeroClaw to act as an ACP client, connecting to an OpenCode ACP server\nvia `opencode acp` command for JSON-RPC 2.0 communication over stdio.",
-      "type": "object",
-      "properties": {
-        "allowed_users": {
-          "description": "Allowed user identifiers (empty = deny all, \"*\" = allow all).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "extra_args": {
-          "description": "Additional arguments to pass to `opencode acp`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "opencode_path": {
-          "description": "OpenCode binary path (default: \"opencode\").",
-          "type": ["string", "null"],
-          "default": "opencode"
-        },
-        "workdir": {
-          "description": "Working directory for OpenCode process.",
-          "type": ["string", "null"]
-        }
-      }
-    },
     "AgentConfig": {
       "description": "Agent orchestration configuration (`[agent]` section).",
       "type": "object",
       "properties": {
-        "allowed_tools": {
-          "description": "Optional allowlist for primary-agent tool visibility.\nWhen non-empty, only listed tools are exposed to the primary agent.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
         "compact_context": {
           "description": "When true: bootstrap_max_chars=6000, rag_chunk_limit=2. Use for 13B or smaller models.",
           "type": "boolean",
           "default": false
-        },
-        "denied_tools": {
-          "description": "Optional denylist for primary-agent tool visibility.\nApplied after `allowed_tools`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "loop_detection_failure_streak": {
-          "description": "Loop detection: consecutive failure streak threshold.\nTriggers when the same tool fails this many times in a row.\nSet to `0` to disable. Default: `3`.",
-          "type": "integer",
-          "format": "uint",
-          "default": 3,
-          "minimum": 0
-        },
-        "loop_detection_no_progress_threshold": {
-          "description": "Loop detection: no-progress repeat threshold.\nTriggers when the same tool+args produces identical output this many times.\nSet to `0` to disable. Default: `3`.",
-          "type": "integer",
-          "format": "uint",
-          "default": 3,
-          "minimum": 0
-        },
-        "loop_detection_ping_pong_cycles": {
-          "description": "Loop detection: ping-pong cycle threshold.\nDetects A→B→A→B alternating patterns with no progress.\nValue is number of full cycles (A-B = 1 cycle). Set to `0` to disable. Default: `2`.",
-          "type": "integer",
-          "format": "uint",
-          "default": 2,
-          "minimum": 0
         },
         "max_history_messages": {
           "description": "Maximum conversation history messages retained per session. Default: `50`.",
@@ -1265,10 +576,10 @@
           "minimum": 0
         },
         "max_tool_iterations": {
-          "description": "Maximum tool-call loop turns per user message. Default: `20`.\nSetting to `0` falls back to the safe default of `20`.",
+          "description": "Maximum tool-call loop turns per user message. Default: `10`.\nSetting to `0` falls back to the safe default of `10`.",
           "type": "integer",
           "format": "uint",
-          "default": 20,
+          "default": 10,
           "minimum": 0
         },
         "parallel_tools": {
@@ -1276,200 +587,10 @@
           "type": "boolean",
           "default": false
         },
-        "safety_heartbeat_interval": {
-          "description": "Safety heartbeat injection interval inside `run_tool_call_loop`.\nInjects a security-constraint reminder every N tool iterations.\nSet to `0` to disable. Default: `5`.\nCompatibility/rollback: omit/remove this key to use default (`5`), or set\nto `0` for explicit disable.",
-          "type": "integer",
-          "format": "uint",
-          "default": 5,
-          "minimum": 0
-        },
-        "safety_heartbeat_turn_interval": {
-          "description": "Safety heartbeat injection interval for interactive sessions.\nInjects a security-constraint reminder every N conversation turns.\nSet to `0` to disable. Default: `10`.\nCompatibility/rollback: omit/remove this key to use default (`10`), or\nset to `0` for explicit disable.",
-          "type": "integer",
-          "format": "uint",
-          "default": 10,
-          "minimum": 0
-        },
-        "session": {
-          "$ref": "#/$defs/AgentSessionConfig",
-          "default": {
-            "backend": "none",
-            "max_messages": 50,
-            "strategy": "per-sender",
-            "ttl_seconds": 3600
-          }
-        },
-        "subagents": {
-          "description": "Sub-agent runtime controls for background delegation.",
-          "$ref": "#/$defs/SubAgentsConfig",
-          "default": {
-            "auto_activate": true,
-            "enabled": true,
-            "inflight_penalty": 10,
-            "load_window_secs": 180,
-            "max_concurrent": 10,
-            "queue_poll_ms": 200,
-            "queue_wait_ms": 15000,
-            "recent_failure_penalty": 16,
-            "recent_selection_penalty": 3,
-            "strategy": "adaptive"
-          }
-        },
-        "teams": {
-          "description": "Agent-team runtime controls for synchronous delegation.",
-          "$ref": "#/$defs/AgentTeamsConfig",
-          "default": {
-            "auto_activate": true,
-            "enabled": true,
-            "inflight_penalty": 8,
-            "load_window_secs": 120,
-            "max_agents": 32,
-            "recent_failure_penalty": 12,
-            "recent_selection_penalty": 2,
-            "strategy": "adaptive"
-          }
-        },
         "tool_dispatcher": {
           "description": "Tool dispatch strategy (e.g. `\"auto\"`). Default: `\"auto\"`.",
           "type": "string",
           "default": "auto"
-        }
-      }
-    },
-    "AgentLoadBalanceStrategy": {
-      "description": "Runtime load-balancing strategy for team/subagent orchestration.",
-      "oneOf": [
-        {
-          "description": "Preserve lexical/metadata scoring priority only.",
-          "type": "string",
-          "const": "semantic"
-        },
-        {
-          "description": "Blend semantic score with runtime load and recent outcomes.",
-          "type": "string",
-          "const": "adaptive"
-        },
-        {
-          "description": "Prioritize least-loaded healthy agents before semantic tie-breakers.",
-          "type": "string",
-          "const": "least_loaded"
-        }
-      ]
-    },
-    "AgentSessionBackend": {
-      "type": "string",
-      "enum": ["memory", "sqlite", "none"]
-    },
-    "AgentSessionConfig": {
-      "description": "Session persistence configuration (`[agent.session]` section).",
-      "type": "object",
-      "properties": {
-        "backend": {
-          "description": "Session backend to use. Options: \"memory\", \"sqlite\", \"none\".\nDefault: \"none\" (no persistence).\nSet to \"none\" to disable session persistence entirely.",
-          "$ref": "#/$defs/AgentSessionBackend",
-          "default": "none"
-        },
-        "max_messages": {
-          "description": "Maximum number of messages to retain per session.\nDefault: 50.",
-          "type": "integer",
-          "format": "uint",
-          "default": 50,
-          "minimum": 0
-        },
-        "strategy": {
-          "description": "Strategy for resolving session IDs. Options: \"per-sender\", \"per-channel\", \"main\".\nDefault: \"per-sender\" (each user gets a unique session per channel).",
-          "$ref": "#/$defs/AgentSessionStrategy",
-          "default": "per-sender"
-        },
-        "ttl_seconds": {
-          "description": "Time-to-live for sessions in seconds.\nDefault: 3600 (1 hour).",
-          "type": "integer",
-          "format": "uint64",
-          "default": 3600,
-          "minimum": 0
-        }
-      }
-    },
-    "AgentSessionStrategy": {
-      "type": "string",
-      "enum": ["per-sender", "per-channel", "main"]
-    },
-    "AgentTeamsConfig": {
-      "description": "Agent-team orchestration controls (`[agent.teams]` section).\n\nThis governs synchronous delegation (`delegate`) and team-wide coordination.",
-      "type": "object",
-      "properties": {
-        "auto_activate": {
-          "description": "Allow automatic team-agent selection when a specific agent is not given.",
-          "type": "boolean",
-          "default": true
-        },
-        "enabled": {
-          "description": "Enable agent-team delegation tools.",
-          "type": "boolean",
-          "default": true
-        },
-        "inflight_penalty": {
-          "description": "Penalty multiplier applied to each currently in-flight task.",
-          "type": "integer",
-          "format": "uint",
-          "default": 8,
-          "minimum": 0
-        },
-        "load_window_secs": {
-          "description": "Sliding window (seconds) used to compute recent load/failure signals.",
-          "type": "integer",
-          "format": "uint",
-          "default": 120,
-          "minimum": 0
-        },
-        "max_agents": {
-          "description": "Maximum number of delegate profiles activated as team members.",
-          "type": "integer",
-          "format": "uint",
-          "default": 32,
-          "minimum": 0
-        },
-        "recent_failure_penalty": {
-          "description": "Penalty multiplier applied to recent failure count in load window.",
-          "type": "integer",
-          "format": "uint",
-          "default": 12,
-          "minimum": 0
-        },
-        "recent_selection_penalty": {
-          "description": "Penalty multiplier applied to recent assignment count in load window.",
-          "type": "integer",
-          "format": "uint",
-          "default": 2,
-          "minimum": 0
-        },
-        "strategy": {
-          "description": "Runtime strategy used for automatic team-agent selection.",
-          "$ref": "#/$defs/AgentLoadBalanceStrategy",
-          "default": "adaptive"
-        }
-      }
-    },
-    "AgentsIpcConfig": {
-      "description": "Inter-process agent communication configuration (`[agents_ipc]` section).\n\nWhen enabled, registers IPC tools that let independent ZeroClaw processes\non the same host discover each other and exchange messages via a shared\nSQLite database. Disabled by default (zero overhead when off).",
-      "type": "object",
-      "properties": {
-        "db_path": {
-          "description": "Path to shared SQLite database (all agents on this host share one file).",
-          "type": "string",
-          "default": "~/.zeroclaw/agents.db"
-        },
-        "enabled": {
-          "description": "Enable inter-process agent communication tools.",
-          "type": "boolean",
-          "default": false
-        },
-        "staleness_secs": {
-          "description": "Agents not seen within this window are considered offline (seconds).",
-          "type": "integer",
-          "format": "uint64",
-          "default": 300,
-          "minimum": 0
         }
       }
     },
@@ -1505,16 +626,6 @@
       "description": "Autonomy and security policy configuration (`[autonomy]` section).\n\nControls what the agent is allowed to do: shell commands, filesystem access,\nrisk approval gates, and per-policy budgets.",
       "type": "object",
       "properties": {
-        "allow_sensitive_file_reads": {
-          "description": "Allow `file_read` to access sensitive workspace secrets such as `.env`,\nkey material, and credential files.\n\nDefault is `false` to reduce accidental secret exposure via tool output.",
-          "type": "boolean",
-          "default": false
-        },
-        "allow_sensitive_file_writes": {
-          "description": "Allow `file_write` / `file_edit` to modify sensitive workspace secrets\nsuch as `.env`, key material, and credential files.\n\nDefault is `false` to reduce accidental secret corruption/exfiltration.",
-          "type": "boolean",
-          "default": false
-        },
         "allowed_commands": {
           "description": "Allowlist of executable names permitted for shell execution.",
           "type": "array",
@@ -1551,14 +662,6 @@
           "type": "boolean",
           "default": true
         },
-        "command_context_rules": {
-          "description": "Context-aware shell command allow/deny rules.\n\nThese rules are evaluated per command segment and can narrow or override\nglobal `allowed_commands` behavior for matching commands.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/CommandContextRuleConfig"
-          }
-        },
         "forbidden_paths": {
           "description": "Explicit path denylist. Default includes system-critical paths and sensitive dotdirs.",
           "type": "array",
@@ -1582,60 +685,13 @@
           "format": "uint32",
           "minimum": 0
         },
-        "non_cli_approval_approvers": {
-          "description": "Optional allowlist for who can manage non-CLI approval commands.\n\nWhen empty, any sender already admitted by the channel allowlist can\nuse approval-management commands.\n\nSupported entry formats:\n- `\"*\"`: allow any sender on any channel\n- `\"alice\"`: allow sender `alice` on any channel\n- `\"telegram:alice\"`: allow sender `alice` only on `telegram`\n- `\"telegram:*\"`: allow any sender on `telegram`\n- `\"*:alice\"`: allow sender `alice` on any channel",
+        "non_cli_excluded_tools": {
+          "description": "Tools to exclude from non-CLI channels (e.g. Telegram, Discord).\n\nWhen a tool is listed here, non-CLI channels will not expose it to the\nmodel in tool specs.",
           "type": "array",
           "default": [],
           "items": {
             "type": "string"
           }
-        },
-        "non_cli_excluded_tools": {
-          "description": "Tools to exclude from non-CLI channels (e.g. Telegram, Discord).\n\nWhen a tool is listed here, non-CLI channels will not expose it to the\nmodel in tool specs.",
-          "type": "array",
-          "default": [
-            "shell",
-            "process",
-            "file_write",
-            "file_edit",
-            "git_operations",
-            "browser",
-            "browser_open",
-            "http_request",
-            "schedule",
-            "cron_add",
-            "cron_remove",
-            "cron_update",
-            "cron_run",
-            "memory_store",
-            "memory_forget",
-            "proxy_config",
-            "web_search_config",
-            "web_access_config",
-            "model_routing_config",
-            "channel_ack_config",
-            "pushover",
-            "composio",
-            "delegate",
-            "screenshot",
-            "image_info"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "non_cli_natural_language_approval_mode": {
-          "description": "Natural-language handling mode for non-CLI approval-management commands.\n\nValues:\n- `direct` (default): phrases like `授权工具 shell` immediately approve.\n- `request_confirm`: phrases create pending requests requiring confirm.\n- `disabled`: ignore natural-language approval commands (slash only).",
-          "$ref": "#/$defs/NonCliNaturalLanguageApprovalMode",
-          "default": "direct"
-        },
-        "non_cli_natural_language_approval_mode_by_channel": {
-          "description": "Optional per-channel override for natural-language approval mode.\n\nKeys are channel names (for example: `telegram`, `discord`, `slack`).\nValues use the same enum as `non_cli_natural_language_approval_mode`.\n\nExample:\n- `telegram = \"direct\"` for private-chat ergonomics\n- `discord = \"request_confirm\"` for stricter team channels",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/NonCliNaturalLanguageApprovalMode"
-          },
-          "default": {}
         },
         "require_approval_for_medium_risk": {
           "description": "Require explicit approval for medium-risk shell commands.",
@@ -1683,42 +739,6 @@
           "const": "full"
         }
       ]
-    },
-    "BlueBubblesConfig": {
-      "description": "BlueBubbles iMessage bridge channel configuration.\n\nBlueBubbles is a self-hosted macOS server that exposes iMessage via a\nREST API and webhook push notifications. See <https://bluebubbles.app>.",
-      "type": "object",
-      "properties": {
-        "allowed_senders": {
-          "description": "Allowed sender handles (phone numbers or Apple IDs). Use `[\"*\"]` to allow all.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "ignore_senders": {
-          "description": "Sender handles to silently ignore (e.g. suppress echoed outbound messages).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "password": {
-          "description": "BlueBubbles server password.",
-          "type": "string"
-        },
-        "server_url": {
-          "description": "BlueBubbles server URL (e.g. `http://192.168.1.100:1234` or an ngrok URL).",
-          "type": "string"
-        },
-        "webhook_secret": {
-          "description": "Optional shared secret to authenticate inbound webhooks.\nIf set, incoming requests must include `Authorization: Bearer <secret>`.",
-          "type": ["string", "null"],
-          "default": null
-        }
-      },
-      "required": ["server_url", "password"]
     },
     "BrowserComputerUseConfig": {
       "description": "Computer-use sidecar configuration (`[browser.computer_use]` section).\n\nDelegates OS-level mouse, keyboard, and screenshot actions to a local sidecar.",
@@ -1772,36 +792,8 @@
       "description": "Browser automation configuration (`[browser]` section).\n\nControls the `browser_open` tool and browser automation backends.",
       "type": "object",
       "properties": {
-        "agent_browser_command": {
-          "description": "Agent-browser executable path/name",
-          "type": "string",
-          "default": "agent-browser"
-        },
-        "agent_browser_extra_args": {
-          "description": "Additional arguments passed to agent-browser before each action command",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "agent_browser_timeout_ms": {
-          "description": "Timeout in milliseconds for each agent-browser command invocation",
-          "type": "integer",
-          "format": "uint64",
-          "default": 30000,
-          "minimum": 0
-        },
         "allowed_domains": {
           "description": "Allowed domains for `browser_open` (exact or subdomain match)",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "auto_backend_priority": {
-          "description": "Auto backend priority order (only used when backend = \"auto\")\nSupported values: \"agent_browser\", \"rust_native\", \"computer_use\"",
           "type": "array",
           "default": [],
           "items": {
@@ -1812,11 +804,6 @@
           "description": "Browser automation backend: \"agent_browser\" | \"rust_native\" | \"computer_use\" | \"auto\"",
           "type": "string",
           "default": "agent_browser"
-        },
-        "browser_open": {
-          "description": "Browser for browser_open tool: \"disable\" | \"brave\" | \"chrome\" | \"firefox\" | \"edge\" | \"msedge\" | \"default\"",
-          "type": "string",
-          "default": "default"
         },
         "computer_use": {
           "description": "Computer-use sidecar configuration",
@@ -1861,59 +848,17 @@
     "BuiltinHooksConfig": {
       "type": "object",
       "properties": {
-        "boot_script": {
-          "description": "Enable the boot-script hook (injects startup/runtime guidance).",
-          "type": "boolean",
-          "default": false
-        },
         "command_logger": {
           "description": "Enable the command-logger hook (logs tool calls for auditing).",
-          "type": "boolean",
-          "default": false
-        },
-        "session_memory": {
-          "description": "Enable the session-memory hook (persists session hints between turns).",
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         }
-      }
+      },
+      "required": ["command_logger"]
     },
     "ChannelsConfig": {
       "description": "Top-level channel configurations (`[channels_config]` section).\n\nEach channel sub-section (e.g. `telegram`, `discord`) is optional;\nsetting it to `Some(...)` enables that channel.",
       "type": "object",
       "properties": {
-        "ack_reaction": {
-          "description": "ACK emoji reaction policy overrides for channels that support message reactions.\n\nUse this table to control reaction enable/disable, emoji pools, and conditional rules\nwithout hardcoding behavior in channel implementations.",
-          "$ref": "#/$defs/AckReactionChannelsConfig",
-          "default": {
-            "discord": null,
-            "feishu": null,
-            "lark": null,
-            "telegram": null
-          }
-        },
-        "acp": {
-          "description": "ACP (Agent Client Protocol) channel configuration.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AcpConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "bluebubbles": {
-          "description": "BlueBubbles iMessage bridge channel configuration.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/BlueBubblesConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "clawdtalk": {
           "description": "ClawdTalk voice channel configuration.",
           "anyOf": [
@@ -1967,17 +912,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/FeishuConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "github": {
-          "description": "GitHub channel configuration.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GitHubConfig"
             },
             {
               "type": "null"
@@ -2056,17 +990,6 @@
           "format": "uint64",
           "default": 300,
           "minimum": 0
-        },
-        "napcat": {
-          "description": "Napcat QQ protocol channel configuration.\nAlso accepts legacy key `[channels_config.onebot]` for OneBot v11 compatibility.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/NapcatConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
         },
         "nextcloud_talk": {
           "description": "Nextcloud Talk bot channel configuration.",
@@ -2258,71 +1181,6 @@
       },
       "required": ["token"]
     },
-    "CommandContextRuleAction": {
-      "description": "Action to apply when a command-context rule matches.",
-      "oneOf": [
-        {
-          "description": "Matching context is explicitly allowed.",
-          "type": "string",
-          "const": "allow"
-        },
-        {
-          "description": "Matching context is explicitly denied.",
-          "type": "string",
-          "const": "deny"
-        },
-        {
-          "description": "Matching context requires interactive approval in supervised mode.\n\nThis does not allow a command by itself; allowlist and deny checks still apply.",
-          "type": "string",
-          "const": "require_approval"
-        }
-      ]
-    },
-    "CommandContextRuleConfig": {
-      "description": "Context-aware command rule for shell commands.\n\nRules are evaluated per command segment. Command matching accepts command\nnames (`curl`), explicit paths (`/usr/bin/curl`), and wildcard (`*`).\n\nMatching semantics:\n- `action = \"deny\"`: if all constraints match, the segment is rejected.\n- `action = \"allow\"`: if at least one allow rule exists for a command,\n  segments must match at least one of those allow rules.\n- `action = \"require_approval\"`: matching segments require explicit\n  `approved=true` in supervised mode, even when `shell` is auto-approved.\n\nConstraints are optional:\n- `allowed_domains`: require URL arguments to match these hosts/patterns.\n- `allowed_path_prefixes`: require path-like arguments to stay under these prefixes.\n- `denied_path_prefixes`: for deny rules, match when any path-like argument\n  is under these prefixes; for allow rules, require path arguments not to hit\n  these prefixes.",
-      "type": "object",
-      "properties": {
-        "action": {
-          "description": "Rule action (`allow` | `deny` | `require_approval`). Defaults to `allow`.",
-          "$ref": "#/$defs/CommandContextRuleAction",
-          "default": "allow"
-        },
-        "allow_high_risk": {
-          "description": "Permit high-risk commands when this allow rule matches.\n\nThe command still requires explicit `approved=true` in supervised mode.",
-          "type": "boolean",
-          "default": false
-        },
-        "allowed_domains": {
-          "description": "Allowed host patterns for URL arguments.\n\nSupports exact hosts (`api.example.com`) and wildcard suffixes (`*.example.com`).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "allowed_path_prefixes": {
-          "description": "Allowed path prefixes for path-like arguments.\n\nPrefixes may be absolute, `~/...`, or workspace-relative.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "command": {
-          "description": "Command name/path pattern (`git`, `/usr/bin/curl`, or `*`).",
-          "type": "string"
-        },
-        "denied_path_prefixes": {
-          "description": "Denied path prefixes for path-like arguments.\n\nPrefixes may be absolute, `~/...`, or workspace-relative.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": ["command"]
-    },
     "ComposioConfig": {
       "description": "Composio managed OAuth tools integration (`[composio]` section).\n\nProvides access to 1000+ OAuth-connected tools via the Composio platform.",
       "type": "object",
@@ -2341,50 +1199,6 @@
           "description": "Default entity ID for multi-user setups",
           "type": "string",
           "default": "default"
-        }
-      }
-    },
-    "CoordinationConfig": {
-      "description": "Delegate coordination runtime configuration (`[coordination]` section).\n\nControls typed delegate message-bus integration used by `delegate` and\n`delegate_coordination_status` tools.",
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable delegate coordination tracing/runtime bus integration.",
-          "type": "boolean",
-          "default": true
-        },
-        "lead_agent": {
-          "description": "Logical lead-agent identity used as coordinator sender/recipient.",
-          "type": "string",
-          "default": "delegate-lead"
-        },
-        "max_context_entries": {
-          "description": "Maximum retained shared-context entries (`ContextPatch` state keys).",
-          "type": "integer",
-          "format": "uint",
-          "default": 512,
-          "minimum": 0
-        },
-        "max_dead_letters": {
-          "description": "Maximum retained dead-letter entries.",
-          "type": "integer",
-          "format": "uint",
-          "default": 256,
-          "minimum": 0
-        },
-        "max_inbox_messages_per_agent": {
-          "description": "Maximum retained inbox messages per registered agent.",
-          "type": "integer",
-          "format": "uint",
-          "default": 256,
-          "minimum": 0
-        },
-        "max_seen_message_ids": {
-          "description": "Maximum retained dedupe window size for processed message IDs.",
-          "type": "integer",
-          "format": "uint",
-          "default": 4096,
-          "minimum": 0
         }
       }
     },
@@ -2407,15 +1221,6 @@
           "description": "Enable cost tracking (default: false)",
           "type": "boolean",
           "default": false
-        },
-        "enforcement": {
-          "description": "Runtime budget enforcement policy (`[cost.enforcement]`).",
-          "$ref": "#/$defs/CostEnforcementConfig",
-          "default": {
-            "mode": "warn",
-            "reserve_percent": 10,
-            "route_down_model": "hint:fast"
-          }
         },
         "monthly_limit_usd": {
           "description": "Monthly spending limit in USD (default: 100.00)",
@@ -2440,50 +1245,6 @@
           "minimum": 0
         }
       }
-    },
-    "CostEnforcementConfig": {
-      "description": "Runtime budget enforcement controls (`[cost.enforcement]`).",
-      "type": "object",
-      "properties": {
-        "mode": {
-          "description": "Enforcement behavior. Default: `warn`.",
-          "$ref": "#/$defs/CostEnforcementMode",
-          "default": "warn"
-        },
-        "reserve_percent": {
-          "description": "Extra reserve added to token/cost estimates (percentage, 0-100). Default: `10`.",
-          "type": "integer",
-          "format": "uint8",
-          "default": 10,
-          "maximum": 255,
-          "minimum": 0
-        },
-        "route_down_model": {
-          "description": "Optional fallback model (or `hint:*`) when `mode = \"route_down\"`.",
-          "type": ["string", "null"],
-          "default": "hint:fast"
-        }
-      }
-    },
-    "CostEnforcementMode": {
-      "description": "Budget enforcement behavior when projected spend approaches/exceeds limits.",
-      "oneOf": [
-        {
-          "description": "Log warnings only; never block the request.",
-          "type": "string",
-          "const": "warn"
-        },
-        {
-          "description": "Attempt one downgrade to a cheaper route/model, then block if still over budget.",
-          "type": "string",
-          "const": "route_down"
-        },
-        {
-          "description": "Block immediately when projected spend exceeds configured limits.",
-          "type": "string",
-          "const": "block"
-        }
-      ]
     },
     "CronConfig": {
       "description": "Cron job configuration (`[cron]` section).",
@@ -2543,19 +1304,6 @@
           "type": ["string", "null"],
           "default": null
         },
-        "capabilities": {
-          "description": "Optional capability tags used by automatic agent selection.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enabled": {
-          "description": "Whether this delegate profile is active for selection/invocation.",
-          "type": "boolean",
-          "default": true
-        },
         "max_depth": {
           "description": "Max recursion depth for nested delegation",
           "type": "integer",
@@ -2573,12 +1321,6 @@
         "model": {
           "description": "Model name",
           "type": "string"
-        },
-        "priority": {
-          "description": "Priority hint for automatic agent selection (higher wins on ties).",
-          "type": "integer",
-          "format": "int32",
-          "default": 0
         },
         "provider": {
           "description": "Provider name (e.g. \"ollama\", \"openrouter\", \"anthropic\")",
@@ -2636,18 +1378,6 @@
         "bot_token": {
           "description": "Discord bot token (from Discord Developer Portal).",
           "type": "string"
-        },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         },
         "guild_id": {
           "description": "Optional guild (server) ID to restrict the bot to a single guild.",
@@ -2713,57 +1443,42 @@
         }
       }
     },
-    "EconomicConfig": {
-      "description": "Economic agent survival tracking configuration (`[economic]` section).\n\nImplements the ClawWork economic model for AI agents, tracking\nbalance, costs, income, and survival status.",
+    "EdgeTtsConfig": {
+      "description": "Edge TTS provider configuration (free, subprocess-based).",
       "type": "object",
       "properties": {
-        "data_path": {
-          "description": "Data directory for economic state persistence (relative to workspace)",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "enabled": {
-          "description": "Enable economic tracking (default: false)",
-          "type": "boolean",
-          "default": false
-        },
-        "initial_balance": {
-          "description": "Starting balance in USD (default: 1000.0)",
-          "type": "number",
-          "format": "double",
-          "default": 1000.0
-        },
-        "min_evaluation_threshold": {
-          "description": "Minimum evaluation score (0.0-1.0) to receive payment (default: 0.6)",
-          "type": "number",
-          "format": "double",
-          "default": 0.6
-        },
-        "token_pricing": {
-          "description": "Token pricing configuration",
-          "$ref": "#/$defs/EconomicTokenPricing",
-          "default": {
-            "input_price_per_million": 3.0,
-            "output_price_per_million": 15.0
-          }
+        "binary_path": {
+          "description": "Path to the `edge-tts` binary (default `\"edge-tts\"`).",
+          "type": "string",
+          "default": "edge-tts"
         }
       }
     },
-    "EconomicTokenPricing": {
-      "description": "Token pricing configuration for economic tracking.",
+    "ElevenLabsTtsConfig": {
+      "description": "ElevenLabs TTS provider configuration.",
       "type": "object",
       "properties": {
-        "input_price_per_million": {
-          "description": "Price per million input tokens (USD)",
-          "type": "number",
-          "format": "double",
-          "default": 3.0
+        "api_key": {
+          "description": "API key for ElevenLabs.",
+          "type": ["string", "null"],
+          "default": null
         },
-        "output_price_per_million": {
-          "description": "Price per million output tokens (USD)",
+        "model_id": {
+          "description": "Model ID (default `\"eleven_monolingual_v1\"`).",
+          "type": "string",
+          "default": "eleven_monolingual_v1"
+        },
+        "similarity_boost": {
+          "description": "Similarity boost (0.0-1.0, default `0.5`).",
           "type": "number",
           "format": "double",
-          "default": 15.0
+          "default": 0.5
+        },
+        "stability": {
+          "description": "Voice stability (0.0-1.0, default `0.5`).",
+          "type": "number",
+          "format": "double",
+          "default": 0.5
         }
       }
     },
@@ -2798,16 +1513,6 @@
         "imap_host": {
           "description": "IMAP server hostname",
           "type": "string"
-        },
-        "imap_id": {
-          "description": "Optional IMAP ID extension (RFC 2971) client identification.",
-          "$ref": "#/$defs/EmailImapIdConfig",
-          "default": {
-            "enabled": true,
-            "name": "zeroclaw",
-            "vendor": "zeroclaw-labs",
-            "version": "0.1.9"
-          }
         },
         "imap_port": {
           "description": "IMAP server port (default: 993 for TLS)",
@@ -2844,32 +1549,6 @@
         }
       },
       "required": ["imap_host", "smtp_host", "username", "password", "from_address"]
-    },
-    "EmailImapIdConfig": {
-      "description": "IMAP ID extension metadata (RFC 2971)",
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Send IMAP `ID` command after login (recommended for some providers such as NetEase).",
-          "type": "boolean",
-          "default": true
-        },
-        "name": {
-          "description": "Client application name",
-          "type": "string",
-          "default": "zeroclaw"
-        },
-        "vendor": {
-          "description": "Client vendor name",
-          "type": "string",
-          "default": "zeroclaw-labs"
-        },
-        "version": {
-          "description": "Client application version",
-          "type": "string",
-          "default": "0.1.9"
-        }
-      }
     },
     "EmbeddingRouteConfig": {
       "description": "Route an embedding hint to a specific provider + model.\n\n```toml\n[[embedding_routes]]\nhint = \"semantic\"\nprovider = \"openai\"\nmodel = \"text-embedding-3-small\"\ndimensions = 1536\n\n[memory]\nembedding_model = \"hint:semantic\"\n```",
@@ -2944,36 +1623,10 @@
           "description": "App Secret from Feishu developer console",
           "type": "string"
         },
-        "draft_update_interval_ms": {
-          "description": "Minimum interval between streaming draft edits (milliseconds).",
-          "type": "integer",
-          "format": "uint64",
-          "default": 3000,
-          "minimum": 0
-        },
         "encrypt_key": {
           "description": "Encrypt key for webhook message decryption (optional)",
           "type": ["string", "null"],
           "default": null
-        },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "max_draft_edits": {
-          "description": "Maximum number of draft edits per message before finalizing.",
-          "type": "integer",
-          "format": "uint32",
-          "default": 20,
-          "minimum": 0
         },
         "port": {
           "description": "HTTP port for webhook mode only. Must be set when receive_mode = \"webhook\".\nNot required (and ignored) for websocket mode.",
@@ -3024,15 +1677,6 @@
           "default": 300,
           "minimum": 0
         },
-        "node_control": {
-          "description": "Node-control protocol scaffold (`[gateway.node_control]`).",
-          "$ref": "#/$defs/NodeControlConfig",
-          "default": {
-            "allowed_node_ids": [],
-            "auth_token": null,
-            "enabled": false
-          }
-        },
         "pair_rate_limit_per_minute": {
           "description": "Max `/pair` requests per minute per client key.",
           "type": "integer",
@@ -3082,114 +1726,21 @@
         }
       }
     },
-    "GitHubConfig": {
-      "description": "GitHub channel configuration (webhook receive + issue/PR comment send).",
+    "GoogleTtsConfig": {
+      "description": "Google Cloud TTS provider configuration.",
       "type": "object",
       "properties": {
-        "access_token": {
-          "description": "GitHub token used for outbound API calls.\n\nSupports fine-grained PAT or installation token with `issues:write` / `pull_requests:write`.",
-          "type": "string"
-        },
-        "allowed_repos": {
-          "description": "Allowed repositories (`owner/repo`), `owner/*`, or `*`.\nEmpty list denies all repositories.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "api_base_url": {
-          "description": "Optional GitHub API base URL (for GHES).\nDefaults to `https://api.github.com` when omitted.",
+        "api_key": {
+          "description": "API key for Google Cloud TTS.",
           "type": ["string", "null"],
           "default": null
         },
-        "webhook_secret": {
-          "description": "Optional webhook secret to verify `X-Hub-Signature-256`.",
-          "type": ["string", "null"],
-          "default": null
-        }
-      },
-      "required": ["access_token"]
-    },
-    "GoalLoopConfig": {
-      "description": "Configuration for the autonomous goal loop engine (`[goal_loop]`).",
-      "type": "object",
-      "properties": {
-        "channel": {
-          "description": "Optional channel to deliver goal events to (e.g. \"lark\", \"telegram\").",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "enabled": {
-          "description": "Enable autonomous goal execution. Default: `false`.",
-          "type": "boolean"
-        },
-        "interval_minutes": {
-          "description": "Interval in minutes between goal loop cycles. Default: `10`.",
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0
-        },
-        "max_steps_per_cycle": {
-          "description": "Maximum steps to execute per cycle. Default: `3`.",
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0
-        },
-        "step_timeout_secs": {
-          "description": "Timeout in seconds for a single step execution. Default: `120`.",
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "target": {
-          "description": "Optional recipient/chat_id for goal event delivery.",
-          "type": ["string", "null"],
-          "default": null
-        }
-      },
-      "required": ["enabled", "interval_minutes", "step_timeout_secs", "max_steps_per_cycle"]
-    },
-    "GroupReplyConfig": {
-      "description": "Advanced group-chat trigger controls.",
-      "type": "object",
-      "properties": {
-        "allowed_sender_ids": {
-          "description": "Sender IDs that always trigger group replies.\n\nThese IDs bypass mention gating in group chats, but do not bypass the\nchannel-level inbound allowlist (`allowed_users` / equivalents).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "mode": {
-          "description": "Optional explicit trigger mode.\n\nIf omitted, channel-specific legacy behavior is used for compatibility.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyMode"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
+        "language_code": {
+          "description": "Language code (default `\"en-US\"`).",
+          "type": "string",
+          "default": "en-US"
         }
       }
-    },
-    "GroupReplyMode": {
-      "description": "Group-chat reply trigger mode for channels that support mention gating.",
-      "oneOf": [
-        {
-          "description": "Reply only when the bot is explicitly @-mentioned in group chats.",
-          "type": "string",
-          "const": "mention_only"
-        },
-        {
-          "description": "Reply to every message in group chats.",
-          "type": "string",
-          "const": "all_messages"
-        }
-      ]
     },
     "HardwareConfig": {
       "description": "Wizard-driven hardware configuration for physical world interaction.",
@@ -3238,13 +1789,6 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]` section).",
       "type": "object",
       "properties": {
-        "dedupe_window_minutes": {
-          "description": "Skip duplicate task text within this cooldown window (minutes). Default: `0` (disabled).",
-          "type": "integer",
-          "format": "uint32",
-          "default": 0,
-          "minimum": 0
-        },
         "enabled": {
           "description": "Enable periodic heartbeat pings. Default: `false`.",
           "type": "boolean"
@@ -3253,13 +1797,6 @@
           "description": "Interval in minutes between heartbeat pings. Default: `30`.",
           "type": "integer",
           "format": "uint32",
-          "minimum": 0
-        },
-        "max_tasks_per_tick": {
-          "description": "Maximum heartbeat tasks to execute per tick. Default: `3`.",
-          "type": "integer",
-          "format": "uint",
-          "default": 3,
           "minimum": 0
         },
         "message": {
@@ -3286,9 +1823,7 @@
         "builtin": {
           "$ref": "#/$defs/BuiltinHooksConfig",
           "default": {
-            "boot_script": false,
-            "command_logger": false,
-            "session_memory": false
+            "command_logger": false
           }
         },
         "enabled": {
@@ -3310,14 +1845,6 @@
             "type": "string"
           }
         },
-        "credential_profiles": {
-          "description": "Optional named credential profiles for env-backed auth injection.\n\nExample:\n`[http_request.credential_profiles.github]`\n`env_var = \"GITHUB_TOKEN\"`\n`header_name = \"Authorization\"`\n`value_prefix = \"Bearer \"`",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/HttpRequestCredentialProfile"
-          },
-          "default": {}
-        },
         "enabled": {
           "description": "Enable `http_request` tool for API interactions",
           "type": "boolean",
@@ -3336,32 +1863,6 @@
           "format": "uint64",
           "default": 30,
           "minimum": 0
-        },
-        "user_agent": {
-          "description": "User-Agent string sent with HTTP requests (env: ZEROCLAW_HTTP_REQUEST_USER_AGENT)",
-          "type": "string",
-          "default": "ZeroClaw/1.0"
-        }
-      }
-    },
-    "HttpRequestCredentialProfile": {
-      "description": "HTTP request tool configuration (`[http_request]` section).\n\nDeny-by-default: if `allowed_domains` is empty, all HTTP requests are rejected.",
-      "type": "object",
-      "properties": {
-        "env_var": {
-          "description": "Environment variable containing the secret/token value",
-          "type": "string",
-          "default": ""
-        },
-        "header_name": {
-          "description": "Header name to inject (for example `Authorization` or `X-API-Key`)",
-          "type": "string",
-          "default": "Authorization"
-        },
-        "value_prefix": {
-          "description": "Optional prefix prepended to the secret (for example `Bearer `)",
-          "type": "string",
-          "default": ""
         }
       }
     },
@@ -3392,14 +1893,6 @@
           "description": "Path to AIEOS JSON file (relative to workspace)",
           "type": ["string", "null"],
           "default": null
-        },
-        "extra_files": {
-          "description": "Additional workspace files injected for the OpenClaw identity format.\n\nPaths are resolved relative to the workspace root.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
         },
         "format": {
           "description": "Identity format: \"openclaw\" (default) or \"aieos\"",
@@ -3487,36 +1980,10 @@
           "description": "App Secret from Lark/Feishu developer console",
           "type": "string"
         },
-        "draft_update_interval_ms": {
-          "description": "Minimum interval (ms) between draft message edits. Default: 3000.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 3000,
-          "minimum": 0
-        },
         "encrypt_key": {
           "description": "Encrypt key for webhook message decryption (optional)",
           "type": ["string", "null"],
           "default": null
-        },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "max_draft_edits": {
-          "description": "Maximum number of edits per draft message before stopping updates.",
-          "type": "integer",
-          "format": "uint32",
-          "default": 20,
-          "minimum": 0
         },
         "mention_only": {
           "description": "When true, only respond to messages that @-mention the bot in groups.\nDirect messages are always processed.",
@@ -3605,11 +2072,6 @@
           "description": "Matrix homeserver URL (e.g. `\"https://matrix.org\"`).",
           "type": "string"
         },
-        "mention_only": {
-          "description": "When true, only respond to direct rooms, explicit @-mentions, or replies to bot messages.",
-          "type": "boolean",
-          "default": false
-        },
         "room_id": {
           "description": "Matrix room ID to listen in (e.g. `\"!abc123:matrix.org\"`).",
           "type": "string"
@@ -3642,18 +2104,6 @@
           "description": "Optional channel ID to restrict the bot to a single channel.",
           "type": ["string", "null"]
         },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "mention_only": {
           "description": "When true, only respond to messages that @-mention the bot.\nOther messages in the channel are silently ignored.",
           "type": ["boolean", "null"],
@@ -3670,102 +2120,6 @@
         }
       },
       "required": ["url", "bot_token"]
-    },
-    "McpConfig": {
-      "description": "External MCP client configuration (`[mcp]` section).",
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable MCP tool loading.",
-          "type": "boolean",
-          "default": false
-        },
-        "servers": {
-          "description": "Configured MCP servers.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/McpServerConfig"
-          }
-        }
-      }
-    },
-    "McpServerConfig": {
-      "description": "Configuration for a single external MCP server.",
-      "type": "object",
-      "properties": {
-        "args": {
-          "description": "Command arguments for stdio transport.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "command": {
-          "description": "Executable to spawn for stdio transport.",
-          "type": "string",
-          "default": ""
-        },
-        "env": {
-          "description": "Optional environment variables for stdio transport.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        },
-        "headers": {
-          "description": "Optional HTTP headers for HTTP/SSE transports.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        },
-        "name": {
-          "description": "Display name used as a tool prefix (`<server>__<tool>`).",
-          "type": "string"
-        },
-        "tool_timeout_secs": {
-          "description": "Optional per-call timeout in seconds (hard capped in validation).",
-          "type": ["integer", "null"],
-          "format": "uint64",
-          "default": null,
-          "minimum": 0
-        },
-        "transport": {
-          "description": "Transport type (default: stdio).",
-          "$ref": "#/$defs/McpTransport",
-          "default": "stdio"
-        },
-        "url": {
-          "description": "URL for HTTP/SSE transports.",
-          "type": ["string", "null"],
-          "default": null
-        }
-      },
-      "required": ["name"]
-    },
-    "McpTransport": {
-      "description": "Transport type for MCP server connections.",
-      "oneOf": [
-        {
-          "description": "Spawn a local process and communicate over stdin/stdout.",
-          "type": "string",
-          "const": "stdio"
-        },
-        {
-          "description": "Connect via HTTP POST.",
-          "type": "string",
-          "const": "http"
-        },
-        {
-          "description": "Connect via HTTP + Server-Sent Events.",
-          "type": "string",
-          "const": "sse"
-        }
-      ]
     },
     "MemoryConfig": {
       "type": "object",
@@ -3787,7 +2141,7 @@
           "type": "boolean"
         },
         "backend": {
-          "description": "\"sqlite\" | \"sqlite_qdrant_hybrid\" | \"lucid\" | \"postgres\" | \"qdrant\" | \"markdown\" | \"none\" (`none` = explicit no-op memory)\n\n`postgres` requires `[storage.provider.config]` with `db_url` (`dbURL` alias supported).\n`qdrant` and `sqlite_qdrant_hybrid` use `[memory.qdrant]` config or `QDRANT_URL` env var.",
+          "description": "\"sqlite\" | \"lucid\" | \"postgres\" | \"qdrant\" | \"markdown\" | \"none\" (`none` = explicit no-op memory)\n\n`postgres` requires `[storage.provider.config]` with `db_url` (`dbURL` alias supported).\n`qdrant` uses `[memory.qdrant]` config or `QDRANT_URL` env var.",
           "type": "string"
         },
         "chunk_max_tokens": {
@@ -3853,7 +2207,7 @@
           "minimum": 0
         },
         "qdrant": {
-          "description": "Configuration for Qdrant vector database backend.\nUsed when `backend = \"qdrant\"` or `backend = \"sqlite_qdrant_hybrid\"`.",
+          "description": "Configuration for Qdrant vector database backend.\nOnly used when `backend = \"qdrant\"`.",
           "$ref": "#/$defs/QdrantConfig",
           "default": {
             "api_key": null,
@@ -3889,11 +2243,6 @@
           "description": "Run snapshot during hygiene passes (heartbeat-driven)",
           "type": "boolean",
           "default": false
-        },
-        "sqlite_journal_mode": {
-          "description": "SQLite journal mode: \"wal\" (default) or \"delete\".\n\nWAL (Write-Ahead Logging) provides better concurrency and is the\nrecommended default. However, WAL requires shared-memory support\n(mmap/shm) which is **not available** on many network and virtual\nshared filesystems (NFS, SMB/CIFS, UTM/VirtioFS, VirtualBox shared\nfolders, etc.), causing `xShmMap` I/O errors at startup.\n\nSet to `\"delete\"` when your workspace lives on such a filesystem.\n\nExample:\n```toml\n[memory]\nsqlite_journal_mode = \"delete\"\n```",
-          "type": "string",
-          "default": "wal"
         },
         "sqlite_open_timeout_secs": {
           "description": "For sqlite backend: max seconds to wait when opening the DB (e.g. file locked).\nNone = wait indefinitely (default). Recommended max: 300.",
@@ -3933,23 +2282,8 @@
       "description": "Named provider profile definition compatible with Codex app-server style config.",
       "type": "object",
       "properties": {
-        "api_key": {
-          "description": "Optional profile-scoped API key.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "auth_header": {
-          "description": "Optional custom authentication header for `custom:` providers\n(for example `api-key` for Azure OpenAI).\n\nContract:\n- Default/omitted (`None`): uses the standard `Authorization: Bearer <token>` header.\n- Compatibility: this key is additive and optional; older runtimes that do not support it\n  ignore the field while continuing to use Bearer auth behavior.\n- Rollback/migration: remove `auth_header` to return to Bearer-only auth if operators\n  need to downgrade or revert custom-header behavior.",
-          "type": ["string", "null"],
-          "default": null
-        },
         "base_url": {
           "description": "Optional base URL for OpenAI-compatible endpoints.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "default_model": {
-          "description": "Optional profile-scoped default model.",
           "type": ["string", "null"],
           "default": null
         },
@@ -3983,13 +2317,6 @@
           "description": "Task hint name (e.g. \"reasoning\", \"fast\", \"code\", \"summarize\")",
           "type": "string"
         },
-        "max_tokens": {
-          "description": "Optional max_tokens override for this route.\nWhen set, provider requests cap output tokens to this value.",
-          "type": ["integer", "null"],
-          "format": "uint32",
-          "default": null,
-          "minimum": 0
-        },
         "model": {
           "description": "Model to use with that provider",
           "type": "string"
@@ -3997,11 +2324,6 @@
         "provider": {
           "description": "Provider to route to (must match a known provider name)",
           "type": "string"
-        },
-        "transport": {
-          "description": "Optional route-specific transport override for this route.\nSupported values: \"auto\", \"websocket\", \"sse\".\n\nWhen `model_routes[].transport` is unset, the route inherits `provider.transport`.\nIf both are unset, runtime defaults are used (`auto` for OpenAI Codex).\nExisting configs without this field remain valid.",
-          "type": ["string", "null"],
-          "default": null
         }
       },
       "required": ["hint", "provider", "model"]
@@ -4030,34 +2352,6 @@
           "minimum": 0
         }
       }
-    },
-    "NapcatConfig": {
-      "description": "Napcat channel configuration (QQ via OneBot-compatible API)",
-      "type": "object",
-      "properties": {
-        "access_token": {
-          "description": "Optional access token (Authorization Bearer token)",
-          "type": ["string", "null"]
-        },
-        "allowed_users": {
-          "description": "Allowed user IDs. Empty = deny all, \"*\" = allow all",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "api_base_url": {
-          "description": "Optional Napcat HTTP API base URL. If omitted, derived from websocket_url.",
-          "type": "string",
-          "default": ""
-        },
-        "websocket_url": {
-          "description": "Napcat WebSocket endpoint (for example `ws://127.0.0.1:3001`)",
-          "type": "string"
-        }
-      },
-      "required": ["websocket_url"]
     },
     "NextcloudTalkConfig": {
       "description": "Nextcloud Talk bot configuration (webhook receive + OCS send API).",
@@ -4100,50 +2394,6 @@
         }
       },
       "required": ["auth_token"]
-    },
-    "NodeControlConfig": {
-      "description": "Node-control scaffold settings under `[gateway.node_control]`.",
-      "type": "object",
-      "properties": {
-        "allowed_node_ids": {
-          "description": "Allowlist of remote node IDs for `node.describe`/`node.invoke`.\nEmpty means \"no explicit allowlist\" (accept all IDs).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "auth_token": {
-          "description": "Optional extra shared token for node-control API calls.\nWhen set, clients must send this value in `X-Node-Control-Token`.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "enabled": {
-          "description": "Enable experimental node-control API endpoints.",
-          "type": "boolean",
-          "default": false
-        }
-      }
-    },
-    "NonCliNaturalLanguageApprovalMode": {
-      "description": "Natural-language behavior for non-CLI approval-management commands.",
-      "oneOf": [
-        {
-          "description": "Do not treat natural-language text as approval-management commands.\nOperators must use explicit slash commands.",
-          "type": "string",
-          "const": "disabled"
-        },
-        {
-          "description": "Natural-language approval phrases create a pending request that must be\nconfirmed with a request ID.",
-          "type": "string",
-          "const": "request_confirm"
-        },
-        {
-          "description": "Natural-language approval phrases directly approve the named tool.\n\nThis keeps private-chat workflows simple while still requiring a human\nsender and passing the same approver allowlist checks as slash commands.",
-          "type": "string",
-          "const": "direct"
-        }
-      ]
     },
     "NostrConfig": {
       "description": "Nostr channel configuration (NIP-04 + NIP-17 private messages)",
@@ -4215,25 +2465,27 @@
       },
       "required": ["backend"]
     },
-    "OtpChallengeDelivery": {
-      "description": "Channel delivery mode for OTP challenges.",
-      "oneOf": [
-        {
-          "description": "Send OTP challenge in direct message/private channel.",
-          "type": "string",
-          "const": "dm"
+    "OpenAiTtsConfig": {
+      "description": "OpenAI TTS provider configuration.",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "description": "API key for OpenAI TTS.",
+          "type": ["string", "null"],
+          "default": null
         },
-        {
-          "description": "Send OTP challenge in thread where supported.",
+        "model": {
+          "description": "Model name (default `\"tts-1\"`).",
           "type": "string",
-          "const": "thread"
+          "default": "tts-1"
         },
-        {
-          "description": "Send OTP challenge as ephemeral message where supported.",
-          "type": "string",
-          "const": "ephemeral"
+        "speed": {
+          "description": "Playback speed multiplier (default `1.0`).",
+          "type": "number",
+          "format": "double",
+          "default": 1.0
         }
-      ]
+      }
     },
     "OtpConfig": {
       "description": "Security OTP configuration.",
@@ -4246,30 +2498,10 @@
           "default": 300,
           "minimum": 0
         },
-        "challenge_delivery": {
-          "description": "Delivery mode for OTP challenge prompts in chat channels.",
-          "$ref": "#/$defs/OtpChallengeDelivery",
-          "default": "dm"
-        },
-        "challenge_max_attempts": {
-          "description": "Maximum OTP attempts allowed per challenge.",
-          "type": "integer",
-          "format": "uint8",
-          "default": 3,
-          "maximum": 255,
-          "minimum": 0
-        },
-        "challenge_timeout_secs": {
-          "description": "Maximum time a challenge remains valid, in seconds.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 120,
-          "minimum": 0
-        },
         "enabled": {
-          "description": "Enable OTP gating. Defaults to enabled.",
+          "description": "Enable OTP gating. Defaults to disabled for backward compatibility.",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "gated_actions": {
           "description": "Tool/action names gated by OTP.",
@@ -4330,44 +2562,6 @@
         }
       ]
     },
-    "OutboundLeakGuardAction": {
-      "description": "Outbound leak handling mode for channel responses.",
-      "oneOf": [
-        {
-          "description": "Redact suspicious credentials and continue delivery.",
-          "type": "string",
-          "const": "redact"
-        },
-        {
-          "description": "Block delivery when suspicious credentials are detected.",
-          "type": "string",
-          "const": "block"
-        }
-      ]
-    },
-    "OutboundLeakGuardConfig": {
-      "description": "Outbound credential leak guard configuration.",
-      "type": "object",
-      "properties": {
-        "action": {
-          "description": "Action to take when potential credentials are detected.",
-          "$ref": "#/$defs/OutboundLeakGuardAction",
-          "default": "redact"
-        },
-        "enabled": {
-          "description": "Enable outbound credential leak scanning for channel responses.",
-          "type": "boolean",
-          "default": true
-        },
-        "sensitivity": {
-          "description": "Detection sensitivity (0.0-1.0, higher = more aggressive).",
-          "type": "number",
-          "format": "double",
-          "default": 0.7
-        }
-      },
-      "additionalProperties": false
-    },
     "PeripheralBoardConfig": {
       "description": "Configuration for a single peripheral board (e.g. STM32, RPi GPIO).",
       "type": "object",
@@ -4417,151 +2611,6 @@
           "description": "Enable peripheral support (boards become agent tools)",
           "type": "boolean",
           "default": false
-        }
-      }
-    },
-    "PerplexityFilterConfig": {
-      "description": "Lightweight perplexity-style filter configuration.",
-      "type": "object",
-      "properties": {
-        "enable_perplexity_filter": {
-          "description": "Enable probabilistic adversarial suffix filtering before provider calls.",
-          "type": "boolean",
-          "default": false
-        },
-        "min_prompt_chars": {
-          "description": "Minimum input length before running the perplexity filter.",
-          "type": "integer",
-          "format": "uint",
-          "default": 32,
-          "minimum": 0
-        },
-        "perplexity_threshold": {
-          "description": "Character-class bigram perplexity threshold for anomaly blocking.",
-          "type": "number",
-          "format": "double",
-          "default": 18.0
-        },
-        "suffix_window_chars": {
-          "description": "Number of trailing characters sampled for suffix anomaly scoring.",
-          "type": "integer",
-          "format": "uint",
-          "default": 64,
-          "minimum": 0
-        },
-        "symbol_ratio_threshold": {
-          "description": "Minimum punctuation ratio in the sampled suffix required to block.",
-          "type": "number",
-          "format": "double",
-          "default": 0.2
-        }
-      }
-    },
-    "PluginEntryConfig": {
-      "description": "Per-plugin configuration entry (`[plugins.entries.<id>]`).",
-      "type": "object",
-      "properties": {
-        "config": {
-          "description": "Plugin-specific configuration table, passed to `PluginApi::plugin_config()`.",
-          "default": null
-        },
-        "enabled": {
-          "description": "Override the plugin's enabled state. If absent, the plugin is enabled\nunless it is bundled-and-disabled-by-default.",
-          "type": ["boolean", "null"]
-        }
-      }
-    },
-    "PluginsConfig": {
-      "description": "Plugin system configuration (`[plugins]` section).\n\nControls plugin discovery, loading, and per-plugin settings.\nMirrors OpenClaw's `plugins` config block.\n\nExample:\n```toml\n[plugins]\nenabled = true\nallow = [\"hello-world\"]\n\n[plugins.entries.hello-world]\nenabled = true\n\n[plugins.entries.hello-world.config]\ngreeting = \"Howdy\"\n```",
-      "type": "object",
-      "properties": {
-        "allow": {
-          "description": "Allowlist — if non-empty, only plugins with these IDs are loaded.\nAn empty list means all discovered plugins are eligible.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "deny": {
-          "description": "Denylist — plugins with these IDs are never loaded, even if in the allowlist.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enabled": {
-          "description": "Master switch — set to `false` to disable all plugin loading. Default: `true`.",
-          "type": "boolean",
-          "default": true
-        },
-        "entries": {
-          "description": "Per-plugin configuration entries.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/PluginEntryConfig"
-          },
-          "default": {}
-        },
-        "load_paths": {
-          "description": "Extra directories to scan for plugins (in addition to the standard locations).\nStandard locations: `<binary_dir>/extensions/`, `~/.zeroclaw/extensions/`,\n`<workspace>/.zeroclaw/extensions/`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "ProgressMode": {
-      "description": "Progress verbosity for channels that support draft streaming.",
-      "oneOf": [
-        {
-          "description": "Show all progress lines (thinking rounds, tool-count lines, tool lifecycle).",
-          "type": "string",
-          "const": "verbose"
-        },
-        {
-          "description": "Show only tool lifecycle lines (start + completion).",
-          "type": "string",
-          "const": "compact"
-        },
-        {
-          "description": "Suppress progress lines and stream only final answer text.",
-          "type": "string",
-          "const": "off"
-        }
-      ]
-    },
-    "ProviderApiMode": {
-      "description": "Protocol mode for `custom:` OpenAI-compatible providers.",
-      "oneOf": [
-        {
-          "description": "Default behavior: `/chat/completions` first, optional `/responses`\nfallback when supported.",
-          "type": "string",
-          "const": "open-ai-chat-completions"
-        },
-        {
-          "description": "Responses-first behavior: call `/responses` directly.",
-          "type": "string",
-          "const": "open-ai-responses"
-        }
-      ]
-    },
-    "ProviderConfig": {
-      "description": "Provider behavior overrides (`[provider]` section).",
-      "type": "object",
-      "properties": {
-        "reasoning_level": {
-          "description": "Optional reasoning level override for providers that support explicit levels\n(e.g. OpenAI Codex `/responses` reasoning effort).",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "transport": {
-          "description": "Optional transport override for providers that support multiple transports.\nSupported values: \"auto\", \"websocket\", \"sse\".\n\nResolution order:\n1) `model_routes[].transport` (route-specific)\n2) env overrides (`PROVIDER_TRANSPORT`, `ZEROCLAW_PROVIDER_TRANSPORT`, `ZEROCLAW_CODEX_TRANSPORT`)\n3) `provider.transport`\n4) runtime default (`auto`, WebSocket-first with SSE fallback for OpenAI Codex)\n\nNote: env overrides replace configured `provider.transport` when set.\n\nExisting configs that omit `provider.transport` remain valid and fall back to defaults.",
-          "type": ["string", "null"],
-          "default": null
         }
       }
     },
@@ -4651,32 +2700,12 @@
         "app_secret": {
           "description": "App Secret from QQ Bot developer console",
           "type": "string"
-        },
-        "environment": {
-          "description": "API environment: \"production\" (default) or \"sandbox\".",
-          "$ref": "#/$defs/QQEnvironment",
-          "default": "production"
-        },
-        "receive_mode": {
-          "description": "Event receive mode: \"webhook\" (default) or \"websocket\".",
-          "$ref": "#/$defs/QQReceiveMode",
-          "default": "webhook"
         }
       },
       "required": ["app_id", "app_secret"]
     },
-    "QQEnvironment": {
-      "description": "QQ API environment.",
-      "type": "string",
-      "enum": ["production", "sandbox"]
-    },
-    "QQReceiveMode": {
-      "description": "QQ Official Bot configuration (Tencent QQ Bot SDK)",
-      "type": "string",
-      "enum": ["websocket", "webhook"]
-    },
     "QdrantConfig": {
-      "description": "Memory backend configuration (`[memory]` section).\n\nControls conversation memory storage, embeddings, hybrid search, response caching,\nand memory snapshot/hydration.\nConfiguration for Qdrant vector database backend (`[memory.qdrant]`).\nUsed when `[memory].backend = \"qdrant\"` or `\"sqlite_qdrant_hybrid\"`.",
+      "description": "Memory backend configuration (`[memory]` section).\n\nControls conversation memory storage, embeddings, hybrid search, response caching,\nand memory snapshot/hydration.\nConfiguration for Qdrant vector database backend (`[memory.qdrant]`).\nUsed when `[memory].backend = \"qdrant\"`.",
       "type": "object",
       "properties": {
         "api_key": {
@@ -4741,14 +2770,6 @@
           "default": 60,
           "minimum": 0
         },
-        "fallback_api_keys": {
-          "description": "Optional per-fallback provider API keys keyed by fallback entry name.\nThis allows distinct credentials for multiple `custom:<url>` endpoints.\n\nContract:\n- Default/omitted (`{}` via `#[serde(default)]`): no per-entry override is used.\n- Compatibility: additive and non-breaking for existing configs that omit this field.\n- Rollback/migration: remove this map (or specific entries) to revert to provider/env-based\n  credential resolution.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        },
         "fallback_providers": {
           "description": "Fallback provider chain (e.g. `[\"anthropic\", \"openai\"]`).",
           "type": "array",
@@ -4758,7 +2779,7 @@
           }
         },
         "model_fallbacks": {
-          "description": "Per-model fallback chains. When a model fails, try these alternatives in order.\nExample: `{ \"claude-opus-4-20250514\" = [\"claude-sonnet-4-20250514\", \"gpt-4o\"] }`\n\nCompatibility behavior: keys matching configured provider names are treated\nas provider-scoped remap chains during provider fallback.",
+          "description": "Per-model fallback chains. When a model fails, try these alternatives in order.\nExample: `{ \"claude-opus-4-20250514\" = [\"claude-sonnet-4-20250514\", \"gpt-4o\"] }`",
           "type": "object",
           "additionalProperties": {
             "type": "array",
@@ -4797,95 +2818,6 @@
           "minimum": 0
         }
       }
-    },
-    "ResearchPhaseConfig": {
-      "description": "Research phase configuration (`[research]` section).\n\nWhen enabled, the agent proactively gathers information using tools\nbefore generating its main response. This creates a \"thinking\" phase\nwhere the agent explores the codebase, searches memory, or fetches\nexternal data to inform its answer.\n\n```toml\n[research]\nenabled = true\ntrigger = \"keywords\"\nkeywords = [\"find\", \"search\", \"check\", \"investigate\"]\nmax_iterations = 5\nshow_progress = true\n```",
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable the research phase.",
-          "type": "boolean",
-          "default": false
-        },
-        "keywords": {
-          "description": "Keywords that trigger research phase (when `trigger = \"keywords\"`).",
-          "type": "array",
-          "default": [
-            "find",
-            "search",
-            "check",
-            "investigate",
-            "look",
-            "research",
-            "найди",
-            "проверь",
-            "исследуй",
-            "поищи"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "max_iterations": {
-          "description": "Maximum tool call iterations during research phase.",
-          "type": "integer",
-          "format": "uint",
-          "default": 5,
-          "minimum": 0
-        },
-        "min_message_length": {
-          "description": "Minimum message length to trigger research (when `trigger = \"length\"`).",
-          "type": "integer",
-          "format": "uint",
-          "default": 50,
-          "minimum": 0
-        },
-        "show_progress": {
-          "description": "Show detailed progress during research (tool calls, results).",
-          "type": "boolean",
-          "default": true
-        },
-        "system_prompt_prefix": {
-          "description": "Custom system prompt prefix for research phase.\nIf empty, uses default research instructions.",
-          "type": "string",
-          "default": ""
-        },
-        "trigger": {
-          "description": "When to trigger research phase.",
-          "$ref": "#/$defs/ResearchTrigger",
-          "default": "never"
-        }
-      }
-    },
-    "ResearchTrigger": {
-      "description": "Research phase trigger mode.",
-      "oneOf": [
-        {
-          "description": "Never trigger research phase.",
-          "type": "string",
-          "const": "never"
-        },
-        {
-          "description": "Always trigger research phase before responding.",
-          "type": "string",
-          "const": "always"
-        },
-        {
-          "description": "Trigger when message contains configured keywords.",
-          "type": "string",
-          "const": "keywords"
-        },
-        {
-          "description": "Trigger when message exceeds minimum length.",
-          "type": "string",
-          "const": "length"
-        },
-        {
-          "description": "Trigger when message contains a question mark.",
-          "type": "string",
-          "const": "question"
-        }
-      ]
     },
     "ResourceLimitsConfig": {
       "description": "Resource limits for command execution",
@@ -4937,7 +2869,7 @@
           }
         },
         "kind": {
-          "description": "Runtime kind (`native` | `docker` | `wasm`).",
+          "description": "Runtime kind (`native` | `docker`).",
           "type": "string",
           "default": "native"
         },
@@ -4945,33 +2877,6 @@
           "description": "Global reasoning override for providers that expose explicit controls.\n- `None`: provider default behavior\n- `Some(true)`: request reasoning/thinking when supported\n- `Some(false)`: disable reasoning/thinking when supported",
           "type": ["boolean", "null"],
           "default": null
-        },
-        "reasoning_level": {
-          "description": "Deprecated compatibility alias for `[provider].reasoning_level`.\n- Canonical key: `provider.reasoning_level`\n- Legacy key accepted for compatibility: `runtime.reasoning_level`\n- When both are set, provider-level value wins.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "wasm": {
-          "description": "WASM runtime settings (used when `kind = \"wasm\"`).",
-          "$ref": "#/$defs/WasmRuntimeConfig",
-          "default": {
-            "allow_workspace_read": false,
-            "allow_workspace_write": false,
-            "allowed_hosts": [],
-            "fuel_limit": 1000000,
-            "max_module_size_mb": 50,
-            "memory_limit_mb": 64,
-            "security": {
-              "capability_escalation_mode": "deny",
-              "module_hash_policy": "warn",
-              "module_sha256": {},
-              "reject_symlink_modules": true,
-              "reject_symlink_tools_dir": true,
-              "require_workspace_relative_tools_dir": true,
-              "strict_host_validation": true
-            },
-            "tools_dir": "tools/wasm"
-          }
         }
       }
     },
@@ -5084,11 +2989,6 @@
             "sign_events": false
           }
         },
-        "canary_tokens": {
-          "description": "Enable per-turn canary tokens to detect system-context exfiltration.",
-          "type": "boolean",
-          "default": true
-        },
         "estop": {
           "description": "Emergency-stop state machine configuration.",
           "$ref": "#/$defs/EstopConfig",
@@ -5103,35 +3003,12 @@
           "$ref": "#/$defs/OtpConfig",
           "default": {
             "cache_valid_secs": 300,
-            "challenge_delivery": "dm",
-            "challenge_max_attempts": 3,
-            "challenge_timeout_secs": 120,
-            "enabled": true,
+            "enabled": false,
             "gated_actions": ["shell", "file_write", "browser_open", "browser", "memory_forget"],
             "gated_domain_categories": [],
             "gated_domains": [],
             "method": "totp",
             "token_ttl_secs": 30
-          }
-        },
-        "outbound_leak_guard": {
-          "description": "Outbound credential leak guard for channel replies.",
-          "$ref": "#/$defs/OutboundLeakGuardConfig",
-          "default": {
-            "action": "redact",
-            "enabled": true,
-            "sensitivity": 0.7
-          }
-        },
-        "perplexity_filter": {
-          "description": "Lightweight statistical filter for adversarial suffixes (opt-in).",
-          "$ref": "#/$defs/PerplexityFilterConfig",
-          "default": {
-            "enable_perplexity_filter": false,
-            "min_prompt_chars": 32,
-            "perplexity_threshold": 18.0,
-            "suffix_window_chars": 64,
-            "symbol_ratio_threshold": 0.2
           }
         },
         "resources": {
@@ -5144,14 +3021,6 @@
             "memory_monitoring": true
           }
         },
-        "roles": {
-          "description": "Custom security role definitions used for user-level tool authorization.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/SecurityRoleConfig"
-          }
-        },
         "sandbox": {
           "description": "Sandbox configuration",
           "$ref": "#/$defs/SandboxConfig",
@@ -5160,174 +3029,8 @@
             "enabled": null,
             "firejail_args": []
           }
-        },
-        "semantic_guard": {
-          "description": "Enable semantic prompt-injection guard backed by vector similarity.\n\nThis guard is additive to lexical prompt detection and only runs when\n`PromptGuard` does not already block the input.",
-          "type": "boolean",
-          "default": false
-        },
-        "semantic_guard_collection": {
-          "description": "Qdrant collection used by the semantic guard.",
-          "type": "string",
-          "default": "semantic_guard"
-        },
-        "semantic_guard_threshold": {
-          "description": "Cosine similarity threshold for semantic-guard detections.",
-          "type": "number",
-          "format": "double",
-          "default": 0.82
-        },
-        "syscall_anomaly": {
-          "description": "Syscall anomaly detection profile for daemon shell/process execution.",
-          "$ref": "#/$defs/SyscallAnomalyConfig",
-          "default": {
-            "alert_cooldown_secs": 20,
-            "alert_on_unknown_syscall": true,
-            "baseline_syscalls": [
-              "read",
-              "write",
-              "open",
-              "openat",
-              "close",
-              "stat",
-              "fstat",
-              "newfstatat",
-              "lseek",
-              "mmap",
-              "mprotect",
-              "munmap",
-              "brk",
-              "rt_sigaction",
-              "rt_sigprocmask",
-              "ioctl",
-              "fcntl",
-              "access",
-              "pipe2",
-              "dup",
-              "dup2",
-              "dup3",
-              "epoll_create1",
-              "epoll_ctl",
-              "epoll_wait",
-              "poll",
-              "ppoll",
-              "select",
-              "futex",
-              "clock_gettime",
-              "nanosleep",
-              "getpid",
-              "gettid",
-              "set_tid_address",
-              "set_robust_list",
-              "clone",
-              "clone3",
-              "fork",
-              "execve",
-              "wait4",
-              "exit",
-              "exit_group",
-              "socket",
-              "connect",
-              "accept",
-              "accept4",
-              "listen",
-              "sendto",
-              "recvfrom",
-              "sendmsg",
-              "recvmsg",
-              "getsockname",
-              "getpeername",
-              "setsockopt",
-              "getsockopt",
-              "getrandom",
-              "statx"
-            ],
-            "enabled": true,
-            "log_path": "syscall-anomalies.log",
-            "max_alerts_per_minute": 30,
-            "max_denied_events_per_minute": 5,
-            "max_total_events_per_minute": 120,
-            "strict_mode": false
-          }
-        },
-        "url_access": {
-          "description": "Shared URL access policy for network-enabled tools.",
-          "$ref": "#/$defs/UrlAccessConfig",
-          "default": {
-            "allow_cidrs": [],
-            "allow_domains": [],
-            "allow_loopback": false,
-            "approved_domains": [],
-            "block_private_ip": true,
-            "domain_allowlist": [],
-            "domain_blocklist": [],
-            "enforce_domain_allowlist": false,
-            "require_first_visit_approval": false
-          }
         }
       }
-    },
-    "SecurityRoleConfig": {
-      "description": "Custom role definition for user-level authorization.",
-      "type": "object",
-      "properties": {
-        "allowed_tools": {
-          "description": "Explicit allowlist of tools for this role.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "denied_tools": {
-          "description": "Explicit denylist of tools for this role.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "description": {
-          "description": "Optional human-readable description.",
-          "type": "string",
-          "default": ""
-        },
-        "gated_domain_categories": {
-          "description": "Role-scoped domain categories requiring OTP.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "gated_domains": {
-          "description": "Role-scoped domain patterns requiring OTP.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "inherits": {
-          "description": "Optional parent role name used for inheritance.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "name": {
-          "description": "Stable role name used by user records.",
-          "type": "string"
-        },
-        "totp_gated": {
-          "description": "Tool names requiring OTP for this role.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false,
-      "required": ["name"]
     },
     "SignalConfig": {
       "type": "object",
@@ -5370,16 +3073,6 @@
       "description": "Skills loading configuration (`[skills]` section).",
       "type": "object",
       "properties": {
-        "allow_scripts": {
-          "description": "Allow script-like files in skills (`.sh`, `.bash`, `.ps1`, shebang shell files).\nDefault: `false` (secure by default).",
-          "type": "boolean",
-          "default": false
-        },
-        "clawhub_token": {
-          "description": "Optional ClawhHub API token for authenticated skill downloads.\nObtain from https://clawhub.ai after signing in.\nSet via config: `clawhub_token = \"...\"` under `[skills]`.",
-          "type": ["string", "null"],
-          "default": null
-        },
         "open_skills_dir": {
           "description": "Optional path to a local open-skills repository.\nIf unset, defaults to `$HOME/open-skills` when enabled.",
           "type": ["string", "null"],
@@ -5391,17 +3084,9 @@
           "default": false
         },
         "prompt_injection_mode": {
-          "description": "Controls how skills are injected into the system prompt.\n`compact` (default) keeps context small and loads skills on demand.\n`full` preserves legacy behavior as an opt-in.",
+          "description": "Controls how skills are injected into the system prompt.\n`full` preserves legacy behavior. `compact` keeps context small and loads skills on demand.",
           "$ref": "#/$defs/SkillsPromptInjectionMode",
-          "default": "compact"
-        },
-        "trusted_skill_roots": {
-          "description": "Optional allowlist of canonical directory roots for workspace skill symlink targets.\nSymlinked workspace skills are rejected unless their resolved targets are under one\nof these roots. Accepts absolute paths and `~/` home-relative paths.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
+          "default": "full"
         }
       }
     },
@@ -5409,14 +3094,14 @@
       "description": "Skills loading configuration (`[skills]` section).",
       "oneOf": [
         {
-          "description": "Inline only compact skill metadata (name/description/location) and load details on demand.",
-          "type": "string",
-          "const": "compact"
-        },
-        {
           "description": "Inline full skill instructions and tool metadata into the system prompt.",
           "type": "string",
           "const": "full"
+        },
+        {
+          "description": "Inline only compact skill metadata (name/description/location) and load details on demand.",
+          "type": "string",
+          "const": "compact"
         }
       ]
     },
@@ -5441,28 +3126,8 @@
           "type": "string"
         },
         "channel_id": {
-          "description": "Optional channel ID to restrict the bot to a single channel.\nOmit (or set `\"*\"`) to listen across all accessible channels.\nIgnored when `channel_ids` is non-empty.",
+          "description": "Optional channel ID to restrict the bot to a single channel.\nOmit (or set `\"*\"`) to listen across all accessible channels.",
           "type": ["string", "null"]
-        },
-        "channel_ids": {
-          "description": "Explicit list of channel/DM IDs to listen on simultaneously.\nTakes precedence over `channel_id`. Empty = fall back to `channel_id`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         }
       },
       "required": ["bot_token"]
@@ -5480,8 +3145,7 @@
               "db_url": null,
               "provider": "",
               "schema": "public",
-              "table": "memories",
-              "tls": false
+              "table": "memories"
             }
           }
         }
@@ -5517,11 +3181,6 @@
           "description": "Table name for memory entries.",
           "type": "string",
           "default": "memories"
-        },
-        "tls": {
-          "description": "Enable TLS for the PostgreSQL connection.\n\n`true` — require TLS (skips certificate verification; suitable for\nself-signed certs and most managed databases).\n`false` (default) — plain TCP, backward-compatible.",
-          "type": "boolean",
-          "default": false
         }
       }
     },
@@ -5537,8 +3196,7 @@
             "db_url": null,
             "provider": "",
             "schema": "public",
-            "table": "memories",
-            "tls": false
+            "table": "memories"
           }
         }
       }
@@ -5555,203 +3213,8 @@
           "description": "Update a draft message with every flush interval.",
           "type": "string",
           "const": "partial"
-        },
-        {
-          "description": "Native streaming for channels that support draft updates directly.",
-          "type": "string",
-          "const": "on"
         }
       ]
-    },
-    "SubAgentsConfig": {
-      "description": "Background sub-agent orchestration controls (`[agent.subagents]` section).\n\nThis governs asynchronous delegation (`subagent_spawn`, `subagent_list`,\n`subagent_manage`).",
-      "type": "object",
-      "properties": {
-        "auto_activate": {
-          "description": "Allow automatic sub-agent selection when a specific agent is not given.",
-          "type": "boolean",
-          "default": true
-        },
-        "enabled": {
-          "description": "Enable background sub-agent tools.",
-          "type": "boolean",
-          "default": true
-        },
-        "inflight_penalty": {
-          "description": "Penalty multiplier applied to each currently in-flight task.",
-          "type": "integer",
-          "format": "uint",
-          "default": 10,
-          "minimum": 0
-        },
-        "load_window_secs": {
-          "description": "Sliding window (seconds) used to compute recent load/failure signals.",
-          "type": "integer",
-          "format": "uint",
-          "default": 180,
-          "minimum": 0
-        },
-        "max_concurrent": {
-          "description": "Maximum number of concurrently running background sub-agents.",
-          "type": "integer",
-          "format": "uint",
-          "default": 10,
-          "minimum": 0
-        },
-        "queue_poll_ms": {
-          "description": "Poll interval while waiting for a concurrency slot.",
-          "type": "integer",
-          "format": "uint",
-          "default": 200,
-          "minimum": 0
-        },
-        "queue_wait_ms": {
-          "description": "When at concurrency limit, wait this long for a slot before failing.\nSet to `0` for immediate fail-fast behavior.",
-          "type": "integer",
-          "format": "uint",
-          "default": 15000,
-          "minimum": 0
-        },
-        "recent_failure_penalty": {
-          "description": "Penalty multiplier applied to recent failure count in load window.",
-          "type": "integer",
-          "format": "uint",
-          "default": 16,
-          "minimum": 0
-        },
-        "recent_selection_penalty": {
-          "description": "Penalty multiplier applied to recent assignment count in load window.",
-          "type": "integer",
-          "format": "uint",
-          "default": 3,
-          "minimum": 0
-        },
-        "strategy": {
-          "description": "Runtime strategy used for automatic sub-agent selection.",
-          "$ref": "#/$defs/AgentLoadBalanceStrategy",
-          "default": "adaptive"
-        }
-      }
-    },
-    "SyscallAnomalyConfig": {
-      "description": "Syscall anomaly detection configuration.",
-      "type": "object",
-      "properties": {
-        "alert_cooldown_secs": {
-          "description": "Cooldown between identical anomaly alerts (seconds).",
-          "type": "integer",
-          "format": "uint64",
-          "default": 20,
-          "minimum": 0
-        },
-        "alert_on_unknown_syscall": {
-          "description": "Emit anomaly alerts when a syscall appears outside the expected baseline.",
-          "type": "boolean",
-          "default": true
-        },
-        "baseline_syscalls": {
-          "description": "Expected syscall baseline. Unknown syscall names trigger anomaly when enabled.",
-          "type": "array",
-          "default": [
-            "read",
-            "write",
-            "open",
-            "openat",
-            "close",
-            "stat",
-            "fstat",
-            "newfstatat",
-            "lseek",
-            "mmap",
-            "mprotect",
-            "munmap",
-            "brk",
-            "rt_sigaction",
-            "rt_sigprocmask",
-            "ioctl",
-            "fcntl",
-            "access",
-            "pipe2",
-            "dup",
-            "dup2",
-            "dup3",
-            "epoll_create1",
-            "epoll_ctl",
-            "epoll_wait",
-            "poll",
-            "ppoll",
-            "select",
-            "futex",
-            "clock_gettime",
-            "nanosleep",
-            "getpid",
-            "gettid",
-            "set_tid_address",
-            "set_robust_list",
-            "clone",
-            "clone3",
-            "fork",
-            "execve",
-            "wait4",
-            "exit",
-            "exit_group",
-            "socket",
-            "connect",
-            "accept",
-            "accept4",
-            "listen",
-            "sendto",
-            "recvfrom",
-            "sendmsg",
-            "recvmsg",
-            "getsockname",
-            "getpeername",
-            "setsockopt",
-            "getsockopt",
-            "getrandom",
-            "statx"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enabled": {
-          "description": "Enable syscall anomaly detection.",
-          "type": "boolean",
-          "default": true
-        },
-        "log_path": {
-          "description": "Path to syscall anomaly log file (relative to ~/.zeroclaw unless absolute).",
-          "type": "string",
-          "default": "syscall-anomalies.log"
-        },
-        "max_alerts_per_minute": {
-          "description": "Maximum anomaly alerts emitted per rolling minute (global guardrail).",
-          "type": "integer",
-          "format": "uint32",
-          "default": 30,
-          "minimum": 0
-        },
-        "max_denied_events_per_minute": {
-          "description": "Allowed denied-syscall events per rolling minute before triggering an alert.",
-          "type": "integer",
-          "format": "uint32",
-          "default": 5,
-          "minimum": 0
-        },
-        "max_total_events_per_minute": {
-          "description": "Allowed total syscall telemetry events per rolling minute before triggering an alert.",
-          "type": "integer",
-          "format": "uint32",
-          "default": 120,
-          "minimum": 0
-        },
-        "strict_mode": {
-          "description": "Treat denied syscall lines as anomalies even when syscall is in baseline.",
-          "type": "boolean",
-          "default": false
-        }
-      }
     },
     "TailscaleTunnelConfig": {
       "type": "object",
@@ -5771,22 +3234,12 @@
       "description": "Telegram bot channel configuration.",
       "type": "object",
       "properties": {
-        "ack_enabled": {
-          "description": "When true, send emoji reaction acknowledgments (⚡️, 👌, 👀, 🔥, 👍) to incoming messages.\nWhen false, no reaction is sent. Default is true.",
-          "type": "boolean",
-          "default": true
-        },
         "allowed_users": {
           "description": "Allowed Telegram user IDs or usernames. Empty = deny all.",
           "type": "array",
           "items": {
             "type": "string"
           }
-        },
-        "base_url": {
-          "description": "Optional custom base URL for Telegram-compatible APIs.\nDefaults to \"https://api.telegram.org\" when omitted.\nExample for Bale messenger: \"https://tapi.bale.ai\"",
-          "type": ["string", "null"],
-          "default": null
         },
         "bot_token": {
           "description": "Telegram Bot API token (from @BotFather).",
@@ -5799,18 +3252,6 @@
           "default": 1000,
           "minimum": 0
         },
-        "group_reply": {
-          "description": "Group-chat trigger controls.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GroupReplyConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "interrupt_on_new_message": {
           "description": "When true, a newer Telegram message from the same sender in the same chat\ncancels the in-flight request and starts a fresh response with preserved history.",
           "type": "boolean",
@@ -5820,11 +3261,6 @@
           "description": "When true, only respond to messages that @-mention the bot in groups.\nDirect messages are always processed.",
           "type": "boolean",
           "default": false
-        },
-        "progress_mode": {
-          "description": "Draft progress verbosity for streaming updates.",
-          "$ref": "#/$defs/ProgressMode",
-          "default": "compact"
         },
         "stream_mode": {
           "description": "Streaming mode for progressive response delivery via message edits.",
@@ -5838,11 +3274,6 @@
       "description": "Voice transcription configuration (Whisper API via Groq).",
       "type": "object",
       "properties": {
-        "api_key": {
-          "description": "API key used for transcription requests.\n\nIf unset, runtime falls back to `GROQ_API_KEY` for backward compatibility.",
-          "type": ["string", "null"],
-          "default": null
-        },
         "api_url": {
           "description": "Whisper API endpoint URL.",
           "type": "string",
@@ -5869,6 +3300,87 @@
           "description": "Whisper model name.",
           "type": "string",
           "default": "whisper-large-v3-turbo"
+        }
+      }
+    },
+    "TtsConfig": {
+      "description": "Text-to-Speech configuration (`[tts]`).",
+      "type": "object",
+      "properties": {
+        "default_format": {
+          "description": "Default audio output format (`\"mp3\"`, `\"opus\"`, `\"wav\"`).",
+          "type": "string",
+          "default": "mp3"
+        },
+        "default_provider": {
+          "description": "Default TTS provider (`\"openai\"`, `\"elevenlabs\"`, `\"google\"`, `\"edge\"`).",
+          "type": "string",
+          "default": "openai"
+        },
+        "default_voice": {
+          "description": "Default voice ID passed to the selected provider.",
+          "type": "string",
+          "default": "alloy"
+        },
+        "edge": {
+          "description": "Edge TTS provider configuration (`[tts.edge]`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeTtsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "elevenlabs": {
+          "description": "ElevenLabs TTS provider configuration (`[tts.elevenlabs]`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElevenLabsTtsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "enabled": {
+          "description": "Enable TTS synthesis.",
+          "type": "boolean",
+          "default": false
+        },
+        "google": {
+          "description": "Google Cloud TTS provider configuration (`[tts.google]`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GoogleTtsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "max_text_length": {
+          "description": "Maximum input text length in characters (default 4096).",
+          "type": "integer",
+          "format": "uint",
+          "default": 4096,
+          "minimum": 0
+        },
+        "openai": {
+          "description": "OpenAI TTS provider configuration (`[tts.openai]`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpenAiTtsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       }
     },
@@ -5931,245 +3443,6 @@
       },
       "required": ["provider"]
     },
-    "UrlAccessConfig": {
-      "description": "Shared URL validation configuration used by network tools.",
-      "type": "object",
-      "properties": {
-        "allow_cidrs": {
-          "description": "Explicit CIDR ranges that bypass private/local-IP blocking.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "allow_domains": {
-          "description": "Explicit domain patterns that bypass private/local-IP blocking.\nSupports exact, `*.example.com`, and `*`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "allow_loopback": {
-          "description": "Allow loopback host/IP access (`localhost`, `127.0.0.1`, `::1`).",
-          "type": "boolean",
-          "default": false
-        },
-        "approved_domains": {
-          "description": "Persisted first-visit approvals granted by a human operator.\nSupports exact, `*.example.com`, and `*`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "block_private_ip": {
-          "description": "Block private/local IPs and hostnames by default.",
-          "type": "boolean",
-          "default": true
-        },
-        "domain_allowlist": {
-          "description": "Global trusted domain allowlist shared by all URL-based network tools.\nSupports exact, `*.example.com`, and `*`.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "domain_blocklist": {
-          "description": "Global domain blocklist shared by all URL-based network tools.\nSupports exact, `*.example.com`, and `*`. Takes priority over allowlists.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "enforce_domain_allowlist": {
-          "description": "Enforce a global domain allowlist in addition to per-tool allowlists.\nWhen enabled, hosts must match `domain_allowlist`.",
-          "type": "boolean",
-          "default": false
-        },
-        "require_first_visit_approval": {
-          "description": "Require explicit human confirmation before first-time access to an\nunseen domain. Confirmed domains are persisted in `approved_domains`.",
-          "type": "boolean",
-          "default": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "WasmCapabilityEscalationMode": {
-      "description": "How to handle invocation capabilities that exceed baseline runtime policy.",
-      "oneOf": [
-        {
-          "description": "Reject any invocation that asks for capabilities above runtime config.",
-          "type": "string",
-          "const": "deny"
-        },
-        {
-          "description": "Automatically clamp invocation capabilities to runtime config ceilings.",
-          "type": "string",
-          "const": "clamp"
-        }
-      ]
-    },
-    "WasmConfig": {
-      "description": "WASM plugin engine configuration (`[wasm]` section).\n\nControls limits applied to every WASM tool invocation.\nRequires the `wasm-tools` compile-time feature to have any effect.",
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable loading WASM tools from installed skill packages.\nDefault: `true` (auto-discovers plugins in the skills directory).",
-          "type": "boolean",
-          "default": true
-        },
-        "fuel_limit": {
-          "description": "CPU fuel budget per invocation (roughly one unit ≈ one WASM instruction).\nDefault: 1_000_000_000.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 1000000000,
-          "minimum": 0
-        },
-        "memory_limit_mb": {
-          "description": "Maximum linear memory per WASM invocation in MiB.\nValid range: 1..=256. Default: `64`.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 64,
-          "minimum": 0
-        },
-        "registry_url": {
-          "description": "URL of the ZeroMarket (or compatible) registry used by `zeroclaw skill install`.\nDefault: the public ZeroMarket registry.",
-          "type": "string",
-          "default": "https://zeromarket.vercel.app/api"
-        }
-      }
-    },
-    "WasmModuleHashPolicy": {
-      "description": "Integrity policy for WASM modules pinned by SHA-256 digest.",
-      "oneOf": [
-        {
-          "description": "Disable module hash validation.",
-          "type": "string",
-          "const": "disabled"
-        },
-        {
-          "description": "Warn on missing or mismatched hashes, but allow execution.",
-          "type": "string",
-          "const": "warn"
-        },
-        {
-          "description": "Require exact hash match before execution.",
-          "type": "string",
-          "const": "enforce"
-        }
-      ]
-    },
-    "WasmRuntimeConfig": {
-      "description": "WASM runtime configuration (`[runtime.wasm]` section).",
-      "type": "object",
-      "properties": {
-        "allow_workspace_read": {
-          "description": "Allow reading files from workspace inside WASM host calls (future-facing).",
-          "type": "boolean",
-          "default": false
-        },
-        "allow_workspace_write": {
-          "description": "Allow writing files to workspace inside WASM host calls (future-facing).",
-          "type": "boolean",
-          "default": false
-        },
-        "allowed_hosts": {
-          "description": "Explicit host allowlist for outbound HTTP from WASM modules (future-facing).",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "fuel_limit": {
-          "description": "Fuel limit per invocation (instruction budget).",
-          "type": "integer",
-          "format": "uint64",
-          "default": 1000000,
-          "minimum": 0
-        },
-        "max_module_size_mb": {
-          "description": "Maximum `.wasm` module size in MB.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 50,
-          "minimum": 0
-        },
-        "memory_limit_mb": {
-          "description": "Memory limit per invocation in MB.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 64,
-          "minimum": 0
-        },
-        "security": {
-          "description": "WASM runtime security controls (`[runtime.wasm.security]` section).",
-          "$ref": "#/$defs/WasmSecurityConfig",
-          "default": {
-            "capability_escalation_mode": "deny",
-            "module_hash_policy": "warn",
-            "module_sha256": {},
-            "reject_symlink_modules": true,
-            "reject_symlink_tools_dir": true,
-            "require_workspace_relative_tools_dir": true,
-            "strict_host_validation": true
-          }
-        },
-        "tools_dir": {
-          "description": "Workspace-relative directory that stores `.wasm` modules.",
-          "type": "string",
-          "default": "tools/wasm"
-        }
-      }
-    },
-    "WasmSecurityConfig": {
-      "description": "Security policy controls for WASM runtime hardening.",
-      "type": "object",
-      "properties": {
-        "capability_escalation_mode": {
-          "description": "Capability escalation handling policy.",
-          "$ref": "#/$defs/WasmCapabilityEscalationMode",
-          "default": "deny"
-        },
-        "module_hash_policy": {
-          "description": "Module digest verification policy.",
-          "$ref": "#/$defs/WasmModuleHashPolicy",
-          "default": "warn"
-        },
-        "module_sha256": {
-          "description": "Optional pinned SHA-256 digest map keyed by module name (without `.wasm`).",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        },
-        "reject_symlink_modules": {
-          "description": "Reject module files that are symlinks before execution.",
-          "type": "boolean",
-          "default": true
-        },
-        "reject_symlink_tools_dir": {
-          "description": "Reject `runtime.wasm.tools_dir` when it is itself a symlink.",
-          "type": "boolean",
-          "default": true
-        },
-        "require_workspace_relative_tools_dir": {
-          "description": "Require `runtime.wasm.tools_dir` to stay workspace-relative and traversal-free.",
-          "type": "boolean",
-          "default": true
-        },
-        "strict_host_validation": {
-          "description": "Strictly validate host allowlist entries (`host` or `host:port` only).",
-          "type": "boolean",
-          "default": true
-        }
-      }
-    },
     "WatiConfig": {
       "description": "WATI WhatsApp Business API channel configuration.",
       "type": "object",
@@ -6195,11 +3468,6 @@
           "description": "Tenant ID for multi-channel setups (optional).",
           "type": ["string", "null"],
           "default": null
-        },
-        "webhook_secret": {
-          "description": "Shared secret for WATI webhook authentication.\n\nSupports `X-Hub-Signature-256` HMAC verification and Bearer-token fallback.\nCan also be set via `ZEROCLAW_WATI_WEBHOOK_SECRET`.\nDefault: `None` (unset).\nCompatibility/migration: additive key for existing deployments; set this\nbefore enabling inbound WATI webhooks. Remove (or set null) to roll back.",
-          "type": ["string", "null"],
-          "default": null
         }
       },
       "required": ["api_token"]
@@ -6215,16 +3483,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "api_key": {
-          "description": "Optional provider API key (required for provider = \"firecrawl\" or \"tavily\").\nMultiple keys can be comma-separated for round-robin load balancing.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "api_url": {
-          "description": "Optional provider API URL override (for self-hosted providers)",
-          "type": ["string", "null"],
-          "default": null
         },
         "blocked_domains": {
           "description": "Blocked domains (exact or subdomain match; always takes priority over allowed_domains)",
@@ -6246,22 +3504,12 @@
           "default": 500000,
           "minimum": 0
         },
-        "provider": {
-          "description": "Provider: \"fast_html2md\", \"nanohtml2text\", \"firecrawl\", or \"tavily\"",
-          "type": "string",
-          "default": "fast_html2md"
-        },
         "timeout_secs": {
           "description": "Request timeout in seconds (default: 30)",
           "type": "integer",
           "format": "uint64",
           "default": 30,
           "minimum": 0
-        },
-        "user_agent": {
-          "description": "User-Agent string sent with fetch requests (env: ZEROCLAW_WEB_FETCH_USER_AGENT)",
-          "type": "string",
-          "default": "ZeroClaw/1.0"
         }
       }
     },
@@ -6269,82 +3517,15 @@
       "description": "Web search tool configuration (`[web_search]` section).",
       "type": "object",
       "properties": {
-        "api_key": {
-          "description": "Generic provider API key (used by firecrawl, tavily, and as fallback for brave).\nMultiple keys can be comma-separated for round-robin load balancing.",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "api_url": {
-          "description": "Optional provider API URL override (for self-hosted providers)",
-          "type": ["string", "null"],
-          "default": null
-        },
         "brave_api_key": {
           "description": "Brave Search API key (required if provider is \"brave\")",
           "type": ["string", "null"],
           "default": null
         },
-        "country": {
-          "description": "Optional country filter forwarded to providers that support it (e.g. \"US\")",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "domain_filter": {
-          "description": "Optional domain filter forwarded to providers that support it",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
         "enabled": {
           "description": "Enable `web_search_tool` for web searches",
           "type": "boolean",
           "default": false
-        },
-        "exa_api_key": {
-          "description": "Exa API key (used when provider is \"exa\")",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "exa_include_text": {
-          "description": "Include textual content payloads for Exa search responses",
-          "type": "boolean",
-          "default": false
-        },
-        "exa_search_type": {
-          "description": "Exa search type override: \"auto\" (default), \"keyword\", or \"neural\"",
-          "type": "string",
-          "default": "auto"
-        },
-        "fallback_providers": {
-          "description": "Fallback providers attempted after primary provider fails.\nSupported values: duckduckgo (or ddg), brave, firecrawl, tavily, perplexity, exa, jina",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "jina_api_key": {
-          "description": "Jina API key (optional; can raise limits for provider = \"jina\")",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "jina_site_filters": {
-          "description": "Optional site filters for Jina search provider",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "language_filter": {
-          "description": "Optional language filter forwarded to providers that support it",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
         },
         "max_results": {
           "description": "Maximum results per search (1-10)",
@@ -6353,48 +3534,10 @@
           "default": 5,
           "minimum": 0
         },
-        "max_tokens": {
-          "description": "Optional max tokens cap used by provider-specific APIs (for example Perplexity)",
-          "type": ["integer", "null"],
-          "format": "uint32",
-          "default": null,
-          "minimum": 0
-        },
-        "max_tokens_per_page": {
-          "description": "Optional per-result token cap used by provider-specific APIs",
-          "type": ["integer", "null"],
-          "format": "uint32",
-          "default": null,
-          "minimum": 0
-        },
-        "perplexity_api_key": {
-          "description": "Perplexity API key (used when provider is \"perplexity\")",
-          "type": ["string", "null"],
-          "default": null
-        },
         "provider": {
-          "description": "Search provider: \"duckduckgo\"/\"ddg\" (free, no API key), \"brave\", \"firecrawl\",\n\"tavily\", \"perplexity\", \"exa\", or \"jina\"",
+          "description": "Search provider: \"duckduckgo\" (free, no API key) or \"brave\" (requires API key)",
           "type": "string",
           "default": "duckduckgo"
-        },
-        "recency_filter": {
-          "description": "Optional recency filter forwarded to providers that support it",
-          "type": ["string", "null"],
-          "default": null
-        },
-        "retries_per_provider": {
-          "description": "Retry count per provider before falling back to next provider",
-          "type": "integer",
-          "format": "uint32",
-          "default": 0,
-          "minimum": 0
-        },
-        "retry_backoff_ms": {
-          "description": "Retry backoff in milliseconds between provider retry attempts",
-          "type": "integer",
-          "format": "uint64",
-          "default": 250,
-          "minimum": 0
         },
         "timeout_secs": {
           "description": "Request timeout in seconds",
@@ -6402,11 +3545,6 @@
           "format": "uint64",
           "default": 15,
           "minimum": 0
-        },
-        "user_agent": {
-          "description": "User-Agent string sent with search requests (env: ZEROCLAW_WEB_SEARCH_USER_AGENT)",
-          "type": "string",
-          "default": "ZeroClaw/1.0"
         }
       }
     },

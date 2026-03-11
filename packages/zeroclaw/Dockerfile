@@ -1,6 +1,6 @@
-FROM rust:1.92-alpine AS builder
+FROM rust:1.94-alpine AS builder
 
-RUN apk add --no-cache musl-dev git
+RUN apk add --no-cache musl-dev git pkgconf
 
 WORKDIR /app
 

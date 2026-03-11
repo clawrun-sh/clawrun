@@ -28,16 +28,12 @@
 
 use super::AppState;
 use crate::agent::loop_::{
-    build_shell_policy_instructions, build_tool_instructions_from_specs,
-    create_cost_enforcement_context, scope_cost_enforcement_context,
-    run_tool_call_loop_with_non_cli_approval_context, NonCliApprovalContext,
-    NonCliApprovalPrompt, SafetyHeartbeatConfig,
-    DRAFT_CLEAR_SENTINEL, DRAFT_PROGRESS_BLOCK_SENTINEL, DRAFT_PROGRESS_SENTINEL,
+    build_tool_instructions, run_tool_call_loop, is_tool_loop_cancelled,
+    DRAFT_CLEAR_SENTINEL,
 };
-use crate::approval::{ApprovalManager, ApprovalResponse};
-use crate::config::ProgressMode;
 use crate::memory::MemoryCategory;
 use crate::providers::ChatMessage;
+use crate::security::SecurityPolicy;
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -264,19 +260,10 @@ fn build_ws_system_prompt(
         config.skills.prompt_injection_mode,
     );
     if !native_tools {
-        prompt.push_str(&build_tool_instructions_from_specs(&tool_specs));
+        prompt.push_str(&build_tool_instructions(tools_registry));
     }
-    prompt.push_str(&build_shell_policy_instructions(&config.autonomy));
 
     prompt
-}
-
-fn refresh_ws_history_system_prompt_datetime(history: &mut [ChatMessage]) {
-    if let Some(system_message) = history.first_mut() {
-        if system_message.role == "system" {
-            crate::agent::prompt::refresh_prompt_datetime(&mut system_message.content);
-        }
-    }
 }
 
 /// Estimate tokens for a single message.
@@ -424,25 +411,35 @@ fn evaluate_ws_auth(
 }
 
 // ---------------------------------------------------------------------------
-// Sentinel parser — converts on_delta strings to structured WS messages
+// Delta parser — converts on_delta strings to structured WS messages
 // ---------------------------------------------------------------------------
 
 /// Parse an on_delta string into a structured JSON WebSocket message.
 ///
-/// The tool loop already emits these sentinels via `on_delta`:
-///   - `DRAFT_CLEAR_SENTINEL`          → `{"type":"clear"}`
-///   - `DRAFT_PROGRESS_SENTINEL`       → `{"type":"status","content":"..."}`
-///   - `DRAFT_PROGRESS_BLOCK_SENTINEL` → `{"type":"tool_progress","content":"..."}`
-///   - plain text                      → `{"type":"chunk","content":"..."}`
+/// The tool loop emits these via `on_delta`:
+///   - `DRAFT_CLEAR_SENTINEL`        → `{"type":"clear"}`
+///   - `🤔 Thinking...\n`            → `{"type":"status","content":"..."}`
+///   - `💬 Got N tool call(s)...\n`   → `{"type":"status","content":"..."}`
+///   - `⏳ tool_name: hint\n`         → `{"type":"tool_progress","content":"..."}`
+///   - `✅ tool_name (Ns)\n`          → `{"type":"tool_progress","content":"..."}`
+///   - `❌ tool_name (Ns)\n`          → `{"type":"tool_progress","content":"..."}`
+///   - plain text                     → `{"type":"chunk","content":"..."}`
 fn parse_delta_sentinel(delta: &str) -> serde_json::Value {
     if delta == DRAFT_CLEAR_SENTINEL {
         json!({"type": "clear"})
-    } else if let Some(content) = delta.strip_prefix(DRAFT_PROGRESS_SENTINEL) {
-        json!({"type": "status", "content": content})
-    } else if let Some(content) = delta.strip_prefix(DRAFT_PROGRESS_BLOCK_SENTINEL) {
-        json!({"type": "tool_progress", "content": content})
     } else {
-        json!({"type": "chunk", "content": delta})
+        let trimmed = delta.trim_start();
+        // Status indicators: 🤔 (U+1F914) and 💬 (U+1F4AC)
+        if trimmed.starts_with('\u{1F914}') || trimmed.starts_with('\u{1F4AC}') {
+            json!({"type": "status", "content": delta})
+        }
+        // Tool progress indicators: ⏳ (U+23F3), ✅ (U+2705), ❌ (U+274C)
+        else if trimmed.starts_with('\u{23F3}') || trimmed.starts_with('\u{2705}') || trimmed.starts_with('\u{274C}') {
+            json!({"type": "tool_progress", "content": delta})
+        }
+        else {
+            json!({"type": "chunk", "content": delta})
+        }
     }
 }
 
@@ -580,6 +577,32 @@ fn build_enriched_response(new_messages: &[ChatMessage], final_response: &str) -
 // WebSocket handler
 // ---------------------------------------------------------------------------
 
+/// Detect whether a request originates from the loopback interface.
+/// Checks the peer socket address and, if `trust_forwarded` is enabled,
+/// the `X-Forwarded-For` / `X-Real-IP` headers.
+fn is_ws_loopback(peer: Option<SocketAddr>, headers: &HeaderMap, trust_forwarded: bool) -> bool {
+    if let Some(addr) = peer {
+        if addr.ip().is_loopback() {
+            return true;
+        }
+    }
+    if trust_forwarded {
+        if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            let first_ip = xff.split(',').next().unwrap_or("").trim();
+            if first_ip == "127.0.0.1" || first_ip == "::1" {
+                return true;
+            }
+        }
+        if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+            let trimmed = real_ip.trim();
+            if trimmed == "127.0.0.1" || trimmed == "::1" {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// GET /ws/clawrun — Streaming WebSocket upgrade for agent chat
 pub async fn handle_ws_clawrun(
     State(state): State<AppState>,
@@ -593,7 +616,7 @@ pub async fn handle_ws_clawrun(
         extract_ws_bearer_token(&headers, query_params.token.as_deref()).unwrap_or_default();
     let has_valid_pairing_token = !token.is_empty() && state.pairing.is_authenticated(&token);
     let is_loopback_request =
-        super::is_loopback_request(Some(peer_addr), &headers, state.trust_forwarded_headers);
+        is_ws_loopback(Some(peer_addr), &headers, state.trust_forwarded_headers);
 
     match evaluate_ws_auth(
         state.pairing.require_pairing(),
@@ -626,24 +649,53 @@ pub async fn handle_ws_clawrun(
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
-    // Build system prompt and approval manager once for the session.
-    // The ApprovalManager is session-scoped so "Always" grants persist across
-    // turns within the same WebSocket connection (matches native channel behavior).
-    let (system_prompt, approval_manager) = {
-        let config_guard = state.config.lock();
-        let prompt = build_ws_system_prompt(
-            &config_guard,
-            &state.model,
-            state.tools_registry_exec.as_ref(),
-            state.provider.supports_native_tools(),
+    // Build executable tools registry from config (same as channels do).
+    // AppState only holds ToolSpec (metadata), so we need to create the
+    // actual executable tools here.
+    let (tools_registry, system_prompt, max_tool_iterations, excluded_tools) = {
+        let config = state.config.lock().clone();
+        let security = Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+        ));
+        let runtime: Arc<dyn crate::runtime::RuntimeAdapter> = match crate::runtime::create_runtime(&config.runtime) {
+            Ok(rt) => Arc::from(rt),
+            Err(e) => {
+                tracing::error!("ws_clawrun: failed to create runtime: {e}");
+                return;
+            }
+        };
+        let (composio_key, composio_entity_id) = if config.composio.enabled {
+            (
+                config.composio.api_key.as_deref(),
+                Some(config.composio.entity_id.as_str()),
+            )
+        } else {
+            (None, None)
+        };
+        let tools = crate::tools::all_tools_with_runtime(
+            Arc::new(config.clone()),
+            &security,
+            runtime,
+            Arc::clone(&state.mem),
+            composio_key,
+            composio_entity_id,
+            &config.browser,
+            &config.http_request,
+            &config.web_fetch,
+            &config.workspace_dir,
+            &config.agents,
+            config.api_key.as_deref(),
+            &config,
         );
-        let mgr = Arc::new(ApprovalManager::from_config(&config_guard.autonomy));
-        (prompt, mgr)
+        let native_tools = state.provider.supports_native_tools();
+        let prompt = build_ws_system_prompt(&config, &state.model, &tools, native_tools);
+        let max_iters = config.agent.max_tool_iterations;
+        let excluded = config.autonomy.non_cli_excluded_tools.clone();
+        (tools, prompt, max_iters, excluded)
     };
 
-    // Split the socket into sender/receiver halves so we can read (for approval
-    // responses and disconnect detection) concurrently with writing (for deltas
-    // and approval prompts) during the tool loop.
+    // Split the socket into sender/receiver halves for concurrent read/write.
     let (ws_sender, mut ws_receiver) = socket.split();
     let ws_sender = Arc::new(tokio::sync::Mutex::new(ws_sender));
 
@@ -702,29 +754,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             continue;
         }
 
-        // Security: perplexity filter
-        let perplexity_cfg = { state.config.lock().security.perplexity_filter.clone() };
-        if let Some(assessment) =
-            crate::security::detect_adversarial_suffix(&content, &perplexity_cfg)
-        {
-            let err = json!({
-                "type": "error",
-                "message": format!(
-                    "Input blocked by security.perplexity_filter: perplexity={:.2} (threshold {:.2}), symbol_ratio={:.2} (threshold {:.2}), suspicious_tokens={}.",
-                    assessment.perplexity,
-                    perplexity_cfg.perplexity_threshold,
-                    assessment.symbol_ratio,
-                    perplexity_cfg.symbol_ratio_threshold,
-                    assessment.suspicious_token_count
-                ),
-            });
-            let _ = ws_sender.lock().await.send(Message::Text(err.to_string().into())).await;
-            continue;
-        }
-
-        // Refresh datetime in system prompt
-        refresh_ws_history_system_prompt_datetime(&mut history);
-
         // Add to in-memory cache (like append_sender_turn)
         append_ws_turn(&thread_id, ChatMessage::user(&content));
 
@@ -777,46 +806,29 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         // Capture length before tool loop so we can extract new messages after
         let llm_len_before_loop = llm_history.len();
 
-        // Get provider info, cost enforcement, safety config, and excluded tools
-        let (
-            provider_label,
-            timeout_secs,
-            cost_ctx,
-            safety_heartbeat,
-            canary_tokens,
-            excluded_tools_snapshot,
-        ) = {
+        // Get provider info and multimodal config
+        let (provider_label, timeout_secs, multimodal_config) = {
             let config = state.config.lock();
             let label = config
                 .default_provider
                 .clone()
                 .unwrap_or_else(|| "unknown".to_string());
-            let scale = (state.max_tool_iterations as u64)
+            let scale = (max_tool_iterations as u64)
                 .max(1)
                 .min(TOOL_LOOP_TIMEOUT_SCALE_CAP);
             let timeout = TOOL_LOOP_BASE_TIMEOUT_SECS.saturating_mul(scale);
-            let cost = create_cost_enforcement_context(&config.cost, &config.workspace_dir);
-            let heartbeat = if config.agent.safety_heartbeat_interval > 0 {
-                let security = crate::security::SecurityPolicy::from_config(
-                    &config.autonomy,
-                    &config.workspace_dir,
-                );
-                Some(SafetyHeartbeatConfig {
-                    body: security.summary_for_heartbeat(),
-                    interval: config.agent.safety_heartbeat_interval,
-                })
-            } else {
-                None
-            };
-            let canary = config.security.canary_tokens;
-            let excluded = config.autonomy.non_cli_excluded_tools.clone();
-            (label, timeout, cost, heartbeat, canary, excluded)
+            let multimodal = config.multimodal.clone();
+            (label, timeout, multimodal)
         };
 
-        // Configured hooks for on_message_received / on_response
-        let configured_hooks = {
+        // Configured hooks
+        let configured_hooks: Option<Arc<crate::hooks::HookRunner>> = {
             let config = state.config.lock();
-            crate::hooks::create_runner_from_config(&config.hooks)
+            if config.hooks.enabled {
+                Some(Arc::new(crate::hooks::HookRunner::new()))
+            } else {
+                None
+            }
         };
 
         // Broadcast agent_start event
@@ -825,35 +837,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             "provider": &provider_label,
             "model": &state.model,
         }));
-
-        // ── Non-CLI approval context (matches channels/mod.rs) ──
-        // The prompt_tx sends approval prompts to the dispatcher which relays
-        // them over the WebSocket. The tool loop polls the ApprovalManager for
-        // resolved decisions.
-        let (approval_prompt_tx, mut approval_prompt_rx) =
-            tokio::sync::mpsc::unbounded_channel::<NonCliApprovalPrompt>();
-        let non_cli_approval_context = Some(NonCliApprovalContext {
-            sender: thread_id.clone(),
-            reply_target: thread_id.clone(),
-            prompt_tx: approval_prompt_tx,
-        });
-
-        // Spawn approval prompt dispatcher — sends prompts to client over WS
-        let sender_for_approval = ws_sender.clone();
-        let approval_prompt_dispatcher = tokio::spawn(async move {
-            while let Some(prompt) = approval_prompt_rx.recv().await {
-                let msg = json!({
-                    "type": "approval_required",
-                    "request_id": prompt.request_id,
-                    "tool_name": prompt.tool_name,
-                    "arguments": prompt.arguments,
-                });
-                let mut sender = sender_for_approval.lock().await;
-                if sender.send(Message::Text(msg.to_string().into())).await.is_err() {
-                    break;
-                }
-            }
-        });
 
         // ── Cancellation token ──
         // Cancelled when the WebSocket disconnects during the tool loop.
@@ -876,15 +859,9 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         });
 
         // Spawn reader task — reads from the WebSocket stream during the tool
-        // loop. Handles two concerns:
-        //   1. Approval responses: client sends {"type":"approval_response",
-        //      "request_id":"...", "decision":"yes"/"no"} → resolved in the
-        //      ApprovalManager so the polling loop picks it up.
-        //   2. Disconnect detection: WebSocket close/error → cancel the tool
-        //      loop via the cancellation token.
+        // loop for disconnect detection. Cancels the tool loop if the client
+        // disconnects.
         let cancellation_for_reader = cancellation_token.clone();
-        let approval_mgr_for_reader = approval_manager.clone();
-        let reader_thread_id = thread_id.clone();
         let reader_task = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -892,45 +869,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
                     () = cancellation_for_reader.cancelled() => break,
                     msg = ws_receiver.next() => {
                         match msg {
-                            Some(Ok(Message::Text(text))) => {
-                                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&*text) {
-                                    if parsed["type"] == "approval_response" {
-                                        let request_id = parsed["request_id"].as_str().unwrap_or("");
-                                        let decision = match parsed["decision"].as_str().unwrap_or("") {
-                                            "yes" => ApprovalResponse::Yes,
-                                            "always" => ApprovalResponse::Always,
-                                            _ => ApprovalResponse::No,
-                                        };
-                                        // Confirm or reject the pending request so the
-                                        // polling loop in await_non_cli_approval_decision
-                                        // picks up the resolution.
-                                        if decision == ApprovalResponse::Yes || decision == ApprovalResponse::Always {
-                                            let _ = approval_mgr_for_reader.confirm_non_cli_pending_request(
-                                                request_id,
-                                                &reader_thread_id,
-                                                "ws_clawrun",
-                                                &reader_thread_id,
-                                            );
-                                            if decision == ApprovalResponse::Always {
-                                                approval_mgr_for_reader.grant_non_cli_session(
-                                                    parsed["tool_name"].as_str().unwrap_or(""),
-                                                );
-                                            }
-                                        } else {
-                                            let _ = approval_mgr_for_reader.reject_non_cli_pending_request(
-                                                request_id,
-                                                &reader_thread_id,
-                                                "ws_clawrun",
-                                                &reader_thread_id,
-                                            );
-                                        }
-                                        approval_mgr_for_reader.record_non_cli_pending_resolution(
-                                            request_id,
-                                            decision,
-                                        );
-                                    }
-                                    // Ignore other message types during tool loop
-                                }
+                            Some(Ok(Message::Text(_))) => {
+                                // Ignore messages during tool loop
                             }
                             Some(Ok(Message::Close(_))) | Some(Err(_)) | None => {
                                 // WebSocket disconnected — cancel the in-flight tool loop
@@ -942,49 +882,38 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
                     }
                 }
             }
-            // Return the receiver half so we can reunite the socket
+            // Return the receiver half so we can reuse it
             ws_receiver
         });
 
-        // Run tool loop with full enforcement: cost tracking, approval,
-        // safety heartbeat, canary tokens, excluded tools, and hooks —
-        // matching native channel behavior.
+        // Run tool loop — matches native channel calling convention.
         let result = tokio::time::timeout(
             Duration::from_secs(timeout_secs),
-            scope_cost_enforcement_context(
-                cost_ctx,
-                run_tool_call_loop_with_non_cli_approval_context(
-                    state.provider.as_ref(),
-                    &mut llm_history,
-                    state.tools_registry_exec.as_ref(),
-                    state.observer.as_ref(),
-                    &provider_label,
-                    &state.model,
-                    state.temperature,
-                    true,                                   // silent
-                    Some(approval_manager.as_ref()),         // approval manager
-                    "ws_clawrun",
-                    non_cli_approval_context,                // non-CLI approval context
-                    &state.multimodal,
-                    state.max_tool_iterations,
-                    Some(cancellation_token.clone()),        // cancellation token
-                    Some(delta_tx),                          // on_delta
-                    configured_hooks.as_deref(),             // hooks
-                    &excluded_tools_snapshot,                // excluded tools
-                    ProgressMode::Verbose,                   // progress_mode
-                    safety_heartbeat,                        // safety heartbeat
-                    canary_tokens,                           // canary tokens
-                ),
+            run_tool_call_loop(
+                state.provider.as_ref(),
+                &mut llm_history,
+                &tools_registry,
+                state.observer.as_ref(),
+                &provider_label,
+                &state.model,
+                state.temperature,
+                true,                                   // silent
+                None,                                   // approval (full autonomy)
+                "ws_clawrun",
+                &multimodal_config,
+                max_tool_iterations,
+                Some(cancellation_token.clone()),        // cancellation token
+                Some(delta_tx),                          // on_delta
+                configured_hooks.as_deref(),             // hooks
+                &excluded_tools,                         // excluded tools
             ),
         )
         .await;
 
-        // Wait for the delta forwarder and approval dispatcher to drain.
+        // Wait for the delta forwarder to drain.
         let _ = delta_forwarder.await;
-        let _ = approval_prompt_dispatcher.await;
 
-        // Stop the reader task: cancel its token (if not already cancelled by
-        // disconnect) and reclaim the receiver half of the socket.
+        // Stop the reader task and reclaim the receiver half of the socket.
         cancellation_token.cancel();
         ws_receiver = match reader_task.await {
             Ok(receiver) => receiver,
@@ -1065,7 +994,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             }
             Err(e) => {
                 // Check if the tool loop was cancelled (WS disconnect)
-                if crate::agent::loop_::is_tool_loop_cancelled(&e) {
+                if is_tool_loop_cancelled(&e) {
                     tracing::info!(
                         "ws_clawrun: tool loop cancelled (client disconnected) — thread {}",
                         thread_id
@@ -1117,20 +1046,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_delta_sentinel_progress() {
-        let msg = parse_delta_sentinel(&format!("{DRAFT_PROGRESS_SENTINEL}🤔 Thinking..."));
-        assert_eq!(msg["type"], "status");
-        assert_eq!(msg["content"], "🤔 Thinking...");
-    }
-
-    #[test]
-    fn parse_delta_sentinel_progress_block() {
-        let msg = parse_delta_sentinel(&format!("{DRAFT_PROGRESS_BLOCK_SENTINEL}🔧 shell ⏳"));
-        assert_eq!(msg["type"], "tool_progress");
-        assert_eq!(msg["content"], "🔧 shell ⏳");
-    }
-
-    #[test]
     fn parse_delta_sentinel_plain_text() {
         let msg = parse_delta_sentinel("Hello, this is the answer");
         assert_eq!(msg["type"], "chunk");
@@ -1142,6 +1057,55 @@ mod tests {
         let msg = parse_delta_sentinel("");
         assert_eq!(msg["type"], "chunk");
         assert_eq!(msg["content"], "");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_thinking_status() {
+        let msg = parse_delta_sentinel("🤔 Thinking...\n");
+        assert_eq!(msg["type"], "status");
+        assert_eq!(msg["content"], "🤔 Thinking...\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_thinking_round_status() {
+        let msg = parse_delta_sentinel("🤔 Thinking (round 3)...\n");
+        assert_eq!(msg["type"], "status");
+        assert_eq!(msg["content"], "🤔 Thinking (round 3)...\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_got_tool_calls_status() {
+        let msg = parse_delta_sentinel("💬 Got 2 tool call(s) (1.5s)\n");
+        assert_eq!(msg["type"], "status");
+        assert_eq!(msg["content"], "💬 Got 2 tool call(s) (1.5s)\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_tool_pending() {
+        let msg = parse_delta_sentinel("⏳ shell\n");
+        assert_eq!(msg["type"], "tool_progress");
+        assert_eq!(msg["content"], "⏳ shell\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_tool_pending_with_hint() {
+        let msg = parse_delta_sentinel("⏳ shell: ls -la\n");
+        assert_eq!(msg["type"], "tool_progress");
+        assert_eq!(msg["content"], "⏳ shell: ls -la\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_tool_success() {
+        let msg = parse_delta_sentinel("✅ shell (2s)\n");
+        assert_eq!(msg["type"], "tool_progress");
+        assert_eq!(msg["content"], "✅ shell (2s)\n");
+    }
+
+    #[test]
+    fn parse_delta_sentinel_tool_failure() {
+        let msg = parse_delta_sentinel("❌ shell (3s)\n");
+        assert_eq!(msg["type"], "tool_progress");
+        assert_eq!(msg["content"], "❌ shell (3s)\n");
     }
 
     // --- Duplicated utility tests ---
@@ -1361,9 +1325,6 @@ mod tests {
     #[test]
     fn trim_ws_history_preserves_system_prompt() {
         let mut history = vec![ChatMessage::system("system")];
-        // Add enough messages to exceed WS_CONTEXT_TOKEN_LIMIT (90K tokens)
-        // Each "msg N" ≈ 6-7 chars → ~6 tokens. Need 90K/6 ≈ 15000 messages.
-        // Use larger messages instead: 600 chars each → ~204 tokens.
         let big = "a".repeat(600);
         for _ in 0..500 {
             history.push(ChatMessage::user(&big));
@@ -1374,7 +1335,7 @@ mod tests {
         trim_ws_history_to_budget(&mut history);
         assert_eq!(history[0].role, "system");
         let total_after: usize = history.iter().map(estimated_message_tokens).sum();
-        assert!(total_after <= WS_CONTEXT_TOKEN_TARGET + 250); // within target + one message
+        assert!(total_after <= WS_CONTEXT_TOKEN_TARGET + 250);
     }
 
     #[test]
@@ -1392,23 +1353,19 @@ mod tests {
     #[test]
     fn trim_ws_history_respects_token_budget() {
         let mut history = vec![ChatMessage::system("sys")];
-        // Each message ~100K chars → ~33K tokens per message, well over the limit
         let big_msg = "x".repeat(100_000);
         history.push(ChatMessage::user(&big_msg));
         history.push(ChatMessage::assistant(&big_msg));
         history.push(ChatMessage::user("latest"));
         trim_ws_history_to_budget(&mut history);
         let total_tokens: usize = history.iter().map(estimated_message_tokens).sum();
-        // Should have trimmed to fit within target
-        assert!(total_tokens <= WS_CONTEXT_TOKEN_TARGET + 35_000); // target + one big msg
-        // The latest message should still be present (it's the newest non-system)
+        assert!(total_tokens <= WS_CONTEXT_TOKEN_TARGET + 35_000);
         assert!(history.iter().any(|m| m.content == "latest"));
     }
 
     #[test]
     fn trim_ws_history_keeps_minimum_messages() {
         let mut history = vec![ChatMessage::system("sys")];
-        // Add exactly WS_CONTEXT_MIN_KEEP non-system messages, each very large
         let big_msg = "x".repeat(100_000);
         for _ in 0..WS_CONTEXT_MIN_KEEP {
             history.push(ChatMessage::user(&big_msg));
@@ -1417,7 +1374,6 @@ mod tests {
         assert_eq!(original_non_system, WS_CONTEXT_MIN_KEEP);
         trim_ws_history_to_budget(&mut history);
         let remaining_non_system = history.iter().filter(|m| m.role != "system").count();
-        // Should keep at least WS_CONTEXT_MIN_KEEP even if over budget
         assert_eq!(remaining_non_system, WS_CONTEXT_MIN_KEEP);
     }
 
@@ -1430,14 +1386,12 @@ mod tests {
 
     #[test]
     fn truncate_with_ellipsis_truncates_long() {
-        // Keeps first 8 chars ("hello wo"), trims trailing whitespace, appends "..."
         let result = truncate_with_ellipsis("hello world", 8);
         assert_eq!(result, "hello wo...");
     }
 
     #[test]
     fn truncate_with_ellipsis_trims_trailing_whitespace() {
-        // "hello " (6 chars) → trim_end → "hello" → "hello..."
         let result = truncate_with_ellipsis("hello world", 6);
         assert_eq!(result, "hello...");
     }
@@ -1468,6 +1422,26 @@ mod tests {
         assert!(!should_skip_memory_entry("user_preference", "likes coffee"));
     }
 
+    // --- is_ws_loopback ---
+
+    #[test]
+    fn is_ws_loopback_detects_ipv4() {
+        let addr: SocketAddr = "127.0.0.1:1234".parse().unwrap();
+        assert!(is_ws_loopback(Some(addr), &HeaderMap::new(), false));
+    }
+
+    #[test]
+    fn is_ws_loopback_detects_ipv6() {
+        let addr: SocketAddr = "[::1]:1234".parse().unwrap();
+        assert!(is_ws_loopback(Some(addr), &HeaderMap::new(), false));
+    }
+
+    #[test]
+    fn is_ws_loopback_rejects_public_ip() {
+        let addr: SocketAddr = "1.2.3.4:1234".parse().unwrap();
+        assert!(!is_ws_loopback(Some(addr), &HeaderMap::new(), false));
+    }
+
     // --- cancellation token ---
 
     #[tokio::test]
@@ -1488,7 +1462,6 @@ mod tests {
     async fn cancellation_token_cancelled_future_resolves() {
         let token = CancellationToken::new();
         let clone = token.clone();
-        // Spawn a task that waits for cancellation
         let handle = tokio::spawn(async move {
             clone.cancelled().await;
             true
@@ -1496,41 +1469,4 @@ mod tests {
         token.cancel();
         assert!(handle.await.unwrap());
     }
-
-    // --- approval prompt dispatcher format ---
-
-    #[test]
-    fn approval_prompt_ws_message_format() {
-        // Verify the JSON shape matches what the reader task expects
-        let msg = json!({
-            "type": "approval_required",
-            "request_id": "req-123",
-            "tool_name": "shell",
-            "arguments": "{\"cmd\":\"rm -rf /\"}",
-        });
-        assert_eq!(msg["type"], "approval_required");
-        assert_eq!(msg["request_id"], "req-123");
-        assert_eq!(msg["tool_name"], "shell");
-    }
-
-    #[test]
-    fn approval_response_parsing() {
-        // Verify decision parsing matches the reader task logic
-        let cases = vec![
-            ("yes", ApprovalResponse::Yes),
-            ("always", ApprovalResponse::Always),
-            ("no", ApprovalResponse::No),
-            ("", ApprovalResponse::No),       // unknown defaults to No
-            ("deny", ApprovalResponse::No),   // unknown defaults to No
-        ];
-        for (input, expected) in cases {
-            let decision = match input {
-                "yes" => ApprovalResponse::Yes,
-                "always" => ApprovalResponse::Always,
-                _ => ApprovalResponse::No,
-            };
-            assert_eq!(decision, expected, "input: {input}");
-        }
-    }
-
 }

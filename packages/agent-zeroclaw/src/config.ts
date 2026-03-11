@@ -99,9 +99,9 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
       // - At boot: lifecycle.ts parses built-in Tool.skillContent + workspace skills
       // - At runtime: skills wrapper patches config after `skills add`
     ],
-    // All tools available from all channels (web UI, Telegram, etc.).
-    // ZeroClaw defaults exclude browser/shell for non-CLI channels.
-    non_cli_excluded_tools: [],
+    // All tools available from all channels (web UI, Telegram, etc.)
+    // except browser_open which launches a system browser (no display in sandbox).
+    non_cli_excluded_tools: ["browser_open"],
     // ZeroClaw defaults forbid /home, /tmp, /var, etc. — designed for local machines.
     // In a sandbox (isolated microVM), the workspace is under /home and browser
     // temp data goes to /tmp, so we clear this.
@@ -109,23 +109,17 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
   },
   memory: { backend: "sqlite", auto_save: true },
   agent: {
-    // Limit history to prevent context overflow from large tool results
-    // (e.g. browser snapshots can be 60K+ chars per page visit).
-    max_history_messages: 20,
+    // In-memory history cap per sender. Native channels also enforce
+    // MAX_CHANNEL_HISTORY=50 hardcoded. Context recovery after daemon
+    // restart goes through memory.recall() (sqlite), not this cap.
+    max_history_messages: 50,
     max_tool_iterations: 50,
     parallel_tools: true,
-    session: {
-      backend: "sqlite",
-      strategy: "per-sender",
-      ttl_seconds: 86400,
-      max_messages: 30,
-    },
   },
   browser: {
     enabled: true,
     backend: "agent_browser",
     allowed_domains: ["*"],
-    browser_open: "disable",
   },
   // Lightweight URL fetching — preferred over browser for simple page reads.
   web_fetch: {
@@ -146,11 +140,8 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
     max_response_size: 1_000_000,
     timeout_secs: 30,
   },
-  // Proactive research phase — agent gathers info before answering when needed.
-  research: {
-    enabled: true,
-    trigger: "keywords",
-  },
+  // Research was removed as a separate config section on master.
+  // The agent now uses web_search and web_fetch tools directly when needed.
   security: { otp: { enabled: false } },
   // Full mode inlines entire SKILL.md into the system prompt so smaller models
   // (e.g. mistral-small) reliably activate skills and follow their instructions.
@@ -204,7 +195,8 @@ export function writeSetupConfig(
         enabled: true,
         daily_limit_usd: data.cost.dailyLimitUsd,
         monthly_limit_usd: data.cost.monthlyLimitUsd,
-        enforcement: { mode: "block" },
+        warn_at_percent: 80,
+        allow_override: false,
         prices: {
           [data.provider.model]: {
             input: data.cost.inputPerMillion,
