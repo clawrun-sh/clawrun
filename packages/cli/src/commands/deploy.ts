@@ -659,49 +659,68 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
       initialValue: false,
     });
 
+    let providerResult: { provider: string; apiKey: string; model: string; apiUrl?: string };
+    let modelChanged = false;
+
     if (!clack.isCancel(reconfigureProvider) && reconfigureProvider) {
       const result = await promptProvider(agent, existingSetup?.provider);
       clack.log.success(
         `Provider: ${chalk.green(result.provider)} | Model: ${chalk.green(result.model)}`,
       );
+      providerResult = result;
+      modelChanged =
+        result.provider !== existingSetup?.provider?.provider ||
+        result.model !== existingSetup?.provider?.model;
+    } else {
+      providerResult = existingSetup?.provider as {
+        provider: string;
+        apiKey: string;
+        model: string;
+        apiUrl?: string;
+      };
+    }
 
-      // Cost management — prompt with existing values as defaults
-      const costSetup = await promptCost(result.provider, result.model, existingSetup?.cost);
+    // Cost management — same flow as new deployment.
+    // If model changed: always prompt (pricing is different).
+    // If model unchanged: ask first to avoid bothering the user.
+    let costSetup: CostSetup | undefined;
 
-      // Write updated config
+    if (modelChanged) {
+      // Model changed — strip saved pricing (wrong model), keep limits as defaults
+      const existingLimitsOnly = existingSetup?.cost
+        ? {
+            enabled: existingSetup.cost.enabled,
+            dailyLimitUsd: existingSetup.cost.dailyLimitUsd,
+            monthlyLimitUsd: existingSetup.cost.monthlyLimitUsd,
+          }
+        : undefined;
+      costSetup = await promptCost(
+        providerResult.provider,
+        providerResult.model,
+        existingLimitsOnly,
+      );
+    } else {
+      const reconfigureCost = await clack.confirm({
+        message: "Reconfigure cost management?",
+        initialValue: false,
+      });
+
+      if (!clack.isCancel(reconfigureCost) && reconfigureCost) {
+        costSetup = await promptCost(
+          providerResult.provider,
+          providerResult.model,
+          existingSetup?.cost,
+        );
+      }
+    }
+
+    // Write config if anything changed
+    if (modelChanged || costSetup) {
       agent.writeSetupConfig(agentConfigDir, {
-        provider: result,
+        provider: providerResult,
         channels: existingSetup?.channels ?? {},
         cost: costSetup,
       });
-    } else {
-      // Provider unchanged — still offer to reconfigure cost
-      const currentProvider = existingSetup?.provider;
-      if (currentProvider?.provider && currentProvider?.model) {
-        const reconfigureCost = await clack.confirm({
-          message: "Reconfigure cost management?",
-          initialValue: false,
-        });
-
-        if (!clack.isCancel(reconfigureCost) && reconfigureCost) {
-          const costSetup = await promptCost(
-            currentProvider.provider,
-            currentProvider.model,
-            existingSetup?.cost,
-          );
-          const currentSetup = agent.readSetup(agentConfigDir);
-          const currentProviderSetup = currentSetup?.provider as {
-            provider: string;
-            apiKey: string;
-            model: string;
-          };
-          agent.writeSetupConfig(agentConfigDir, {
-            provider: currentProviderSetup,
-            channels: currentSetup?.channels ?? {},
-            cost: costSetup,
-          });
-        }
-      }
     }
 
     const channelResult = await promptChannels(agent, existingSetup?.channels, name);

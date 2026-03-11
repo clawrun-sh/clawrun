@@ -137,6 +137,10 @@ export interface CostInfo {
   totalTokens?: number;
   requestCount?: number;
   byModel?: { model: string; cost: number; tokens: number; requests: number; share: number }[];
+  /** Daily spending limit in USD (from agent config). */
+  dailyLimitUsd?: number;
+  /** Monthly spending limit in USD (from agent config). */
+  monthlyLimitUsd?: number;
 }
 
 export interface DiagResult {

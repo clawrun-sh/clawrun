@@ -232,19 +232,18 @@ describe("lookupModelPricingSync", () => {
     expect(result.matchedKey).toBe("vercel_ai_gateway/anthropic/claude-4-sonnet");
   });
 
-  it("falls back to sub-provider entry for Vercel gateway models", () => {
-    // vercel_ai_gateway/mistral/mistral-large-latest doesn't exist in mock,
-    // but mistral/mistral-large-latest does — should fall through to it
-    const result = lookupModelPricingSync(data, "vercel", "mistral/mistral-large-latest")!;
-    expect(result.inputPerMillion).toBe(2);
-    expect(result.matchedKey).toBe("mistral/mistral-large-latest");
+  it("returns null for Vercel gateway models not in LiteLLM", () => {
+    // vercel_ai_gateway/mistral/mistral-large-latest doesn't exist in mock.
+    // Should NOT fall back to mistral/mistral-large-latest (different pricing).
+    const result = lookupModelPricingSync(data, "vercel", "mistral/mistral-large-latest");
+    expect(result).toBeNull();
   });
 
-  it("resolves Vercel gateway model via dot-to-dash normalization", () => {
-    // Vercel serves "anthropic/claude-sonnet-4.6" but LiteLLM may have
-    // "claude-sonnet-4-6" (dashes). Should normalize and match.
-    data["claude-sonnet-4-6"] = {
-      litellm_provider: "anthropic",
+  it("resolves Vercel gateway model via dot-to-dash normalization on gateway key", () => {
+    // Vercel serves "anthropic/claude-sonnet-4.6" — should try
+    // "vercel_ai_gateway/anthropic/claude-sonnet-4-6" (dot-to-dash on gateway prefix)
+    data["vercel_ai_gateway/anthropic/claude-sonnet-4-6"] = {
+      litellm_provider: "vercel_ai_gateway",
       input_cost_per_token: 3e-6,
       output_cost_per_token: 1.5e-5,
       max_input_tokens: 200_000,
@@ -253,12 +252,12 @@ describe("lookupModelPricingSync", () => {
     };
     const result = lookupModelPricingSync(data, "vercel", "anthropic/claude-sonnet-4.6")!;
     expect(result.inputPerMillion).toBe(3);
-    expect(result.matchedKey).toBe("claude-sonnet-4-6");
+    expect(result.matchedKey).toBe("vercel_ai_gateway/anthropic/claude-sonnet-4-6");
   });
 
-  it("resolves Vercel gateway model via OpenRouter cross-lookup", () => {
-    // Vercel serves "anthropic/claude-sonnet-4.6" and LiteLLM has
-    // "openrouter/anthropic/claude-sonnet-4.6" — should find it
+  it("does not fall back to OpenRouter or bare model for Vercel gateway", () => {
+    // Even if openrouter/anthropic/claude-sonnet-4.6 exists,
+    // Vercel should NOT use it — gateway pricing differs
     data["openrouter/anthropic/claude-sonnet-4.6"] = {
       litellm_provider: "openrouter",
       input_cost_per_token: 3e-6,
@@ -267,9 +266,8 @@ describe("lookupModelPricingSync", () => {
       max_output_tokens: 64_000,
       mode: "chat",
     };
-    const result = lookupModelPricingSync(data, "vercel", "anthropic/claude-sonnet-4.6")!;
-    expect(result.inputPerMillion).toBe(3);
-    expect(result.matchedKey).toBe("openrouter/anthropic/claude-sonnet-4.6");
+    const result = lookupModelPricingSync(data, "vercel", "anthropic/claude-sonnet-4.6");
+    expect(result).toBeNull();
   });
 
   it("finds Together AI models with prefix", () => {

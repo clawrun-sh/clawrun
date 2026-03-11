@@ -409,11 +409,32 @@ export class ZeroclawAgent implements Agent {
 
   async getCostInfo(
     sandbox: SandboxHandle,
-    _root: string,
+    root: string,
     opts?: { signal?: AbortSignal },
   ): Promise<CostInfo> {
     if (typeof sandbox.domain !== "function") return {};
-    return fetchCostInfo(sandbox, opts);
+    const costInfo = await fetchCostInfo(sandbox, opts);
+
+    // Read cost limits from config.toml inside the sandbox
+    try {
+      const buf = await sandbox.readFile(`${root}/agent/config.toml`);
+      if (buf) {
+        const config = TOML.parse(buf.toString("utf-8"));
+        const cost = config.cost as Record<string, unknown> | undefined;
+        if (cost) {
+          if (typeof cost.daily_limit_usd === "number") {
+            costInfo.dailyLimitUsd = cost.daily_limit_usd;
+          }
+          if (typeof cost.monthly_limit_usd === "number") {
+            costInfo.monthlyLimitUsd = cost.monthly_limit_usd;
+          }
+        }
+      }
+    } catch {
+      // Config read failure is non-fatal — limits just won't show
+    }
+
+    return costInfo;
   }
 
   async runDiagnostics(

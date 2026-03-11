@@ -51,18 +51,30 @@ export async function promptCost(
   let outputPerMillion: number;
 
   if (pricing) {
-    inputPerMillion = existing?.inputPerMillion ?? pricing.inputPerMillion;
-    outputPerMillion = existing?.outputPerMillion ?? pricing.outputPerMillion;
+    inputPerMillion = pricing.inputPerMillion;
+    outputPerMillion = pricing.outputPerMillion;
+    s.stop("Found model pricing");
 
-    s.stop(
-      `Model pricing: ${chalk.green(`$${inputPerMillion}`)} in / ${chalk.green(`$${outputPerMillion}`)} out per 1M tokens`,
+    clack.note(
+      [
+        `Input:  ${chalk.green(`$${inputPerMillion}`)} per 1M tokens`,
+        `Output: ${chalk.green(`$${outputPerMillion}`)} per 1M tokens`,
+      ].join("\n"),
+      "Model Pricing",
     );
   } else if (existing?.inputPerMillion != null && existing.inputPerMillion > 0) {
+    // Use saved pricing only when the caller confirms the model hasn't changed.
+    // Callers must NOT pass existing pricing when the model changed.
     inputPerMillion = existing.inputPerMillion;
     outputPerMillion = existing.outputPerMillion ?? 0;
+    s.stop("Using saved pricing");
 
-    s.stop(
-      `Using saved pricing: ${chalk.green(`$${inputPerMillion}`)} in / ${chalk.green(`$${outputPerMillion}`)} out per 1M tokens`,
+    clack.note(
+      [
+        `Input:  ${chalk.green(`$${inputPerMillion}`)} per 1M tokens`,
+        `Output: ${chalk.green(`$${outputPerMillion}`)} per 1M tokens`,
+      ].join("\n"),
+      "Saved Pricing",
     );
   } else {
     inputPerMillion = 0;
@@ -72,8 +84,9 @@ export async function promptCost(
   }
 
   // Ask to enable cost management
+  clack.log.info(chalk.dim("Tracks token usage and enforces daily/monthly spending limits."));
   const enableCost = await clack.confirm({
-    message: "Set up cost management?",
+    message: "Enable spending limits?",
     initialValue: existing?.enabled ?? true,
   });
 

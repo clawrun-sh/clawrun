@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { Switch } from "@clawrun/ui/components/ui/switch";
 import { SandboxStatus } from "./sandbox-status";
+import { CostBanner } from "./cost-banner";
 
 export function NavSecondary({
   items,
@@ -37,6 +38,7 @@ export function NavSecondary({
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
+          <CostBanner />
           <SandboxStatus />
           <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
             <SidebarMenuButton asChild>

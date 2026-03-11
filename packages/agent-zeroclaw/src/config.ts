@@ -204,7 +204,7 @@ export function writeSetupConfig(
         enabled: true,
         daily_limit_usd: data.cost.dailyLimitUsd,
         monthly_limit_usd: data.cost.monthlyLimitUsd,
-        enforcement: { mode: "warn" },
+        enforcement: { mode: "block" },
         prices: {
           [data.provider.model]: {
             input: data.cost.inputPerMillion,

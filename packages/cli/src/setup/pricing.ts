@@ -258,13 +258,22 @@ function buildCandidateKeys(provider: string, modelId: string): string[] {
   }
 
   // 2. Gateway providers: model ID already contains sub-provider prefix
-  //    (e.g. "anthropic/claude-sonnet-4.6" on Vercel). Try it as-is since
-  //    it may match a direct provider entry like "anthropic/claude-sonnet-4.6"
-  //    under the OpenRouter prefix (which uses the same naming).
-  if (GATEWAY_PROVIDERS.has(normalized) && modelId.includes("/")) {
-    addUnique(modelId);
-    // Also try via OpenRouter prefix — OpenRouter often has the same model ID
-    addUnique(`openrouter/${modelId}`);
+  //    (e.g. "anthropic/claude-sonnet-4.6" on Vercel, "anthropic/claude-sonnet-4" on OpenRouter).
+  //    Try gateway-specific variations (with dot-to-dash normalization).
+  //    Do NOT fall back to the underlying provider's direct pricing — gateway
+  //    pricing differs and showing wrong numbers is worse than showing none.
+  if (GATEWAY_PROVIDERS.has(normalized)) {
+    if (modelId.includes("/")) {
+      // Dot-to-dash normalization on full model ID for gateway prefix
+      const dashModelId = modelId.replace(/\./g, "-");
+      if (prefixes) {
+        for (const prefix of prefixes) {
+          if (dashModelId !== modelId) addUnique(`${prefix}${dashModelId}`);
+        }
+      }
+    }
+    // Gateway providers: stop here. No fallback to underlying provider.
+    return keys;
   }
 
   // 3. Strip sub-provider prefix for bare model lookup.
