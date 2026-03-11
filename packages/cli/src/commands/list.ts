@@ -4,6 +4,7 @@ import * as clack from "@clack/prompts";
 import { listInstances } from "@clawrun/sdk";
 import type { SandboxEntry } from "@clawrun/sdk";
 import { connectInstance } from "../connect-instance.js";
+import { createTable } from "../table.js";
 
 function timeAgo(ms: number): string {
   const seconds = Math.floor((Date.now() - ms) / 1000);
@@ -16,25 +17,20 @@ function timeAgo(ms: number): string {
   return `${days}d ago`;
 }
 
-function formatStatus(status: string, width: number): string {
-  let colorFn: (s: string) => string;
+function statusColor(status: string): (s: string) => string {
   switch (status) {
     case "running":
-      colorFn = chalk.green;
-      break;
+      return chalk.green;
     case "stopped":
     case "stopping":
     case "snapshotting":
-      colorFn = chalk.yellow;
-      break;
+      return chalk.yellow;
     case "failed":
     case "aborted":
-      colorFn = chalk.red;
-      break;
+      return chalk.red;
     default:
-      colorFn = chalk.dim;
+      return chalk.dim;
   }
-  return colorFn(status.padEnd(width));
 }
 
 export const list = command({
@@ -72,34 +68,32 @@ export const list = command({
     );
     spinner.stop("Done.");
 
+    // Sort by sandbox createdAt descending (newest first), no-sandbox instances last
+    const indexed = instances.map((inst, i) => ({ inst, sbx: sandboxes[i] }));
+    indexed.sort((a, b) => (b.sbx?.createdAt ?? 0) - (a.sbx?.createdAt ?? 0));
+
     console.log(chalk.bold(`\n  Instances (${instances.length}):\n`));
 
-    const nameW = 28;
-    const statusW = 14;
-    const createdW = 14;
-    const agentW = 12;
+    const table = createTable([
+      { label: "NAME", width: 28, color: chalk.cyan },
+      { label: "SANDBOX", width: 14 },
+      { label: "CREATED", width: 14, color: chalk.dim },
+      { label: "AGENT", width: 12 },
+      { label: "URL", width: 30 },
+    ]);
 
-    console.log(
-      chalk.dim(
-        `  ${"NAME".padEnd(nameW)}${"SANDBOX".padEnd(statusW)}${"CREATED".padEnd(createdW)}${"AGENT".padEnd(agentW)}URL`,
-      ),
-    );
-    console.log(chalk.dim(`  ${"─".repeat(nameW + statusW + createdW + agentW + 30)}`));
-
-    for (let i = 0; i < instances.length; i++) {
-      const inst = instances[i];
-      const sbx = sandboxes[i];
-      const url = inst.deployedUrl ?? chalk.dim("not deployed");
-      const status = sbx ? formatStatus(sbx.status, statusW) : chalk.dim("—".padEnd(statusW));
-      const created = sbx
-        ? chalk.dim(timeAgo(sbx.createdAt).padEnd(createdW))
-        : chalk.dim("—".padEnd(createdW));
-
-      console.log(
-        `  ${chalk.cyan(inst.name.padEnd(nameW))}${status}${created}${inst.agent.padEnd(agentW)}${url}`,
-      );
+    for (const { inst, sbx } of indexed) {
+      const status = sbx?.status ?? "—";
+      table.row({
+        NAME: inst.name,
+        SANDBOX: { raw: status, display: statusColor(status)(status) },
+        CREATED: sbx ? timeAgo(sbx.createdAt) : "—",
+        AGENT: inst.agent,
+        URL: inst.deployedUrl ?? "not deployed",
+      });
     }
 
+    table.print();
     console.log();
   },
 });
