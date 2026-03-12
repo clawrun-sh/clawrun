@@ -27,23 +27,35 @@ function deriveState(
   data: HealthResponse | null,
   loading: boolean,
   userAction: "starting" | "stopping" | null,
-): { state: SandboxState; transitionLabel: string | null } {
-  if (loading && !data) return { state: "loading", transitionLabel: null };
-  if (userAction === "starting") return { state: "transitioning", transitionLabel: "Starting" };
-  if (userAction === "stopping") return { state: "transitioning", transitionLabel: "Stopping" };
+): { state: SandboxState; transitionLabel: string | null; actionSettled: boolean } {
+  if (loading && !data) return { state: "loading", transitionLabel: null, actionSettled: false };
 
   const sandbox = data?.sandbox;
-  if (!sandbox) return { state: "offline", transitionLabel: null };
-  if (sandbox.running) return { state: "running", transitionLabel: null };
+  const sandboxRunning = sandbox?.running ?? false;
+
+  // "starting" stays in transition until settle timer clears it
+  if (userAction === "starting") {
+    return { state: "transitioning", transitionLabel: "Starting", actionSettled: sandboxRunning };
+  }
+  // "stopping" resolves as soon as the sandbox reports not running
+  if (userAction === "stopping") {
+    if (sandbox && !sandboxRunning) {
+      return { state: "offline", transitionLabel: null, actionSettled: true };
+    }
+    return { state: "transitioning", transitionLabel: "Stopping", actionSettled: false };
+  }
+
+  if (!sandbox) return { state: "offline", transitionLabel: null, actionSettled: false };
+  if (sandboxRunning) return { state: "running", transitionLabel: null, actionSettled: false };
 
   // Any non-terminal status is a transitional state
   if (!OFFLINE_STATUSES.has(sandbox.status)) {
     const raw = sandbox.status ?? "Busy";
     const label = raw.charAt(0).toUpperCase() + raw.slice(1);
-    return { state: "transitioning", transitionLabel: label };
+    return { state: "transitioning", transitionLabel: label, actionSettled: false };
   }
 
-  return { state: "offline", transitionLabel: null };
+  return { state: "offline", transitionLabel: null, actionSettled: false };
 }
 
 export function SandboxStateProvider({ children }: { children: React.ReactNode }) {
@@ -55,7 +67,7 @@ export function SandboxStateProvider({ children }: { children: React.ReactNode }
   const [userAction, setUserAction] = useState<"starting" | "stopping" | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
 
-  const { state, transitionLabel } = deriveState(data, loading, userAction);
+  const { state, transitionLabel, actionSettled } = deriveState(data, loading, userAction);
 
   // Adaptive polling: 5s when transitioning/loading, 15s otherwise
   const isTransitioning = state === "transitioning" || state === "loading";
@@ -69,22 +81,23 @@ export function SandboxStateProvider({ children }: { children: React.ReactNode }
   }, [refetch, isTransitioning]);
 
   // Clear user-initiated action when sandbox state catches up.
-  // When starting, hold the transitioning state for 10s after sandbox
+  // When starting, hold the transitioning state for 5s after sandbox
   // reports running to let the agent daemon fully start.
   const settleRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const sandboxRunning = data?.sandbox?.running ?? false;
 
   useEffect(() => {
-    if (userAction === "starting" && sandboxRunning && !settleRef.current) {
+    if (!actionSettled) return;
+    if (userAction === "starting" && !settleRef.current) {
       settleRef.current = setTimeout(() => {
         settleRef.current = null;
         setUserAction(null);
       }, 5_000);
+    } else if (userAction === "stopping") {
+      // deriveState already shows "offline" — clear stale action on next tick
+      const id = setTimeout(() => setUserAction(null), 0);
+      return () => clearTimeout(id);
     }
-    if (userAction === "stopping" && data?.sandbox && !sandboxRunning) {
-      setUserAction(null);
-    }
-  }, [userAction, sandboxRunning, data?.sandbox]);
+  }, [actionSettled, userAction]);
 
   // Clean up settle timer on unmount
   useEffect(() => {

@@ -10,8 +10,16 @@ export function ClickableCodeBlock(props: ComponentProps<"pre">) {
     btn?.click();
   }, []);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const btn = e.currentTarget.querySelector<HTMLButtonElement>("figure button");
+      btn?.click();
+    }
+  }, []);
+
   return (
-    <div onClick={handleClick}>
+    <div role="button" tabIndex={0} onClick={handleClick} onKeyDown={handleKeyDown}>
       <CodeBlock {...props} className="bg-fd-secondary/50 [&_button]:cursor-pointer">
         <Pre>{props.children}</Pre>
       </CodeBlock>

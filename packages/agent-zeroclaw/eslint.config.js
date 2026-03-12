@@ -2,13 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.next/**",
-      "**/components/ai-elements/**",
-      "**/components/ui/**",
-    ],
+    ignores: ["node_modules/**", "dist/**"],
   },
   ...tseslint.configs.recommended,
   {

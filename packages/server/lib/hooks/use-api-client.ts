@@ -51,14 +51,17 @@ export function useQuery<T>(
 
   const enabled = options?.enabled ?? true;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const queryFnRef = useRef(queryFn);
+  queryFnRef.current = queryFn;
+
   const refetch = useCallback(() => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setLoading(true);
     setError(null);
-    queryFn(controller.signal)
+    queryFnRef
+      .current(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
           setData(result);
@@ -72,6 +75,7 @@ export function useQuery<T>(
           setLoading(false);
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   useEffect(() => {

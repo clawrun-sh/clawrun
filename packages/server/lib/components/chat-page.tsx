@@ -96,7 +96,6 @@ export default function ChatPage(_props: ChatPageProps) {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const transport = useMemo(
@@ -115,15 +114,26 @@ export default function ChatPage(_props: ChatPageProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
 
-  // Hydrate messages from Dexie on mount (after threadId loaded)
+  // Hydrate messages from Dexie on mount (after threadId loaded).
+  // The loaded+threadId key ensures messagesLoaded resets on thread change
+  // because the cleanup sets cancelled=true, preventing the stale finally from
+  // setting messagesLoaded=true, and the new effect invocation starts fresh.
   useEffect(() => {
     if (!loaded) return;
+    // Reset before async load — intentional sync setState to show loading state
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessagesLoaded(false);
+    let cancelled = false;
     loadMessages(threadId)
       .then((stored) => {
-        if (stored.length > 0) setMessages(stored);
+        if (!cancelled && stored.length > 0) setMessages(stored);
       })
-      .finally(() => setMessagesLoaded(true));
+      .finally(() => {
+        if (!cancelled) setMessagesLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [loaded, threadId, setMessages]);
 
   // Persist messages to Dexie when response is complete

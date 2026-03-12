@@ -24,6 +24,7 @@ import {
 import type { ThreadResult } from "@clawrun/agent";
 import type { UIMessage } from "ai";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 interface ThreadDetailPageProps {
@@ -44,9 +45,9 @@ export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
         <div className="flex items-center gap-3 px-4 lg:px-6">
           <Button variant="ghost" size="icon" asChild>
-            <a href="/threads">
+            <Link href="/threads">
               <ArrowLeft className="size-4" />
-            </a>
+            </Link>
           </Button>
           <div>
             <h2 className="text-sm font-medium">Thread</h2>

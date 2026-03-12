@@ -57,6 +57,8 @@ export function Mermaid({ chart }: { chart: string }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Hydration guard — must run client-side only
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

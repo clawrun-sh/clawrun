@@ -45,6 +45,7 @@ export function SidebarDragHandle() {
   );
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- drag handle, mouse-only
     <div
       onMouseDown={onMouseDown}
       className="fixed top-0 bottom-0 z-50 hidden w-1 cursor-col-resize select-none md:block bg-transparent hover:bg-fd-muted-foreground/25 transition-colors"
