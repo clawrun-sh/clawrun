@@ -49,7 +49,7 @@ import type {
 import { SANDBOX_DEFAULTS } from "@clawrun/runtime";
 import { hasWakeHook } from "@clawrun/channel";
 import { createAgent } from "@clawrun/agent";
-import type { Agent } from "@clawrun/agent";
+import type { Agent, ChannelInfo } from "@clawrun/agent";
 import { ClawRunClient } from "@clawrun/sdk";
 import { yes } from "../args/yes.js";
 import { startAgentChat } from "./agent.js";
@@ -589,7 +589,10 @@ async function handleNewInstance(
   }
 
   // Success
-  printSuccess(name, url, channelSetup.channelNames.length > 0);
+  const configuredChannels = agent
+    .getSupportedChannels()
+    .filter((ch) => channelSetup.channelNames.includes(ch.id));
+  printSuccess(name, url, configuredChannels);
 
   // Go straight into chat — the agent's BOOTSTRAP.md handles onboarding
   await startChat(name);
@@ -948,21 +951,42 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   // Success
   const agentForChannels = createAgent(config.agent.name);
   const channelSetupForSuccess = agentForChannels.readSetup(instanceAgentDir(name));
-  const hasChannels = Object.keys(channelSetupForSuccess?.channels ?? {}).length > 0;
-  printSuccess(name, url, hasChannels);
+  const configuredChannelIds = Object.keys(channelSetupForSuccess?.channels ?? {});
+  const configuredChannels = agentForChannels
+    .getSupportedChannels()
+    .filter((ch) => configuredChannelIds.includes(ch.id));
+  printSuccess(name, url, configuredChannels);
 
   // Go straight into chat
   await startChat(name);
 }
 
-function printSuccess(name: string, url: string, hasChannels: boolean): void {
+function printSuccess(name: string, url: string, channels: ChannelInfo[]): void {
   clack.log.success(chalk.bold.green("Deployment successful!"));
   clack.log.info(
     `${chalk.bold("Instance:")} ${chalk.cyan(name)}\n` +
       `${chalk.bold("URL:")} ${chalk.cyan(url)}\n` +
       `${chalk.bold("Health:")} ${chalk.cyan(`${url}/api/v1/health`)}` +
-      (hasChannels ? chalk.dim("\n\nYour agent is live!") : ""),
+      (channels.length > 0 ? chalk.dim("\n\nYour agent is live!") : ""),
   );
+
+  // Show webhook URLs for always-on channels that need manual setup
+  const alwaysOn = channels.filter((ch) => ch.wakeHook === "always-on");
+  if (alwaysOn.length > 0) {
+    const lines: string[] = [
+      "These channels need a webhook URL configured in their platform dashboard:",
+      "",
+    ];
+    for (const ch of alwaysOn) {
+      const webhookUrl = `${url}/api/v1/webhook/${ch.id}`;
+      lines.push(`${chalk.bold(ch.name)}: ${chalk.cyan(webhookUrl)}`);
+      if (ch.wakeHookInstructions) {
+        lines.push(chalk.dim(ch.wakeHookInstructions));
+      }
+      lines.push("");
+    }
+    clack.note(lines.join("\n").trimEnd(), "Webhook setup required");
+  }
 
   clack.outro("Done!");
 }

@@ -419,6 +419,7 @@ export const CHANNELS: ChannelInfo[] = [
     id: "telegram",
     name: "Telegram",
     apiDomains: ["api.telegram.org"],
+    wakeHook: "programmable",
     setupFields: [
       { name: "bot_token", label: "Bot token (from @BotFather)", type: "password", required: true },
       {
@@ -439,6 +440,7 @@ export const CHANNELS: ChannelInfo[] = [
     id: "discord",
     name: "Discord",
     apiDomains: ["discord.com", "gateway.discord.gg"],
+    wakeHook: "programmable",
     setupFields: [
       {
         name: "bot_token",
@@ -471,6 +473,11 @@ export const CHANNELS: ChannelInfo[] = [
     id: "slack",
     name: "Slack",
     apiDomains: ["slack.com"],
+    wakeHook: "always-on",
+    wakeHookInstructions:
+      "Go to https://api.slack.com/apps → select your app → Event Subscriptions → " +
+      "toggle ON → paste your webhook URL as the Request URL. " +
+      'Under "Subscribe to bot events", add the "message.im" event (and "message.channels" if you want channel messages).',
     setupFields: [
       { name: "bot_token", label: "Bot token (xoxb-...)", type: "password", required: true },
       {
@@ -582,6 +589,10 @@ export const CHANNELS: ChannelInfo[] = [
     id: "whatsapp",
     name: "WhatsApp (Cloud API)",
     apiDomains: ["graph.facebook.com"],
+    wakeHook: "always-on",
+    wakeHookInstructions:
+      "Go to https://developers.facebook.com → your app → WhatsApp → Configuration → " +
+      "paste your webhook URL as the Callback URL. Set the Verify Token to match your config.",
     setupFields: [
       {
         name: "access_token",
@@ -742,6 +753,10 @@ export const CHANNELS: ChannelInfo[] = [
     id: "qq",
     name: "QQ Official",
     apiDomains: ["bots.qq.com"],
+    wakeHook: "always-on",
+    wakeHookInstructions:
+      "Go to the QQ Bot Developer Console → your app → " +
+      "paste your webhook URL as the callback URL.",
     setupFields: [
       { name: "app_id", label: "App ID", type: "text", required: true },
       { name: "app_secret", label: "App Secret", type: "password", required: true },
@@ -750,14 +765,6 @@ export const CHANNELS: ChannelInfo[] = [
         label: "Allowed user IDs (comma-separated, * for all)",
         type: "list",
         required: true,
-      },
-      {
-        name: "receive_mode",
-        label: "Receive mode",
-        type: "text",
-        required: false,
-        default: "webhook",
-        description: "webhook or websocket",
       },
       {
         name: "environment",
@@ -773,6 +780,10 @@ export const CHANNELS: ChannelInfo[] = [
     id: "lark",
     name: "Lark / Feishu",
     apiDomains: ["open.feishu.cn", "open.larksuite.com"],
+    wakeHook: "always-on",
+    wakeHookInstructions:
+      "Go to the Lark/Feishu Developer Console → your app → Event Subscriptions → " +
+      "paste your webhook URL as the Request URL (only needed if using webhook receive mode).",
     setupFields: [
       { name: "app_id", label: "App ID", type: "text", required: true },
       { name: "app_secret", label: "App Secret", type: "password", required: true },
@@ -803,6 +814,176 @@ export const CHANNELS: ChannelInfo[] = [
         label: "Allowed user Open IDs (comma-separated, * for all)",
         type: "list",
         required: true,
+      },
+    ],
+  },
+  {
+    id: "mattermost",
+    name: "Mattermost",
+    apiDomains: [],
+    setupFields: [
+      {
+        name: "url",
+        label: "Mattermost server URL (e.g. https://mattermost.example.com)",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "bot_token",
+        label: "Bot access token",
+        type: "password",
+        required: true,
+      },
+      {
+        name: "channel_id",
+        label: "Channel ID (leave empty for all channels)",
+        type: "text",
+        required: false,
+      },
+      {
+        name: "allowed_users",
+        label: "Allowed user IDs (comma-separated, * for all)",
+        type: "list",
+        required: true,
+        guidance: [
+          "Allowlist your own Mattermost user ID first (recommended).",
+          "Use '*' only for temporary open testing.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "wati",
+    name: "WATI (WhatsApp Business)",
+    apiDomains: ["live-mt-server.wati.io"],
+    setupFields: [
+      {
+        name: "api_token",
+        label: "WATI API token",
+        type: "password",
+        required: true,
+      },
+      {
+        name: "api_url",
+        label: "WATI API base URL",
+        type: "text",
+        required: false,
+        default: "https://live-mt-server.wati.io",
+      },
+      {
+        name: "tenant_id",
+        label: "Tenant ID (for multi-channel setups)",
+        type: "text",
+        required: false,
+      },
+      {
+        name: "allowed_numbers",
+        label: "Allowed phone numbers (comma-separated E.164, * for all)",
+        type: "list",
+        required: false,
+        default: "*",
+      },
+    ],
+  },
+  {
+    id: "email",
+    name: "Email (IMAP/SMTP)",
+    apiDomains: [],
+    setupFields: [
+      { name: "imap_host", label: "IMAP server hostname", type: "text", required: true },
+      {
+        name: "imap_port",
+        label: "IMAP port",
+        type: "text",
+        required: false,
+        default: "993",
+        description: "Default: 993 (TLS)",
+      },
+      { name: "smtp_host", label: "SMTP server hostname", type: "text", required: true },
+      {
+        name: "smtp_port",
+        label: "SMTP port",
+        type: "text",
+        required: false,
+        default: "465",
+        description: "Default: 465 (TLS)",
+      },
+      { name: "username", label: "Email username", type: "text", required: true },
+      { name: "password", label: "Email password", type: "password", required: true },
+      { name: "from_address", label: "From address", type: "text", required: true },
+      {
+        name: "allowed_senders",
+        label: "Allowed sender addresses (comma-separated, * for all)",
+        type: "list",
+        required: false,
+        default: "*",
+      },
+    ],
+  },
+  {
+    id: "feishu",
+    name: "Feishu (China)",
+    apiDomains: ["open.feishu.cn"],
+    setupFields: [
+      { name: "app_id", label: "App ID", type: "text", required: true },
+      { name: "app_secret", label: "App Secret", type: "password", required: true },
+      {
+        name: "receive_mode",
+        label: "Receive mode",
+        type: "text",
+        required: false,
+        default: "websocket",
+        description: "websocket or webhook",
+      },
+      {
+        name: "verification_token",
+        label: "Verification token (for webhook mode)",
+        type: "password",
+        required: false,
+      },
+      {
+        name: "allowed_users",
+        label: "Allowed user IDs (comma-separated, * for all)",
+        type: "list",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "clawdtalk",
+    name: "ClawdTalk (Voice)",
+    apiDomains: ["api.telnyx.com"],
+    setupFields: [
+      {
+        name: "api_key",
+        label: "Telnyx API key",
+        type: "password",
+        required: true,
+      },
+      {
+        name: "connection_id",
+        label: "Telnyx SIP connection ID",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "from_number",
+        label: "Phone number to call from (E.164, e.g. +12223334444)",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "webhook_secret",
+        label: "Webhook secret (for signature verification)",
+        type: "password",
+        required: false,
+      },
+      {
+        name: "allowed_destinations",
+        label: "Allowed destination numbers (comma-separated, * for all)",
+        type: "list",
+        required: false,
+        default: "*",
       },
     ],
   },

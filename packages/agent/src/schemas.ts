@@ -38,6 +38,15 @@ export const channelInfoSchema = z.object({
   name: z.string().min(1),
   setupFields: z.array(channelSetupFieldSchema).min(1),
   apiDomains: z.array(z.string()).default([]),
+  /**
+   * Wake hook behavior for this channel.
+   * - "programmable": ClawRun auto-registers/deregisters webhooks (e.g. Telegram, Discord)
+   * - "always-on": User must configure the webhook URL in the platform dashboard (e.g. Slack, WhatsApp)
+   * - undefined: No wake hook support — sandbox must be running for messages to flow
+   */
+  wakeHook: z.enum(["programmable", "always-on"]).optional(),
+  /** Instructions shown after channel setup for always-on wake hook channels. */
+  wakeHookInstructions: z.string().optional(),
 });
 
 // --- Cost ---

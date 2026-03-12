@@ -96,6 +96,34 @@ export async function promptChannels(
       channels[channelId] = result.fields;
       status.set(channelId, "configured");
       clack.log.success(`${channelInfo.name} configured`);
+
+      // Wake hook behavior note
+      if (channelInfo.wakeHook === "programmable") {
+        clack.note(
+          "Wake-on-message is automatic — your sandbox will start\n" +
+            "when a message arrives, even if it's sleeping.",
+          `${channelInfo.name} wake hook`,
+        );
+      } else if (channelInfo.wakeHook === "always-on") {
+        const webhookPath = `/api/v1/webhook/${channelId}`;
+        const lines = [
+          "Wake-on-message is supported, but you need to configure",
+          "the webhook URL in the platform dashboard after deploy.",
+          "",
+          `Webhook URL: ${chalk.cyan(`<your-deploy-url>${webhookPath}`)}`,
+        ];
+        if (channelInfo.wakeHookInstructions) {
+          lines.push("", chalk.dim(channelInfo.wakeHookInstructions));
+        }
+        clack.note(lines.join("\n"), `${channelInfo.name} wake hook`);
+      } else {
+        clack.note(
+          "This channel has no wake hook — your sandbox must be running\n" +
+            "to receive messages. No messages are lost while offline;\n" +
+            "they will be delivered when the sandbox starts.",
+          `${channelInfo.name} wake hook`,
+        );
+      }
     } else {
       status.set(channelId, "failed");
       clack.log.error(`${channelInfo.name}: ${result.error ?? "setup failed"}`);
