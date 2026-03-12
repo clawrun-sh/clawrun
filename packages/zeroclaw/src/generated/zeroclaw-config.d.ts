@@ -460,6 +460,10 @@ export interface EmailConfig {
    */
   allowed_senders?: string[];
   /**
+   * Default subject line for outgoing emails (default: "ZeroClaw Message")
+   */
+  default_subject?: string;
+  /**
    * From address for outgoing emails
    */
   from_address: string;
@@ -1188,6 +1192,41 @@ export interface BuiltinHooksConfig {
    * Enable the command-logger hook (logs tool calls for auditing).
    */
   command_logger: boolean;
+  webhook_audit?: WebhookAuditConfig;
+  [k: string]: unknown;
+}
+/**
+ * Configuration for the webhook-audit hook.
+ *
+ * When enabled, POSTs a JSON payload to `url` for every tool invocation
+ * that matches one of `tool_patterns`.
+ */
+export interface WebhookAuditConfig {
+  /**
+   * Enable the webhook-audit hook. Default: `false`.
+   */
+  enabled?: boolean;
+  /**
+   * Include tool call arguments in the audit payload. Default: `false`.
+   *
+   * Be mindful of sensitive data — arguments may contain secrets or PII.
+   */
+  include_args?: boolean;
+  /**
+   * Maximum size (in bytes) of serialised arguments included in a single
+   * audit payload. Arguments exceeding this limit are truncated.
+   * Default: `4096`.
+   */
+  max_args_bytes?: number;
+  /**
+   * Glob patterns for tool names to audit (e.g. `["Bash", "Write"]`).
+   * An empty list means **no** tools are audited.
+   */
+  tool_patterns?: string[];
+  /**
+   * Target URL that will receive the audit POST requests.
+   */
+  url?: string;
   [k: string]: unknown;
 }
 /**
@@ -1353,6 +1392,18 @@ export interface QdrantConfig {
  * Named provider profile definition compatible with Codex app-server style config.
  */
 export interface ModelProviderConfig {
+  /**
+   * Azure OpenAI API version (defaults to "2024-08-01-preview").
+   */
+  azure_openai_api_version?: string | null;
+  /**
+   * Azure OpenAI deployment name (e.g. "gpt-4o").
+   */
+  azure_openai_deployment?: string | null;
+  /**
+   * Azure OpenAI resource name (e.g. "my-resource" in https://my-resource.openai.azure.com).
+   */
+  azure_openai_resource?: string | null;
   /**
    * Optional base URL for OpenAI-compatible endpoints.
    */
