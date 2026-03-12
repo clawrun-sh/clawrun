@@ -93,30 +93,6 @@ export class ZeroclawAgent implements Agent {
     });
   }
 
-  async injectSkillCommands(
-    sandbox: SandboxHandle,
-    root: string,
-    commands: string[],
-    _opts?: { signal?: AbortSignal },
-  ): Promise<void> {
-    if (commands.length === 0) return;
-
-    const configPath = `${root}/agent/config.toml`;
-    const buf = await sandbox.readFile(configPath);
-    if (!buf) return;
-
-    const config = TOML.parse(buf.toString("utf-8"));
-    const autonomy = (config.autonomy ?? {}) as JsonMap;
-    const existing = (autonomy.allowed_commands ?? []) as string[];
-    const merged = [...new Set([...existing, ...commands])];
-    autonomy.allowed_commands = merged;
-    config.autonomy = autonomy;
-
-    await sandbox.writeFiles([{ path: configPath, content: Buffer.from(TOML.stringify(config)) }]);
-
-    log.info(`Injected ${commands.length} skill commands into config (total: ${merged.length})`);
-  }
-
   getAvailableTools(): Tool[] {
     return [new AgentBrowserTool(), new GhCliTool(), new FindSkillsTool()];
   }

@@ -34,71 +34,11 @@ const CLAWRUN_DEFAULTS: Partial<ZeroClawConfig> = {
     max_cost_per_day_cents: 5000,
     require_approval_for_medium_risk: false,
     block_high_risk_commands: false,
-    allowed_commands: [
-      // Read-only inspection
-      "ls",
-      "cat",
-      "head",
-      "tail",
-      "wc",
-      "grep",
-      "find",
-      "echo",
-      "pwd",
-      "date",
-      "which",
-      "file",
-      // Text processing / stream filters
-      "jq",
-      "sort",
-      "uniq",
-      "cut",
-      "tr",
-      "sed",
-      "awk",
-      "diff",
-      "patch",
-      "tee",
-      "xargs",
-      // Path utilities
-      "basename",
-      "dirname",
-      "realpath",
-      "env",
-      "printenv",
-      // Version control
-      "git",
-      // Package managers
-      "npm",
-      "pnpm",
-      "yarn",
-      "pip",
-      "pip3",
-      "cargo",
-      // Runtimes
-      "node",
-      "python",
-      "python3",
-      // File operations (no permission changes)
-      "mkdir",
-      "cp",
-      "mv",
-      "rm",
-      "touch",
-      "ln",
-      // Archive
-      "tar",
-      "gzip",
-      "gunzip",
-      "zip",
-      "unzip",
-      // Build
-      "make",
-      // Tool-specific commands (agent-browser, gh, skills, firecrawl, etc.) are
-      // injected dynamically from SKILL.md allowed-tools frontmatter:
-      // - At boot: lifecycle.ts parses built-in Tool.skillContent + workspace skills
-      // - At runtime: skills wrapper patches config after `skills add`
-    ],
+    // Wildcard: allow all commands. The sandbox is an isolated Firecracker
+    // microVM — the VM boundary is the security perimeter, not the command
+    // allowlist. ZeroClaw's other safety layers (subshell/redirect blocking,
+    // forbidden_paths, workspace_only) still apply.
+    allowed_commands: ["*"],
     // All tools available from all channels (web UI, Telegram, etc.)
     // except browser_open which launches a system browser (no display in sandbox).
     non_cli_excluded_tools: ["browser_open"],

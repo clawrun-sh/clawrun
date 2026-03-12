@@ -255,14 +255,6 @@ export interface Agent {
 
   provision(sandbox: SandboxHandle, root: string, opts: ProvisionOpts): Promise<void>;
 
-  /** Inject allowed commands derived from installed skills into agent config. */
-  injectSkillCommands(
-    sandbox: SandboxHandle,
-    root: string,
-    commands: string[],
-    opts?: { signal?: AbortSignal },
-  ): Promise<void>;
-
   /**
    * Return tools enabled in the agent config.
    * Used to build sidecar tool install config (runs inside the sandbox).

@@ -53,4 +53,3 @@ export {
 } from "./schemas.js";
 export { createAgent, registerAgentFactory } from "./registry.js";
 export { baseWorkspaceDir } from "./workspace.js";
-export { parseSkillCommands, scanSkillsDirectory } from "./skill-commands.js";

@@ -1,7 +1,6 @@
 ---
 name: gh-cli
 description: Use when the user needs to interact with GitHub — checking CI status, viewing PRs, listing issues, querying the API, or any GitHub-related task. Triggers include "check CI", "list PRs", "view issue", "GitHub API", or any request involving repositories, pull requests, issues, or workflows.
-allowed-tools: Bash(gh:*)
 ---
 
 # GitHub Skill

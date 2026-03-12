@@ -9,7 +9,6 @@ import type {
 } from "@clawrun/provider";
 import { CountBasedRetention, getProvider, ACTIVE_SANDBOX_STATUSES } from "@clawrun/provider";
 import type { Agent, CronJob } from "@clawrun/agent";
-import { parseSkillCommands } from "@clawrun/agent";
 import { getAgent } from "../agents/registry.js";
 import { getRuntimeConfig } from "../config.js";
 import { getStateStore } from "../storage/state.js";
@@ -675,26 +674,6 @@ export class SandboxLifecycleManager {
         secretKey,
         fromSnapshot: !!snapshotId,
       });
-
-      // Inject allowed commands from built-in tools into agent config.
-      // User-installed skill commands are already in config.toml (persisted in
-      // snapshot), and new runtime installs are handled by the skills wrapper.
-      try {
-        const allCommands: string[] = [];
-        for (const tool of this.agent.getAvailableTools()) {
-          if (tool.skillContent) {
-            allCommands.push(...parseSkillCommands(tool.skillContent));
-          }
-        }
-        const unique = [...new Set(allCommands)];
-        if (unique.length > 0) {
-          await this.agent.injectSkillCommands(sandbox, root, unique);
-          log.info(`Injected skill commands: [${unique.join(", ")}]`);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.info(`Skill command injection skipped: ${msg}`);
-      }
 
       // Apply network policy before starting services.
       if (networkPolicy !== "allow-all") {

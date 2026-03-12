@@ -68,21 +68,15 @@ describe("writeSetupConfig — fresh deploy", () => {
     expect((config.autonomy as TOML.JsonMap).level).toBe("full");
   });
 
-  it("uses clawrun allowed_commands, not zeroclaw defaults", () => {
+  it("uses wildcard allowed_commands (sandbox is the security boundary)", () => {
     const config = writeAndParse();
     const cmds = (config.autonomy as TOML.JsonMap).allowed_commands as string[];
-    const schemaCmds = (schemaDefaults.autonomy as Record<string, unknown>)
-      .allowed_commands as string[];
-    expect(cmds).not.toEqual(schemaCmds);
-    // Base commands are hardcoded; tool-specific commands (agent-browser, gh, skills)
-    // are injected dynamically at boot from Tool.skillContent.
-    expect(cmds).toContain("git");
-    expect(cmds).toContain("make");
+    expect(cmds).toEqual(["*"]);
   });
 
-  it("clears non_cli_excluded_tools so all tools work from all channels", () => {
+  it("excludes browser_open from non-CLI channels (no display in sandbox)", () => {
     const config = writeAndParse();
-    expect((config.autonomy as TOML.JsonMap).non_cli_excluded_tools).toEqual([]);
+    expect((config.autonomy as TOML.JsonMap).non_cli_excluded_tools).toEqual(["browser_open"]);
   });
 
   it("overrides browser.enabled to true (zeroclaw default is false)", () => {
@@ -124,16 +118,10 @@ describe("writeSetupConfig — fresh deploy", () => {
     expect(agent.max_tool_iterations).toBe(50);
   });
 
-  it("limits max_history_messages to 20 (prevents context overflow from browser snapshots)", () => {
+  it("sets max_history_messages to 50 (matches native channel MAX_CHANNEL_HISTORY)", () => {
     const config = writeAndParse();
     const agent = config.agent as TOML.JsonMap;
-    expect(agent.max_history_messages).toBe(20);
-  });
-
-  it("limits session.max_messages to 30", () => {
-    const config = writeAndParse();
-    const session = (config.agent as TOML.JsonMap).session as TOML.JsonMap;
-    expect(session.max_messages).toBe(30);
+    expect(agent.max_history_messages).toBe(50);
   });
 
   it("enables web_fetch with wildcard domains", () => {
