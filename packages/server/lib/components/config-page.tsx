@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
-import { useQuery } from "../hooks/use-api-client";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
+import useSWR from "swr";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Button } from "@clawrun/ui/components/ui/button";
@@ -25,7 +25,7 @@ import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 
 function ConfigTab() {
   const client = useApiClient();
-  const { data, loading, error } = useSandboxQuery((s) => client.getConfig(s), [client]);
+  const { data, error, isLoading: loading } = useSandboxSWR("config", () => client.getConfig());
 
   return (
     <Card>
@@ -46,7 +46,7 @@ function ConfigTab() {
         {loading ? (
           <Skeleton className="h-96 w-full" />
         ) : error ? (
-          <p className="text-sm text-muted-foreground">{error}</p>
+          <p className="text-sm text-muted-foreground">{error?.message}</p>
         ) : (
           <pre className="h-[calc(100vh-22rem)] w-full overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-sm">
             {data?.content ?? ""}
@@ -63,7 +63,11 @@ function ConfigTab() {
 
 function WorkspaceTab() {
   const client = useApiClient();
-  const { data, loading, error } = useSandboxQuery((s) => client.listWorkspaceFiles(s), [client]);
+  const {
+    data,
+    error,
+    isLoading: loading,
+  } = useSandboxSWR("workspace-files", () => client.listWorkspaceFiles());
 
   const files: WorkspaceFile[] = data?.files ?? [];
   const [selected, setSelected] = useState<string | null>(null);
@@ -71,18 +75,13 @@ function WorkspaceTab() {
   // Auto-select first file when list loads
   const activeFile = selected ?? files[0]?.name ?? null;
 
-  const fileFetcher = useCallback(
-    (signal: AbortSignal) => {
-      if (!activeFile) return Promise.resolve(null);
-      return client.readWorkspaceFile(activeFile, signal);
-    },
-    [client, activeFile],
-  );
   const {
     data: fileData,
-    loading: fileLoading,
+    isLoading: fileLoading,
     error: fileError,
-  } = useQuery(fileFetcher, [fileFetcher]);
+  } = useSWR(activeFile ? `workspace-file/${activeFile}` : null, () =>
+    client.readWorkspaceFile(activeFile!),
+  );
 
   if (loading) {
     return (
@@ -95,7 +94,7 @@ function WorkspaceTab() {
   }
 
   if (error) {
-    return <p className="text-sm text-muted-foreground">{error}</p>;
+    return <p className="text-sm text-muted-foreground">{error?.message}</p>;
   }
 
   if (files.length === 0) {
@@ -133,7 +132,7 @@ function WorkspaceTab() {
           {fileLoading ? (
             <Skeleton className="h-full w-full flex-1" />
           ) : fileError ? (
-            <p className="text-sm text-muted-foreground">{fileError}</p>
+            <p className="text-sm text-muted-foreground">{fileError?.message}</p>
           ) : (
             <pre className="flex-1 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-sm">
               {fileData?.content ?? ""}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { Card, CardDescription, CardHeader, CardTitle } from "@clawrun/ui/components/ui/card";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import {
@@ -70,7 +70,7 @@ function ToolDetailDialog({
 
 export default function ToolsPage() {
   const client = useApiClient();
-  const { data, loading, error } = useSandboxQuery((s) => client.listTools(s), [client]);
+  const { data, error, isLoading: loading } = useSandboxSWR("tools", () => client.listTools());
   const [search, setSearch] = useState("");
   const [selectedTool, setSelectedTool] = useState<RuntimeToolInfo | null>(null);
 
@@ -100,7 +100,7 @@ export default function ToolsPage() {
               ))}
             </div>
           ) : error ? (
-            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
+            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error?.message}</p>
           ) : allTools.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Wrench className="mb-4 size-12 text-muted-foreground" />

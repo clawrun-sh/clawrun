@@ -1,7 +1,7 @@
 "use client";
 
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
 import { Button } from "@clawrun/ui/components/ui/button";
 import {
@@ -21,8 +21,6 @@ import {
   ReasoningTrigger,
   ReasoningContent,
 } from "@clawrun/ui/components/ai-elements/reasoning";
-import type { ThreadResult } from "@clawrun/agent";
-import type { UIMessage } from "ai";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
@@ -33,10 +31,11 @@ interface ThreadDetailPageProps {
 
 export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
   const client = useApiClient();
-  const { data, loading, error } = useSandboxQuery(
-    (s) => client.getThread(threadId, s),
-    [client, threadId],
-  );
+  const {
+    data,
+    error,
+    isLoading: loading,
+  } = useSandboxSWR(`thread/${threadId}`, () => client.getThread(threadId));
 
   const messages = data?.messages ?? [];
 
@@ -64,7 +63,7 @@ export default function ThreadDetailPage({ threadId }: ThreadDetailPageProps) {
                 ))}
               </div>
             ) : error ? (
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-sm text-muted-foreground">{error?.message}</p>
             ) : messages.length === 0 ? (
               <p className="text-sm text-muted-foreground">No messages in this thread.</p>
             ) : (

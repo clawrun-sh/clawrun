@@ -43,7 +43,6 @@ import { Button } from "@clawrun/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
 import { Check, Clipboard, SquarePen, Loader2, MessageSquare } from "lucide-react";
-import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { defaultRehypePlugins } from "streamdown";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
@@ -57,7 +56,7 @@ const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/
 // instead of showing "[Image blocked: ...]". Images from the agent are delivered
 // as SDK file parts, so markdown image refs to local filenames are expected to
 // be unresolvable and should be hidden.
-const hardenEntry = defaultRehypePlugins.harden as [Function, Record<string, unknown>];
+const hardenEntry = defaultRehypePlugins.harden as [(...args: unknown[]) => void, Record<string, unknown>];
 const rehypePlugins = Object.values({
   ...defaultRehypePlugins,
   harden: [hardenEntry[0], { ...hardenEntry[1], imageBlockPolicy: "remove" }],
@@ -107,6 +106,8 @@ export default function ChatPage(_props: ChatPageProps) {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
+    // threadId is only needed for the initial save when no stored ID exists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const transport = useMemo(
@@ -132,7 +133,6 @@ export default function ChatPage(_props: ChatPageProps) {
   useEffect(() => {
     if (!loaded) return;
     // Reset before async load — intentional sync setState to show loading state
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessagesLoaded(false);
     let cancelled = false;
     loadMessages(threadId)
@@ -244,6 +244,7 @@ export default function ChatPage(_props: ChatPageProps) {
                                 {seg.content}
                               </MessageResponse>
                             ) : (
+                              // eslint-disable-next-line @next/next/no-img-element -- data URI images from agent can't use next/image
                               <img
                                 key={`${i}-${j}`}
                                 src={seg.src}
@@ -278,6 +279,7 @@ export default function ChatPage(_props: ChatPageProps) {
                         }
                         if (part.type === "file" && part.mediaType.startsWith("image/")) {
                           return (
+                            // eslint-disable-next-line @next/next/no-img-element -- dynamic agent file URLs can't use next/image
                             <img
                               key={i}
                               src={part.url}

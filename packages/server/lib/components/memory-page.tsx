@@ -15,7 +15,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { DataTable } from "@clawrun/ui/components/ui/data-table";
 import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
 import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
@@ -215,10 +215,12 @@ const columns: ColumnDef<MemoryEntryInfo>[] = [
 export default function MemoryPage() {
   const client = useApiClient();
 
-  const { data, loading, error, refetch } = useSandboxQuery(
-    (s) => client.listMemories({}, s),
-    [client],
-  );
+  const {
+    data,
+    error,
+    isLoading: loading,
+    mutate,
+  } = useSandboxSWR("memory", () => client.listMemories({}));
 
   const entries = data?.entries ?? [];
 
@@ -233,12 +235,13 @@ export default function MemoryPage() {
     async (key: string) => {
       try {
         await client.deleteMemory(key);
-        refetch();
+        mutate();
       } catch {}
     },
-    [client, refetch],
+    [client, mutate],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table API is incompatible with React Compiler by design
   const table = useReactTable({
     data: entries,
     columns,
@@ -277,10 +280,10 @@ export default function MemoryPage() {
       setNewKey("");
       setNewContent("");
       setNewCategory("");
-      refetch();
+      mutate();
     } catch {}
     setAdding(false);
-  }, [client, newKey, newContent, newCategory, refetch]);
+  }, [client, newKey, newContent, newCategory, mutate]);
 
   return (
     <SandboxOfflineGuard>
@@ -378,7 +381,7 @@ export default function MemoryPage() {
                 ))}
               </div>
             ) : error ? (
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-sm text-muted-foreground">{error?.message}</p>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Brain className="mb-4 size-12 text-muted-foreground" />

@@ -63,6 +63,6 @@ export async function proxy(req: NextRequest) {
 // Match everything except auth pages, static assets, and public files.
 export const config = {
   matcher: [
-    "/((?!auth|_next/static|_next/image|favicon\\.ico|.*\\.png$).*)",
+    "/((?!auth|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.webmanifest$).*)",
   ],
 };

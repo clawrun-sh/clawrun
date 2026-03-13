@@ -18,7 +18,7 @@ import {
 import { useSandboxState } from "../hooks/use-sandbox-state";
 
 export function SandboxStatus() {
-  const { state, transitionLabel, start, stop } = useSandboxState();
+  const { state, start, stop } = useSandboxState();
 
   // Offline — primary action button
   if (state === "offline") {

@@ -15,7 +15,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { DataTable } from "@clawrun/ui/components/ui/data-table";
 import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
 import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
@@ -139,10 +139,12 @@ const columns: ColumnDef<LogRow>[] = [
 
 export default function LogsPage() {
   const client = useApiClient();
-  const { data, loading, error, refetch } = useSandboxQuery(
-    (s) => client.readLogs({ limit: 1000 }, s),
-    [client],
-  );
+  const {
+    data,
+    error,
+    isLoading: loading,
+    mutate,
+  } = useSandboxSWR("logs", () => client.readLogs({ limit: 1000 }));
 
   // Reverse so newest entries come first, derive levelLabel for filtering
   const rows: LogRow[] = useMemo(() => {
@@ -158,6 +160,7 @@ export default function LogsPage() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = useState("");
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table API is incompatible with React Compiler by design
   const table = useReactTable({
     data: rows,
     columns,
@@ -188,7 +191,7 @@ export default function LogsPage() {
               ))}
             </div>
           ) : error ? (
-            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
+            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error?.message}</p>
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileText className="mb-4 size-12 text-muted-foreground" />
@@ -226,7 +229,7 @@ export default function LogsPage() {
                   </Button>
                 )}
                 <div className="ml-auto flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  <Button variant="outline" size="sm" onClick={() => mutate()}>
                     <RefreshCw className="mr-1 size-3.5" />
                     Refresh
                   </Button>

@@ -16,7 +16,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { DataTable } from "@clawrun/ui/components/ui/data-table";
 import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
 import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
@@ -83,7 +83,7 @@ const columns: ColumnDef<ThreadInfo>[] = [
 
 export default function ThreadsPage() {
   const client = useApiClient();
-  const { data, loading, error } = useSandboxQuery((s) => client.listThreads(s), [client]);
+  const { data, error, isLoading: loading } = useSandboxSWR("threads", () => client.listThreads());
   const threads = data?.threads ?? [];
 
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -91,6 +91,7 @@ export default function ThreadsPage() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = useState("");
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table API is incompatible with React Compiler by design
   const table = useReactTable({
     data: threads,
     columns,
@@ -120,7 +121,7 @@ export default function ThreadsPage() {
               ))}
             </div>
           ) : error ? (
-            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error}</p>
+            <p className="px-4 text-sm text-muted-foreground lg:px-6">{error?.message}</p>
           ) : threads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <MessagesSquare className="mb-4 size-12 text-muted-foreground" />

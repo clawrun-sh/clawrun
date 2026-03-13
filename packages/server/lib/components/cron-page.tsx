@@ -15,7 +15,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useApiClient } from "../hooks/use-api-client";
-import { useSandboxQuery } from "../hooks/use-sandbox-query";
+import { useSandboxSWR } from "../hooks/use-sandbox-query";
 import { DataTable } from "@clawrun/ui/components/ui/data-table";
 import { DataTablePagination } from "@clawrun/ui/components/ui/data-table-pagination";
 import { DataTableColumnHeader } from "@clawrun/ui/components/ui/data-table-column-header";
@@ -195,10 +195,12 @@ const statusOptions = [
 
 export default function CronPage() {
   const client = useApiClient();
-  const { data, loading, error, refetch } = useSandboxQuery(
-    (s) => client.listCronJobs(s),
-    [client],
-  );
+  const {
+    data,
+    error,
+    isLoading: loading,
+    mutate,
+  } = useSandboxSWR("cron", () => client.listCronJobs());
   const jobs = data?.jobs ?? [];
 
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -210,12 +212,13 @@ export default function CronPage() {
     async (id: string) => {
       try {
         await client.deleteCronJob(id);
-        refetch();
+        mutate();
       } catch {}
     },
-    [client, refetch],
+    [client, mutate],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table API is incompatible with React Compiler by design
   const table = useReactTable({
     data: jobs,
     columns,
@@ -254,10 +257,10 @@ export default function CronPage() {
       setNewName("");
       setNewSchedule("");
       setNewCommand("");
-      refetch();
+      mutate();
     } catch {}
     setAdding(false);
-  }, [client, newName, newSchedule, newCommand, refetch]);
+  }, [client, newName, newSchedule, newCommand, mutate]);
 
   return (
     <SandboxOfflineGuard>
@@ -353,7 +356,7 @@ export default function CronPage() {
                 ))}
               </div>
             ) : error ? (
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-sm text-muted-foreground">{error?.message}</p>
             ) : jobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Clock className="mb-4 size-12 text-muted-foreground" />

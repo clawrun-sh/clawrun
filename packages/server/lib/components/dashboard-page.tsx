@@ -1,6 +1,5 @@
 "use client";
 
-import { useApiClient, useQuery } from "../hooks/use-api-client";
 import {
   Card,
   CardAction,
@@ -12,14 +11,11 @@ import {
 } from "@clawrun/ui/components/ui/card";
 import { Badge } from "@clawrun/ui/components/ui/badge";
 import { Skeleton } from "@clawrun/ui/components/ui/skeleton";
-import type { AgentStatus, CostInfo, HealthResult } from "@clawrun/agent";
+import type { AgentStatus, CostInfo } from "@clawrun/agent";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Server, Zap, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { ProviderLogo } from "./provider-logo";
-
-interface HealthData extends HealthResult {
-  provider: string;
-}
+import { useDashboardData, type DashboardSnapshot } from "../hooks/use-dashboard-data";
 
 function formatUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -30,7 +26,7 @@ function formatUptime(seconds: number): string {
 }
 
 function formatCost(value?: number): string {
-  if (value == null) return "—";
+  if (value == null) return "\u2014";
   return `$${value.toFixed(4)}`;
 }
 
@@ -38,17 +34,18 @@ function SectionCards({
   health,
   status,
   cost,
+  loading,
 }: {
-  health: { data: HealthData | null; loading: boolean };
-  status: { data: AgentStatus | null; loading: boolean; error: string | null };
-  cost: { data: CostInfo | null; loading: boolean; error: string | null };
+  health: DashboardSnapshot["health"] | undefined;
+  status: AgentStatus | null | undefined;
+  cost: CostInfo | null | undefined;
+  loading: boolean;
 }) {
-  const isOnline = health.data?.sandbox?.running ?? false;
+  const isOnline = health?.sandbox?.running ?? false;
 
   // When sandbox is offline, treat status/cost data as unavailable
-  // (useQuery retains stale data on error, so we gate on health instead)
-  const statusData = isOnline ? status.data : null;
-  const costData = isOnline ? cost.data : null;
+  const statusData = isOnline ? status : null;
+  const costData = isOnline ? cost : null;
 
   return (
     <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
@@ -57,25 +54,25 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Sandbox</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {health.loading ? <Skeleton className="h-8 w-20" /> : isOnline ? "Online" : "Offline"}
+            {loading ? <Skeleton className="h-8 w-20" /> : isOnline ? "Online" : "Offline"}
           </CardTitle>
           <CardAction>
             <Badge variant="outline" className="capitalize bg-muted/60 dark:bg-muted">
               <Server className="size-3" />
-              {health.data?.sandbox?.status ?? (isOnline ? "running" : "stopped")}
+              {health?.sandbox?.status ?? (isOnline ? "running" : "stopped")}
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="flex items-center gap-1.5 text-muted-foreground">
-            {health.data?.provider && (
-              <ProviderLogo provider={health.data.provider} size={14} className="shrink-0" />
+            {health?.provider && (
+              <ProviderLogo provider={health.provider} size={14} className="shrink-0" />
             )}
-            {health.data?.provider
-              ? health.data.provider.charAt(0).toUpperCase() + health.data.provider.slice(1)
-              : "—"}
+            {health?.provider
+              ? health.provider.charAt(0).toUpperCase() + health.provider.slice(1)
+              : "\u2014"}
             <span>&middot;</span>
-            Agent: {health.data?.agent ?? "—"}
+            Agent: {health?.agent ?? "\u2014"}
           </div>
         </CardFooter>
       </Card>
@@ -85,13 +82,13 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Provider / Model</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {status.loading && isOnline ? (
+            {loading && isOnline ? (
               <Skeleton className="h-8 w-32" />
-            ) : !isOnline || status.error ? (
-              <span className="text-lg text-muted-foreground">—</span>
+            ) : !isOnline ? (
+              <span className="text-lg text-muted-foreground">&mdash;</span>
             ) : (
               <div className="flex flex-col gap-0.5">
-                <span className="text-lg truncate">{statusData?.provider ?? "—"}</span>
+                <span className="text-lg truncate">{statusData?.provider ?? "\u2014"}</span>
                 {statusData?.model && (
                   <span className="text-sm font-medium text-muted-foreground truncate">
                     {statusData.model}
@@ -121,12 +118,12 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Uptime</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {status.loading && isOnline ? (
+            {loading && isOnline ? (
               <Skeleton className="h-8 w-16" />
             ) : statusData?.uptime != null ? (
               formatUptime(statusData.uptime)
             ) : (
-              "—"
+              "\u2014"
             )}
           </CardTitle>
           <CardAction>
@@ -168,10 +165,10 @@ function SectionCards({
         <CardHeader>
           <CardDescription>Cost</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {cost.loading && isOnline ? (
+            {loading && isOnline ? (
               <Skeleton className="h-8 w-20" />
-            ) : !isOnline || cost.error ? (
-              <span className="text-lg text-muted-foreground">—</span>
+            ) : !isOnline ? (
+              <span className="text-lg text-muted-foreground">&mdash;</span>
             ) : (
               <>
                 {formatCost(costData?.dailyCost)}
@@ -204,23 +201,20 @@ function SectionCards({
 }
 
 export default function DashboardPage() {
-  const client = useApiClient();
-  const poll = { pollInterval: 15_000 };
-  const health = useQuery<HealthData>(
-    (s) => client.health(s) as Promise<HealthData>,
-    [client],
-    poll,
-  );
-  const status = useQuery((s) => client.getStatus(s), [client], poll);
-  const cost = useQuery((s) => client.getCost(s), [client], poll);
+  const { data, error } = useDashboardData();
+  const loading = !data && !error;
 
-  const isOnline = health.data?.sandbox?.running ?? false;
-  const statusData = isOnline ? status.data : null;
+  const health = data?.health;
+  const statusData = data?.status ?? null;
+  const costData = data?.cost ?? null;
+
+  const isOnline = health?.sandbox?.running ?? false;
+  const displayStatus = isOnline ? statusData : null;
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        <SectionCards health={health} status={status} cost={cost} />
+        <SectionCards health={health} status={statusData} cost={costData} loading={loading} />
 
         {/* Health grid */}
         <div className="px-4 lg:px-6">
@@ -230,23 +224,23 @@ export default function DashboardPage() {
               <CardDescription>Agent process health status</CardDescription>
             </CardHeader>
             <CardContent>
-              {status.loading && isOnline ? (
+              {loading && isOnline ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-3/4" />
                 </div>
-              ) : !isOnline || status.error ? (
+              ) : !isOnline ? (
                 <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-4">
                   <Server className="size-4 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
                     Sandbox is offline — health data unavailable
                   </p>
                 </div>
-              ) : !statusData?.health?.length ? (
+              ) : !displayStatus?.health?.length ? (
                 <p className="text-sm text-muted-foreground">No health data available</p>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {statusData.health.map((h) => (
+                  {displayStatus.health.map((h) => (
                     <Tooltip key={h.name}>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1.5">

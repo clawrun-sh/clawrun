@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useApiClient, useQuery } from "./use-api-client";
+import { useApiClient } from "./use-api-client";
+import { useDashboardHealth } from "./use-dashboard-data";
 
 import type { HealthResult } from "@clawrun/agent";
 
@@ -16,19 +17,21 @@ interface SandboxStateContextValue {
   state: SandboxState;
   /** User-triggered action label (e.g. "Starting", "Stopping") when transitioning */
   transitionLabel: string | null;
+  /** SSE connection error (e.g. connection closed) */
+  connectionError: Error | undefined;
+  /** SSE is attempting to reconnect after a disruption */
+  reconnecting: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
-  refetch: () => void;
 }
 
 const SandboxStateContext = createContext<SandboxStateContextValue | null>(null);
 
 function deriveState(
-  data: HealthResponse | null,
-  loading: boolean,
+  data: HealthResponse | null | undefined,
   userAction: "starting" | "stopping" | null,
 ): { state: SandboxState; transitionLabel: string | null; actionSettled: boolean } {
-  if (loading && !data) return { state: "loading", transitionLabel: null, actionSettled: false };
+  if (!data) return { state: "loading", transitionLabel: null, actionSettled: false };
 
   const sandbox = data?.sandbox;
   const sandboxRunning = sandbox?.running ?? false;
@@ -60,25 +63,10 @@ function deriveState(
 
 export function SandboxStateProvider({ children }: { children: React.ReactNode }) {
   const client = useApiClient();
-  const { data, loading, refetch } = useQuery<HealthResponse>(
-    (s) => client.health(s) as Promise<HealthResponse>,
-    [client],
-  );
+  const { data: healthData, error: connectionError, reconnecting } = useDashboardHealth();
   const [userAction, setUserAction] = useState<"starting" | "stopping" | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
 
-  const { state, transitionLabel, actionSettled } = deriveState(data, loading, userAction);
-
-  // Adaptive polling: 5s when transitioning/loading, 15s otherwise
-  const isTransitioning = state === "transitioning" || state === "loading";
-  useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    const interval = isTransitioning ? 5_000 : 15_000;
-    intervalRef.current = setInterval(refetch, interval);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [refetch, isTransitioning]);
+  const { state, transitionLabel, actionSettled } = deriveState(healthData ?? null, userAction);
 
   // Clear user-initiated action when sandbox state catches up.
   // When starting, hold the transitioning state for 5s after sandbox
@@ -110,24 +98,24 @@ export function SandboxStateProvider({ children }: { children: React.ReactNode }
     setUserAction("starting");
     try {
       await client.start();
-      refetch();
     } catch {
       setUserAction(null);
     }
-  }, [client, refetch]);
+  }, [client]);
 
   const stop = useCallback(async () => {
     setUserAction("stopping");
     try {
       await client.stop();
-      refetch();
     } catch {
       setUserAction(null);
     }
-  }, [client, refetch]);
+  }, [client]);
 
   return (
-    <SandboxStateContext.Provider value={{ state, transitionLabel, start, stop, refetch }}>
+    <SandboxStateContext.Provider
+      value={{ state, transitionLabel, connectionError, reconnecting, start, stop }}
+    >
       {children}
     </SandboxStateContext.Provider>
   );

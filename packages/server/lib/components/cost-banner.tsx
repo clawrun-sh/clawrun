@@ -4,11 +4,11 @@ import type { CostInfo } from "@clawrun/agent";
 import { AlertTriangle, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@clawrun/ui/components/ui/alert";
 import { SidebarMenuItem } from "@clawrun/ui/components/ui/sidebar";
-import { useApiClient, useQuery } from "../hooks/use-api-client";
+import { useDashboardCost } from "../hooks/use-dashboard-data";
 import { useSandboxState } from "../hooks/use-sandbox-state";
 
 function formatCost(value?: number): string {
-  if (value == null) return "—";
+  if (value == null) return "\u2014";
   return `$${value.toFixed(4)}`;
 }
 
@@ -48,7 +48,7 @@ function CostBannerInner({ costData }: { costData: CostInfo }) {
     ? `${worst.label.charAt(0).toUpperCase() + worst.label.slice(1)} limit reached`
     : `${Math.round(worst.pct)}% of ${worst.label} limit`;
 
-  const detail = `${formatCost(worst.current)} / ${formatCost(worst.limit)} ${worst.label}${exceeded ? " — agent may be blocked" : ""}`;
+  const detail = `${formatCost(worst.current)} / ${formatCost(worst.limit)} ${worst.label}${exceeded ? " \u2014 agent may be blocked" : ""}`;
 
   return (
     <SidebarMenuItem>
@@ -72,16 +72,10 @@ function CostBannerInner({ costData }: { costData: CostInfo }) {
 }
 
 export function CostBanner() {
-  const client = useApiClient();
   const { state } = useSandboxState();
+  const { data } = useDashboardCost();
 
-  const isOnline = state === "running";
-  const { data } = useQuery<CostInfo>((s) => client.getCost(s), [client], {
-    pollInterval: 15_000,
-    enabled: isOnline,
-  });
-
-  if (!isOnline || !data) return null;
+  if (state !== "running" || !data) return null;
 
   return <CostBannerInner costData={data} />;
 }
