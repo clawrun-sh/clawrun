@@ -514,8 +514,10 @@ export async function embedImages(
   text: string,
 ): Promise<string> {
   const agentDir = `${root}/agent`;
+  // The sandbox home dir is the parent of root (e.g. /home/user).
+  // The agent's cwd is typically the home dir, so screenshots land there.
+  const homeDir = root.replace(/\/[^/]+$/, "");
 
-  /** Read a file from the sandbox, returning null on any error. */
   async function safeReadFile(path: string): Promise<Buffer | null> {
     try {
       return await sandbox.readFile(path);
@@ -531,7 +533,9 @@ export async function embedImages(
     const mime = mimeFromPath(filename);
     if (!mime) continue;
 
-    const buf = await safeReadFile(`${agentDir}/${filename}`);
+    const buf =
+      (await safeReadFile(`${agentDir}/${filename}`)) ??
+      (await safeReadFile(`${homeDir}/${filename}`));
     if (!buf) continue;
 
     const b64 = buf.toString("base64");
@@ -565,6 +569,7 @@ export async function embedImages(
     if (!mime) continue;
 
     const buf =
+      (await safeReadFile(`${homeDir}/${filename}`)) ??
       (await safeReadFile(`${agentDir}/${filename}`)) ??
       (await safeReadFile(`${agentDir}/workspace/${filename}`));
     if (!buf) continue;
@@ -1045,12 +1050,12 @@ async function streamViaWs(
 
           if (receivedClear && parser.hasEmitted) {
             // Post-clear content was already streamed via the parser.
-            // Mark settled before cleanup so the WS close event doesn't
-            // race and reject the promise while embedImages is running.
-            settled = true;
-            cleanup();
+            // Embed images BEFORE closing WS — the sandbox may become
+            // unreachable once the daemon's WS handler exits.
             const raw = msg.full_response ?? "";
             const enriched = await embedImages(sandbox, root, raw);
+            settled = true;
+            cleanup();
             if (enriched !== raw) {
               // Extract embedded data-URI images and emit as SDK file parts
               const DATA_URI_RE =
@@ -1071,14 +1076,16 @@ async function streamViaWs(
             const raw = (msg.full_response ?? msg.content ?? "").trim();
             const finalContent =
               raw || "Tool execution completed, but no final response text was returned.";
-            settled = true;
-            cleanup();
             try {
               const enriched = await embedImages(sandbox, root, finalContent);
+              settled = true;
+              cleanup();
               emitParsedResponse(lazyWriter, enriched);
               lazyWriter.write({ type: "finish", finishReason: "stop" });
               resolve();
             } catch (err) {
+              settled = true;
+              cleanup();
               reject(err as Error);
             }
           }

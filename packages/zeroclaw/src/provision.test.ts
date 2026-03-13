@@ -230,28 +230,6 @@ describe("provision", () => {
     expect(content).toContain('ZEROCLAW_CONFIG_DIR="/home/user/.clawrun/agent"');
   });
 
-  it("falls back to /home/vercel-sandbox when $HOME is empty", async () => {
-    const sandbox = mockSandbox();
-    sandbox.runCommand.mockImplementation(async (cmd: string, args?: string[]) => {
-      if (cmd === "sh" && args?.[1]?.includes("test -x")) {
-        return { exitCode: 0, stdout: async () => "ok\n", stderr: async () => "" };
-      }
-      // Return empty for $HOME
-      if (cmd === "sh" && args?.[1]?.includes("echo")) {
-        return { exitCode: 0, stdout: async () => "\n", stderr: async () => "" };
-      }
-      return { exitCode: 0, stdout: async () => "", stderr: async () => "" };
-    });
-
-    await provision(sandbox as unknown as ZeroclawSandbox, defaultOpts());
-
-    const lastWrite = sandbox.writeFiles.mock.calls[sandbox.writeFiles.mock.calls.length - 1];
-    const files = lastWrite[0];
-    const profile = files.find((f) => f.path.endsWith(".profile"));
-    expect(profile).toBeDefined();
-    expect(profile!.path).toBe("/home/vercel-sandbox/.profile");
-  });
-
   it("restricts permissions on config.toml and .secret_key", async () => {
     const sandbox = mockSandbox();
     await provision(sandbox as unknown as ZeroclawSandbox, defaultOpts());

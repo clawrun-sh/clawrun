@@ -12,9 +12,6 @@ import {
   CombinedAutocompleteProvider,
   matchesKey,
   Key,
-  getCapabilities,
-  getImageDimensions,
-  imageFallback,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
 import { randomUUID } from "node:crypto";
@@ -234,28 +231,11 @@ export async function startChatTUI(
     msg.addChild(new Spacer(1));
     msg.addChild(new Markdown(cleaned, 1, 0, markdownTheme));
 
-    // Render extracted images (if terminal supports them)
-    const caps = getCapabilities();
     for (const img of images) {
-      if (caps.images) {
-        msg.addChild(new Spacer(1));
-        msg.addChild(
-          new Image(
-            img.base64,
-            img.mimeType,
-            {
-              fallbackColor: colors.dim,
-            },
-            {
-              maxWidthCells: 60,
-            },
-          ),
-        );
-      } else {
-        const dims = getImageDimensions(img.base64, img.mimeType) ?? undefined;
-        msg.addChild(new Spacer(1));
-        msg.addChild(new Markdown(imageFallback(img.mimeType, dims, img.alt), 1, 0, markdownTheme));
-      }
+      msg.addChild(new Spacer(1));
+      msg.addChild(
+        new Image(img.base64, img.mimeType, { fallbackColor: colors.dim }, { maxWidthCells: 60 }),
+      );
     }
 
     chatContainer.addChild(msg);
@@ -345,6 +325,7 @@ export async function startChatTUI(
       tui.requestRender();
     }
 
+    const fileImages: ExtractedImage[] = [];
     let responseText: string | undefined;
     let hasError = false;
     try {
@@ -368,6 +349,14 @@ export async function startChatTUI(
           const toolLabel = `\`${toolName}\` ${input ? formatToolArgs(input) : ""}`;
           toolLines.push(toolLabel);
           updateStreamContent();
+        } else if (chunk.type === "file" && chunk.url?.startsWith("data:image/")) {
+          // Parse data URI directly — avoid regex on huge base64 strings
+          const semicolonIdx = chunk.url.indexOf(";base64,");
+          if (semicolonIdx > 0) {
+            const mimeType = chunk.url.substring(5, semicolonIdx); // "image/png"
+            const base64 = chunk.url.substring(semicolonIdx + 8); // raw base64
+            fileImages.push({ alt: "image", mimeType, base64 });
+          }
         } else if (chunk.type === "finish-step") {
           // Step boundary — agent will think about tool results next
           showThinkingLoader();
@@ -399,6 +388,13 @@ export async function startChatTUI(
         chatContainer.removeChild(streamMsg);
       }
       addAgentMessage(responseText);
+    } else if (fileImages.length > 0) {
+      const target = streamMsg ?? chatContainer;
+      for (const img of fileImages) {
+        target.addChild(new Spacer(1));
+        target.addChild(new Image(img.base64, img.mimeType, { fallbackColor: colors.dim }));
+      }
+      tui.requestRender();
     } else if (!streaming && !hasError) {
       // No streaming events and no error — show empty response
       addAgentMessage(streamText || colors.dim("(no response)"));

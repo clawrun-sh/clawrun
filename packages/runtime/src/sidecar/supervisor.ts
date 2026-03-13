@@ -56,8 +56,14 @@ export function superviseDaemon(
         (state.daemonRestarts > 0 ? ` (restart #${state.daemonRestarts})` : ""),
     );
 
+    const home = process.env.HOME!;
     const child = spawn(config.daemon.cmd, config.daemon.args, {
-      env: { ...process.env, ...config.daemon.env },
+      cwd: home,
+      env: {
+        ...process.env,
+        ...config.daemon.env,
+        SHELL: process.env.SHELL ?? "/bin/bash",
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
 

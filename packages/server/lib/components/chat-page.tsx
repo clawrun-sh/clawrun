@@ -45,12 +45,23 @@ import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
 import { Check, Clipboard, SquarePen, Loader2, MessageSquare } from "lucide-react";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { defaultRehypePlugins } from "streamdown";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
 import { useSetHeaderActions } from "./header-actions";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 import { useSandboxState } from "../hooks/use-sandbox-state";
 
 const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
+
+// Override streamdown's default harden plugin to silently remove blocked images
+// instead of showing "[Image blocked: ...]". Images from the agent are delivered
+// as SDK file parts, so markdown image refs to local filenames are expected to
+// be unresolvable and should be hidden.
+const hardenEntry = defaultRehypePlugins.harden as [Function, Record<string, unknown>];
+const rehypePlugins = Object.values({
+  ...defaultRehypePlugins,
+  harden: [hardenEntry[0], { ...hardenEntry[1], imageBlockPolicy: "remove" }],
+}) as typeof defaultRehypePlugins extends Record<string, infer V> ? V[] : never;
 
 type ContentPart = { type: "text"; content: string } | { type: "image"; alt: string; src: string };
 
@@ -229,7 +240,9 @@ export default function ChatPage(_props: ChatPageProps) {
                           const segments = splitContentParts(part.text);
                           return segments.map((seg, j) =>
                             seg.type === "text" ? (
-                              <MessageResponse key={`${i}-${j}`}>{seg.content}</MessageResponse>
+                              <MessageResponse key={`${i}-${j}`} rehypePlugins={rehypePlugins}>
+                                {seg.content}
+                              </MessageResponse>
                             ) : (
                               <img
                                 key={`${i}-${j}`}
