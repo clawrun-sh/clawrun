@@ -14,7 +14,8 @@ import type {
   CostInfo,
   DiagResult,
 } from "@clawrun/agent";
-import type { UIMessage, UIMessageStreamWriter } from "ai";
+import type { UIMessage, UIMessageStreamWriter, UIMessageChunk } from "ai";
+import { generateId } from "ai";
 import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("zeroclaw:ws");
@@ -25,29 +26,14 @@ const log = createLogger("zeroclaw:ws");
 export type HistoryMessage = { role: string; content: string };
 
 /**
- * Superset of all daemon WebSocket message shapes across both `/ws/chat` and
- * `/ws/clawrun` protocols. Not all fields are present in every message — the
- * `type` discriminant determines which fields are meaningful.
+ * Daemon `/ws/clawrun` WebSocket message shapes. Not all fields are present
+ * in every message — the `type` discriminant determines which are meaningful.
  */
 interface DaemonWsMessage {
-  type?:
-    | "message"
-    | "chunk"
-    | "done"
-    | "error"
-    | "history" // both protocols
-    | "tool_call"
-    | "tool_result" // /ws/chat only
-    | "status"
-    | "tool_progress"
-    | "clear"; // /ws/clawrun only
+  type?: "message" | "chunk" | "done" | "error" | "history" | "status" | "tool_progress" | "clear";
   content?: string;
   full_response?: string;
   message?: string;
-  // /ws/chat structured tool fields
-  name?: string;
-  args?: Record<string, unknown>;
-  output?: string;
   // history payload
   messages?: HistoryMessage[];
   thread_id?: string;
@@ -388,7 +374,7 @@ export class StreamingTagParser {
     if (!content) return;
     this.receivedAny = true;
     if (!this.textOpen) {
-      this.textId = crypto.randomUUID();
+      this.textId = generateId();
       this.writer.write({ type: "text-start", id: this.textId });
       this.textOpen = true;
     }
@@ -408,7 +394,7 @@ export class StreamingTagParser {
   }
 
   private startReasoning(): void {
-    this.reasoningId = crypto.randomUUID();
+    this.reasoningId = generateId();
     this.writer.write({ type: "reasoning-start", id: this.reasoningId });
     this.reasoningOpen = true;
     this.receivedAny = true;
@@ -430,7 +416,7 @@ export class StreamingTagParser {
   private emitToolCall(): void {
     this.receivedAny = true;
     this.closeText();
-    this.currentToolCallId = crypto.randomUUID();
+    this.currentToolCallId = generateId();
     let args: Record<string, unknown> = {};
     try {
       const parsed = JSON.parse(this.toolCallBuffer.trim());
@@ -453,6 +439,9 @@ export class StreamingTagParser {
       output: this.toolResultBuffer.trim() || "completed",
       dynamic: true,
     });
+    // Signal step boundary so clients can show a "thinking" indicator
+    // while the agent processes the tool result before the next response.
+    this.writer.write({ type: "finish-step" });
   }
 }
 
@@ -526,6 +515,15 @@ export async function embedImages(
 ): Promise<string> {
   const agentDir = `${root}/agent`;
 
+  /** Read a file from the sandbox, returning null on any error. */
+  async function safeReadFile(path: string): Promise<Buffer | null> {
+    try {
+      return await sandbox.readFile(path);
+    } catch {
+      return null;
+    }
+  }
+
   // 1. Handle ![alt](attachment:filename)
   const attachmentMatches = [...text.matchAll(ATTACHMENT_RE)];
   for (const m of attachmentMatches) {
@@ -533,7 +531,7 @@ export async function embedImages(
     const mime = mimeFromPath(filename);
     if (!mime) continue;
 
-    const buf = await sandbox.readFile(`${agentDir}/${filename}`);
+    const buf = await safeReadFile(`${agentDir}/${filename}`);
     if (!buf) continue;
 
     const b64 = buf.toString("base64");
@@ -547,7 +545,7 @@ export async function embedImages(
     const mime = mimeFromPath(filePath);
     if (!mime) continue;
 
-    const buf = await sandbox.readFile(filePath);
+    const buf = await safeReadFile(filePath);
     if (!buf) continue;
 
     const b64 = buf.toString("base64");
@@ -567,8 +565,8 @@ export async function embedImages(
     if (!mime) continue;
 
     const buf =
-      (await sandbox.readFile(`${agentDir}/${filename}`)) ??
-      (await sandbox.readFile(`${agentDir}/workspace/${filename}`));
+      (await safeReadFile(`${agentDir}/${filename}`)) ??
+      (await safeReadFile(`${agentDir}/workspace/${filename}`));
     if (!buf) continue;
 
     const b64 = buf.toString("base64");
@@ -599,10 +597,9 @@ export function buildDaemonWsUrl(sandbox: SandboxHandle, path: string, threadId?
 async function fetchHistoryViaWs(
   sandbox: SandboxHandle,
   threadId: string,
-  path: string,
   opts?: { signal?: AbortSignal },
 ): Promise<HistoryMessage[]> {
-  const wsUrl = buildDaemonWsUrl(sandbox, path, threadId);
+  const wsUrl = buildDaemonWsUrl(sandbox, "/ws/clawrun", threadId);
   log.info(`fetchHistory url=${wsUrl} threadId=${threadId}`);
 
   return new Promise<HistoryMessage[]>((resolve, reject) => {
@@ -707,25 +704,20 @@ export async function sendMessageViaCli(
 // --- Send via daemon WebSocket ---
 
 /**
- * Send a message and collect a batch AgentResponse. Handles both /ws/chat and
- * /ws/clawrun protocols — the superset of message types is switched; types that
- * a given protocol never sends simply never match.
+ * Send a message via `/ws/clawrun` and collect a batch AgentResponse.
  */
 async function sendViaWs(
   sandbox: SandboxHandle,
   root: string,
   message: string,
-  path: string,
   opts?: {
     env?: Record<string, string>;
     signal?: AbortSignal;
     threadId?: string;
   },
 ): Promise<AgentResponse> {
-  const wsUrl = buildDaemonWsUrl(sandbox, path, opts?.threadId);
+  const wsUrl = buildDaemonWsUrl(sandbox, "/ws/clawrun", opts?.threadId);
   log.info(`send url=${wsUrl} threadId=${opts?.threadId ?? "(none)"}`);
-
-  const toolCalls: ToolCallInfo[] = [];
 
   return new Promise<AgentResponse>((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
@@ -785,21 +777,6 @@ async function sendViaWs(
           pendingContent += msg.content ?? "";
           break;
         }
-        // /ws/chat: structured tool messages
-        case "tool_call": {
-          toolCalls.push({
-            name: msg.name ?? "unknown",
-            arguments: msg.args ?? {},
-          });
-          break;
-        }
-        case "tool_result": {
-          if (toolCalls.length > 0) {
-            toolCalls[toolCalls.length - 1].output = msg.output ?? "";
-          }
-          break;
-        }
-        // /ws/clawrun: informational events
         case "status":
         case "tool_progress": {
           log.debug(`${msg.type}: ${msg.content ?? ""}`);
@@ -814,8 +791,7 @@ async function sendViaWs(
           const raw = (msg.full_response ?? msg.content ?? pendingContent).trim();
           const finalContent =
             raw || "Tool execution completed, but no final response text was returned.";
-          const { cleanText, toolCalls: extractedTools } = extractToolCalls(finalContent);
-          const finalTools = toolCalls.length > 0 ? toolCalls : extractedTools;
+          const { cleanText, toolCalls } = extractToolCalls(finalContent);
           pendingContent = "";
           cleanup();
           embedImages(sandbox, root, cleanText).then(
@@ -824,7 +800,7 @@ async function sendViaWs(
                 resolve({
                   success: true,
                   message: enriched,
-                  toolCalls: finalTools,
+                  toolCalls,
                 }),
               ),
             (err) => settle(() => reject(err)),
@@ -862,10 +838,11 @@ async function sendViaWs(
 // --- Stream via daemon WebSocket → AI SDK UIMessageStream ---
 
 /**
- * Adapter: connects to ZeroClaw daemon WS and writes AI SDK UIMessageStream
- * events directly to the writer. Handles both /ws/chat and /ws/clawrun
- * protocols — the superset of message types is switched; types that a given
- * protocol never sends simply never match.
+ * Adapter: connects to ZeroClaw daemon `/ws/clawrun` and writes AI SDK
+ * UIMessageStream events directly to the writer.
+ *
+ * Pre-clear chunks (intermediate tool-loop output) go to a discarded writer.
+ * After `clear`, chunks stream to the real writer (final answer).
  *
  * Chunks are processed through StreamingTagParser which handles:
  *   - `<thinking>` → reasoning-start/delta/end
@@ -873,42 +850,58 @@ async function sendViaWs(
  *   - `<tool_call>` → tool-input-available
  *   - `<tool_result>` → tool-output-available
  *
- * /ws/chat may also send structured `tool_call`/`tool_result` WS messages
- * which are handled alongside the XML tag parsing.
- *
- * /ws/clawrun may send `status`, `tool_progress`, and `clear` events which
- * are logged or used to flush the parser.
+ * `tool_progress` events are parsed for real-time tool status updates.
+ * `clear` marks the boundary between tool-loop output and final answer.
  */
 async function streamViaWs(
   sandbox: SandboxHandle,
   root: string,
   message: string,
   writer: UIMessageStreamWriter,
-  path: string,
   opts?: { signal?: AbortSignal; threadId?: string },
 ): Promise<void> {
-  const wsUrl = buildDaemonWsUrl(sandbox, path, opts?.threadId);
+  const wsUrl = buildDaemonWsUrl(sandbox, "/ws/clawrun", opts?.threadId);
   log.info(`stream url=${wsUrl} threadId=${opts?.threadId ?? "(none)"}`);
-
-  const isClawrun = path === "/ws/clawrun";
 
   return new Promise<void>((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
     const signal = opts?.signal;
     let settled = false;
 
-    // Null writer pattern: for /ws/clawrun, pre-clear chunks go to a
-    // discarded writer (intermediate tool-loop output); only post-clear
-    // chunks stream to the real writer (final answer).
-    const nullWriter = { write: () => {} } as unknown as UIMessageStreamWriter;
+    const messageId = generateId();
 
-    let parser = new StreamingTagParser(isClawrun ? nullWriter : writer);
+    // Wrap the writer so the `start` event is emitted lazily — only when
+    // actual content is about to be written. This keeps the client in the
+    // "submitted" (thinking) state until the daemon produces output, rather
+    // than flipping to "streaming" the moment the WS opens.
+    let startSent = false;
+    const lazyWriter = new Proxy(writer, {
+      get(target, prop, receiver) {
+        if (prop === "write") {
+          return (chunk: UIMessageChunk) => {
+            if (!startSent) {
+              startSent = true;
+              target.write({ type: "start", messageId });
+            }
+            target.write(chunk);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+
+    // Pre-clear chunks are intermediate tool-loop output — discard them.
+    // After `clear`, the parser switches to lazyWriter for the final answer.
+    const nullWriter: UIMessageStreamWriter = {
+      write() {},
+      merge() {},
+      onError: undefined,
+    };
+
+    let parser = new StreamingTagParser(nullWriter);
     let receivedClear = false;
 
-    // Track current tool call ID for structured WS tool messages (/ws/chat)
-    let currentToolCallId = "";
-
-    // Tool progress tracking for /ws/clawrun
+    // Tool progress tracking
     interface TrackedToolEntry {
       name: string;
       hint: string;
@@ -966,41 +959,12 @@ async function streamViaWs(
           break;
         }
 
-        // /ws/chat: structured tool messages
-        case "tool_call": {
-          parser.flush();
-          currentToolCallId = crypto.randomUUID();
-          writer.write({
-            type: "tool-input-available",
-            toolCallId: currentToolCallId,
-            toolName: msg.name ?? "unknown",
-            input: msg.args ?? {},
-            dynamic: true,
-          });
-          break;
-        }
-
-        case "tool_result": {
-          writer.write({
-            type: "tool-output-available",
-            toolCallId: currentToolCallId,
-            output: msg.output ?? "completed",
-            dynamic: true,
-          });
-          break;
-        }
-
-        // /ws/clawrun: informational events
         case "status": {
           log.debug(`status: ${msg.content ?? ""}`);
           break;
         }
 
         case "tool_progress": {
-          if (!isClawrun) {
-            log.debug(`tool_progress: ${msg.content ?? ""}`);
-            break;
-          }
           const content = msg.content ?? "";
           const lines = content.split("\n").filter((l: string) => l.trim());
           for (let i = 0; i < lines.length; i++) {
@@ -1008,14 +972,14 @@ async function streamViaWs(
             if (!parsed) continue;
             if (i >= trackedTools.length) {
               // New tool — emit tool-input-available
-              const toolCallId = crypto.randomUUID();
+              const toolCallId = generateId();
               trackedTools.push({
                 name: parsed.name,
                 hint: parsed.hint,
                 toolCallId,
                 completed: parsed.completed,
               });
-              writer.write({
+              lazyWriter.write({
                 type: "tool-input-available",
                 toolCallId,
                 toolName: parsed.name,
@@ -1024,14 +988,14 @@ async function streamViaWs(
               });
               if (parsed.completed) {
                 if (parsed.success) {
-                  writer.write({
+                  lazyWriter.write({
                     type: "tool-output-available",
                     toolCallId,
                     output: "completed",
                     dynamic: true,
                   });
                 } else {
-                  writer.write({
+                  lazyWriter.write({
                     type: "tool-output-error",
                     toolCallId,
                     errorText: "Tool execution failed",
@@ -1042,14 +1006,14 @@ async function streamViaWs(
             } else if (!trackedTools[i].completed && parsed.completed) {
               trackedTools[i].completed = true;
               if (parsed.success) {
-                writer.write({
+                lazyWriter.write({
                   type: "tool-output-available",
                   toolCallId: trackedTools[i].toolCallId,
                   output: "completed",
                   dynamic: true,
                 });
               } else {
-                writer.write({
+                lazyWriter.write({
                   type: "tool-output-error",
                   toolCallId: trackedTools[i].toolCallId,
                   errorText: "Tool execution failed",
@@ -1063,43 +1027,59 @@ async function streamViaWs(
 
         case "clear": {
           parser.flush();
-          if (isClawrun) {
-            receivedClear = true;
-            parser = new StreamingTagParser(writer);
+          // Only emit a step boundary if there was actual tool activity
+          // before the clear. The daemon sends `clear` even for simple
+          // text responses with no tools — emitting finish-step there
+          // would produce a spurious step that kills the thinking state.
+          if (trackedTools.length > 0) {
+            lazyWriter.write({ type: "finish-step" });
           }
+          receivedClear = true;
+          parser = new StreamingTagParser(lazyWriter);
           break;
         }
 
         case "message":
         case "done": {
-          // Flush any remaining buffered chunk content
           parser.flush();
 
-          if (isClawrun && receivedClear && parser.hasEmitted) {
-            // /ws/clawrun: post-clear content was streamed — embed images then resolve
+          if (receivedClear && parser.hasEmitted) {
+            // Post-clear content was already streamed via the parser.
+            // Mark settled before cleanup so the WS close event doesn't
+            // race and reject the promise while embedImages is running.
+            settled = true;
             cleanup();
-            try {
-              await embedImages(sandbox, root, msg.full_response ?? "");
-              settle(() => resolve());
-            } catch (err) {
-              settle(() => reject(err as Error));
+            const raw = msg.full_response ?? "";
+            const enriched = await embedImages(sandbox, root, raw);
+            if (enriched !== raw) {
+              // Extract embedded data-URI images and emit as SDK file parts
+              const DATA_URI_RE =
+                /!\[([^\]]*)\]\((data:image\/([^;]+);base64,[A-Za-z0-9+/=\s]+)\)/g;
+              for (const match of enriched.matchAll(DATA_URI_RE)) {
+                const [, , dataUri, subtype] = match;
+                lazyWriter.write({
+                  type: "file",
+                  url: dataUri,
+                  mediaType: `image/${subtype}`,
+                });
+              }
             }
-          } else if (!isClawrun && parser.hasEmitted) {
-            // /ws/chat: content was streamed via chunks — already emitted
-            cleanup();
-            settle(() => resolve());
+            lazyWriter.write({ type: "finish", finishReason: "stop" });
+            resolve();
           } else {
             // No streaming happened — parse the full response for tags + images
             const raw = (msg.full_response ?? msg.content ?? "").trim();
             const finalContent =
               raw || "Tool execution completed, but no final response text was returned.";
+            settled = true;
             cleanup();
             try {
               const enriched = await embedImages(sandbox, root, finalContent);
-              emitParsedResponse(writer, enriched);
-              settle(() => resolve());
+              emitParsedResponse(lazyWriter, enriched);
+              lazyWriter.write({ type: "finish", finishReason: "stop" });
+              resolve();
             } catch (err) {
-              settle(() => reject(err as Error));
+              reject(err as Error);
             }
           }
           break;
@@ -1107,7 +1087,7 @@ async function streamViaWs(
 
         case "error": {
           parser.flush();
-          writer.write({
+          lazyWriter.write({
             type: "error",
             errorText: msg.message ?? "Unknown error",
           });
@@ -1146,7 +1126,7 @@ async function streamViaWs(
 
     ws.on("error", (err: Error) => {
       parser.flush();
-      writer.write({
+      lazyWriter.write({
         type: "error",
         errorText: err.message ?? "Connection error",
       });
@@ -1166,7 +1146,7 @@ async function streamViaWs(
 }
 
 // ---------------------------------------------------------------------------
-// Public exports — try /ws/clawrun first, fall back to /ws/chat
+// Public exports
 // ---------------------------------------------------------------------------
 
 export async function fetchHistoryViaDaemon(
@@ -1175,19 +1155,7 @@ export async function fetchHistoryViaDaemon(
   threadId: string,
   opts?: { signal?: AbortSignal },
 ): Promise<HistoryMessage[]> {
-  try {
-    return await fetchHistoryViaWs(sandbox, threadId, "/ws/clawrun", opts);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(
-      `/ws/clawrun unavailable for history, using /ws/chat: ${err instanceof Error ? err.message : err}`,
-    );
-  }
-  try {
-    return await fetchHistoryViaWs(sandbox, threadId, "/ws/chat", opts);
-  } catch {
-    return [];
-  }
+  return fetchHistoryViaWs(sandbox, threadId, opts);
 }
 
 export async function sendMessageViaDaemon(
@@ -1200,15 +1168,7 @@ export async function sendMessageViaDaemon(
     threadId?: string;
   },
 ): Promise<AgentResponse> {
-  try {
-    return await sendViaWs(sandbox, root, message, "/ws/clawrun", opts);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(
-      `/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`,
-    );
-  }
-  return await sendViaWs(sandbox, root, message, "/ws/chat", opts);
+  return sendViaWs(sandbox, root, message, opts);
 }
 
 export async function streamMessageViaDaemon(
@@ -1218,15 +1178,7 @@ export async function streamMessageViaDaemon(
   writer: UIMessageStreamWriter,
   opts?: { signal?: AbortSignal; threadId?: string },
 ): Promise<void> {
-  try {
-    return await streamViaWs(sandbox, root, message, writer, "/ws/clawrun", opts);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
-    log.warn(
-      `/ws/clawrun unavailable, using /ws/chat: ${err instanceof Error ? err.message : err}`,
-    );
-  }
-  return await streamViaWs(sandbox, root, message, writer, "/ws/chat", opts);
+  return streamViaWs(sandbox, root, message, writer, opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -1399,7 +1351,7 @@ export function parseAssistantParts(content: string): UIMessage["parts"] {
       parts.push({
         type: "dynamic-tool" as const,
         toolName: name,
-        toolCallId: crypto.randomUUID(),
+        toolCallId: generateId(),
         state: "output-available" as const,
         input,
         output,
@@ -1779,14 +1731,14 @@ export async function getThreadViaDaemon(
 
       if (parsed.role === "user") {
         return {
-          id: crypto.randomUUID(),
+          id: generateId(),
           role: "user" as const,
           parts: [{ type: "text" as const, text: content }],
         };
       }
 
       return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "assistant" as const,
         parts: parseAssistantParts(content),
       };

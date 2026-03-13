@@ -263,6 +263,16 @@ export default function ChatPage(_props: ChatPageProps) {
                             </Tool>
                           );
                         }
+                        if (part.type === "file" && part.mediaType.startsWith("image/")) {
+                          return (
+                            <img
+                              key={i}
+                              src={part.url}
+                              alt={part.filename ?? "image"}
+                              className="my-2 max-w-full rounded-md"
+                            />
+                          );
+                        }
                         return null;
                       })
                     : m.parts.map((part, i) => {

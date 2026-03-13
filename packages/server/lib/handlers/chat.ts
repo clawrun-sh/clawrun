@@ -1,5 +1,5 @@
-import { createUIMessageStream } from "ai";
-import type { TextUIPart, UIMessageChunk } from "ai";
+import { createUIMessageStream, createUIMessageStreamResponse, isTextUIPart } from "ai";
+import type { UIMessageChunk, UIDataTypes, UITools, UIMessagePart } from "ai";
 import { getProvider } from "@clawrun/provider";
 import { getAgent, getRuntimeConfig, resolveRoot, SandboxLifecycleManager } from "@clawrun/runtime";
 import { createLogger } from "@clawrun/logger";
@@ -41,9 +41,7 @@ export async function POST(req: Request) {
     if (last && typeof last.content === "string" && last.content.trim()) {
       message = last.content.trim();
     } else if (last && Array.isArray(last.parts)) {
-      const textPart = (last.parts as Array<{ type: string; text?: string }>).find(
-        (p): p is TextUIPart => p.type === "text" && typeof p.text === "string",
-      );
+      const textPart = (last.parts as UIMessagePart<UIDataTypes, UITools>[]).find(isTextUIPart);
       if (textPart) message = textPart.text.trim();
     }
   }
@@ -93,36 +91,23 @@ export async function POST(req: Request) {
     },
   });
 
-  // Format stream parts as SSE events with a small delay between text/reasoning
-  // deltas for progressive streaming. Without the delay, all word-deltas from a
-  // single daemon WS chunk are written synchronously and coalesce into one TCP
-  // write. The pause matches the AI SDK smoothStream default and gives the
-  // HTTP response pipeline time to flush each event individually.
+  // Insert a small delay between text/reasoning delta events for progressive
+  // streaming. Without the pause, word-level deltas from a single daemon WS
+  // chunk coalesce into one TCP write. The delay matches the AI SDK
+  // smoothStream default and gives the HTTP pipeline time to flush each event.
   const DELTA_TYPES = new Set<UIMessageChunk["type"]>(["text-delta", "reasoning-delta"]);
 
-  const sseStream = stream
-    .pipeThrough(
-      new TransformStream<UIMessageChunk, string>({
-        async transform(part, controller) {
-          controller.enqueue(`data: ${JSON.stringify(part)}\n\n`);
-          if (DELTA_TYPES.has(part.type)) {
-            await new Promise<void>((r) => setTimeout(r, SSE_DELTA_DELAY_MS));
-          }
-        },
-        flush(controller) {
-          controller.enqueue("data: [DONE]\n\n");
-        },
-      }),
-    )
-    .pipeThrough(new TextEncoderStream());
+  const delayedStream = stream.pipeThrough(
+    new TransformStream<UIMessageChunk, UIMessageChunk>({
+      async transform(part, controller) {
+        controller.enqueue(part);
+        if (DELTA_TYPES.has(part.type)) {
+          await new Promise<void>((r) => setTimeout(r, SSE_DELTA_DELAY_MS));
+        }
+      },
+    }),
+  );
 
-  return new Response(sseStream, {
-    headers: {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache, no-transform",
-      connection: "keep-alive",
-      "x-vercel-ai-ui-message-stream": "v1",
-      "x-accel-buffering": "no",
-    },
-  });
+  // Delegate SSE framing (JsonToSseTransformStream + [DONE] + headers) to the SDK
+  return createUIMessageStreamResponse({ stream: delayedStream });
 }

@@ -325,26 +325,52 @@ export async function startChatTUI(
       tui.requestRender();
     }
 
+    function showThinkingLoader() {
+      if (streaming) {
+        // Re-show loader below the streamed content
+        const thinkingLoader = new CancellableLoader(
+          tui,
+          colors.spinnerFn,
+          colors.spinnerMsgFn,
+          "Thinking...",
+        );
+        statusContainer.addChild(thinkingLoader);
+        thinkingLoader.start();
+        tui.requestRender();
+      }
+    }
+
+    function hideThinkingLoader() {
+      statusContainer.clear();
+      tui.requestRender();
+    }
+
     let responseText: string | undefined;
     let hasError = false;
     try {
       const stream = instance.chat(message, { id: threadId, signal: loader.signal });
       for await (const chunk of stream) {
         if (chunk.type === "text-delta") {
+          hideThinkingLoader();
           ensureStreaming();
           streamText += chunk.delta ?? "";
           updateStreamContent();
         } else if (chunk.type === "reasoning-delta") {
+          hideThinkingLoader();
           ensureStreaming();
           reasoningText += chunk.delta ?? "";
           updateStreamContent();
         } else if (chunk.type === "tool-input-available") {
+          hideThinkingLoader();
           ensureStreaming();
           const toolName = chunk.toolName ?? "tool";
           const input = chunk.input as Record<string, unknown> | undefined;
           const toolLabel = `\`${toolName}\` ${input ? formatToolArgs(input) : ""}`;
           toolLines.push(toolLabel);
           updateStreamContent();
+        } else if (chunk.type === "finish-step") {
+          // Step boundary — agent will think about tool results next
+          showThinkingLoader();
         } else if (chunk.type === "error") {
           hasError = true;
           responseText = colors.error(chunk.errorText ?? "Unknown error");
@@ -359,7 +385,8 @@ export async function startChatTUI(
       hasError = true;
     }
 
-    // Clean up loader (may already be stopped if streaming started)
+    // Clean up loaders (initial or mid-step thinking)
+    hideThinkingLoader();
     if (!streaming) {
       loader.stop();
       loader.dispose();
