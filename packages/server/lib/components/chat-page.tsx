@@ -317,7 +317,7 @@ export default function ChatPage(_props: ChatPageProps) {
                 )}
               </Message>
             ))}
-            {status === "submitted" && (
+            {(status === "submitted" || status === "streaming") && (
               <Message from="assistant">
                 <MessageContent>
                   <Shimmer className="text-sm" duration={1.5}>
