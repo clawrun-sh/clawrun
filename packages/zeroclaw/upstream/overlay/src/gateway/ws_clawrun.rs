@@ -652,7 +652,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
     // Build executable tools registry from config (same as channels do).
     // AppState only holds ToolSpec (metadata), so we need to create the
     // actual executable tools here.
-    let (tools_registry, system_prompt, max_tool_iterations, excluded_tools) = {
+    let (tools_registry, system_prompt, max_tool_iterations, excluded_tools, dedup_exempt_tools) = {
         let config = state.config.lock().clone();
         let security = Arc::new(SecurityPolicy::from_config(
             &config.autonomy,
@@ -673,7 +673,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         } else {
             (None, None)
         };
-        let tools = crate::tools::all_tools_with_runtime(
+        let (tools, _delegate_handle) = crate::tools::all_tools_with_runtime(
             Arc::new(config.clone()),
             &security,
             runtime,
@@ -692,7 +692,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         let prompt = build_ws_system_prompt(&config, &state.model, &tools, native_tools);
         let max_iters = config.agent.max_tool_iterations;
         let excluded = config.autonomy.non_cli_excluded_tools.clone();
-        (tools, prompt, max_iters, excluded)
+        let dedup_exempt = config.agent.tool_call_dedup_exempt.clone();
+        (tools, prompt, max_iters, excluded, dedup_exempt)
     };
 
     // Split the socket into sender/receiver halves for concurrent read/write.
@@ -825,7 +826,16 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         let configured_hooks: Option<Arc<crate::hooks::HookRunner>> = {
             let config = state.config.lock();
             if config.hooks.enabled {
-                Some(Arc::new(crate::hooks::HookRunner::new()))
+                let mut runner = crate::hooks::HookRunner::new();
+                if config.hooks.builtin.command_logger {
+                    runner.register(Box::new(crate::hooks::builtin::CommandLoggerHook::new()));
+                }
+                if config.hooks.builtin.webhook_audit.enabled {
+                    runner.register(Box::new(crate::hooks::builtin::WebhookAuditHook::new(
+                        config.hooks.builtin.webhook_audit.clone(),
+                    )));
+                }
+                Some(Arc::new(runner))
             } else {
                 None
             }
@@ -906,6 +916,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
                 Some(delta_tx),                          // on_delta
                 configured_hooks.as_deref(),             // hooks
                 &excluded_tools,                         // excluded tools
+                &dedup_exempt_tools,                     // dedup exempt tools
             ),
         )
         .await;

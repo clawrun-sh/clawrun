@@ -18,6 +18,11 @@ export interface Config {
    */
   api_key?: string | null;
   /**
+   * Custom API path suffix for OpenAI-compatible / custom providers
+   * (e.g. "/v2/generate" instead of the default "/v1/chat/completions").
+   */
+  api_path?: string | null;
+  /**
    * Base URL override for provider API (e.g. "http://10.0.0.1:11434" for remote Ollama)
    */
   api_url?: string | null;
@@ -43,12 +48,26 @@ export interface Config {
    * Embedding routing rules — route `hint:<name>` to specific provider+model combos.
    */
   embedding_routes?: EmbeddingRouteConfig[];
+  /**
+   * Extra HTTP headers to include in LLM provider API requests.
+   *
+   * Some providers require specific headers (e.g., `User-Agent`, `HTTP-Referer`,
+   * `X-Title`) for request routing or policy enforcement. Headers defined here
+   * augment (and override) the program's default headers.
+   *
+   * Can also be set via `ZEROCLAW_EXTRA_HEADERS` environment variable using
+   * the format `Key:Value,Key2:Value2`. Env var headers override config file headers.
+   */
+  extra_headers?: {
+    [k: string]: string;
+  };
   gateway?: GatewayConfig;
   hardware?: HardwareConfig;
   heartbeat?: HeartbeatConfig;
   hooks?: HooksConfig;
   http_request?: HttpRequestConfig;
   identity?: IdentityConfig;
+  mcp?: McpConfig;
   memory?: MemoryConfig;
   /**
    * Optional named provider profiles keyed by id (Codex app-server compatible layout).
@@ -61,8 +80,16 @@ export interface Config {
    */
   model_routes?: ModelRouteConfig[];
   multimodal?: MultimodalConfig;
+  nodes?: NodesConfig;
   observability?: ObservabilityConfig;
   peripherals?: PeripheralsConfig;
+  /**
+   * HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
+   *
+   * Increase for slower backends (e.g., llama.cpp on constrained hardware)
+   * that need more time processing large contexts.
+   */
+  provider_timeout_secs?: number;
   proxy?: ProxyConfig;
   query_classification?: QueryClassificationConfig;
   reliability?: ReliabilityConfig;
@@ -101,9 +128,58 @@ export interface AgentConfig {
    */
   parallel_tools?: boolean;
   /**
+   * Tools exempt from the within-turn duplicate-call dedup check. Default: `[]`.
+   */
+  tool_call_dedup_exempt?: string[];
+  /**
    * Tool dispatch strategy (e.g. `"auto"`). Default: `"auto"`.
    */
   tool_dispatcher?: string;
+  /**
+   * Per-turn MCP tool schema filtering groups.
+   *
+   * When non-empty, only MCP tools matched by an active group are included in the
+   * tool schema sent to the LLM for that turn. Built-in tools always pass through.
+   * Default: `[]` (no filtering — all tools included).
+   */
+  tool_filter_groups?: ToolFilterGroup[];
+  [k: string]: unknown;
+}
+/**
+ * A named group of MCP tool patterns with an activation mode.
+ *
+ * Each group lists glob patterns for MCP tool names (prefix `mcp_`) and an
+ * optional set of keywords that trigger inclusion in `dynamic` mode.
+ * Built-in (non-MCP) tools always pass through and are never affected by
+ * `tool_filter_groups`.
+ *
+ * # Example
+ * ```toml
+ * [[agent.tool_filter_groups]]
+ * mode = "always"
+ * tools = ["mcp_filesystem_*"]
+ * keywords = []
+ *
+ * [[agent.tool_filter_groups]]
+ * mode = "dynamic"
+ * tools = ["mcp_browser_*"]
+ * keywords = ["browse", "website", "url", "search"]
+ * ```
+ */
+export interface ToolFilterGroup {
+  /**
+   * Keywords that activate this group in `dynamic` mode (case-insensitive substring).
+   * Ignored when `mode = "always"`.
+   */
+  keywords?: string[];
+  /**
+   * Activation mode: `"always"` or `"dynamic"`.
+   */
+  mode?: "always" | "dynamic";
+  /**
+   * Glob patterns matching MCP tool names (single `*` wildcard supported).
+   */
+  tools?: string[];
   [k: string]: unknown;
 }
 /**
@@ -289,6 +365,11 @@ export interface BrowserComputerUseConfig {
  */
 export interface ChannelsConfig {
   /**
+   * Whether to add acknowledgement reactions (👀 on receipt, ✅/⚠️ on
+   * completion) to incoming channel messages. Default: `true`.
+   */
+  ack_reactions?: boolean;
+  /**
    * ClawdTalk voice channel configuration.
    */
   clawdtalk?: ClawdTalkConfig | null;
@@ -373,6 +454,10 @@ export interface ChannelsConfig {
    * Webhook channel configuration.
    */
   webhook?: WebhookConfig | null;
+  /**
+   * WeCom (WeChat Enterprise) Bot Webhook channel configuration.
+   */
+  wecom?: WeComConfig | null;
   /**
    * WhatsApp channel configuration (Cloud API or Web mode).
    */
@@ -905,6 +990,20 @@ export interface WebhookConfig {
   [k: string]: unknown;
 }
 /**
+ * WeCom (WeChat Enterprise) Bot Webhook configuration
+ */
+export interface WeComConfig {
+  /**
+   * Allowed user IDs. Empty = deny all, "*" = allow all
+   */
+  allowed_users?: string[];
+  /**
+   * Webhook key from WeCom Bot configuration
+   */
+  webhook_key: string;
+  [k: string]: unknown;
+}
+/**
  * WhatsApp channel configuration (Cloud API or Web mode).
  *
  * Set `phone_number_id` for Cloud API mode, or `session_path` for Web mode.
@@ -1270,6 +1369,69 @@ export interface IdentityConfig {
   [k: string]: unknown;
 }
 /**
+ * External MCP server connections (`[mcp]`).
+ */
+export interface McpConfig {
+  /**
+   * Load MCP tool schemas on-demand via `tool_search` instead of eagerly
+   * including them in the LLM context window. When `true` (the default),
+   * only tool names are listed in the system prompt; the LLM must call
+   * `tool_search` to fetch full schemas before invoking a deferred tool.
+   */
+  deferred_loading?: boolean;
+  /**
+   * Enable MCP tool loading.
+   */
+  enabled?: boolean;
+  /**
+   * Configured MCP servers.
+   */
+  servers?: McpServerConfig[];
+  [k: string]: unknown;
+}
+/**
+ * Configuration for a single external MCP server.
+ */
+export interface McpServerConfig {
+  /**
+   * Command arguments for stdio transport.
+   */
+  args?: string[];
+  /**
+   * Executable to spawn for stdio transport.
+   */
+  command?: string;
+  /**
+   * Optional environment variables for stdio transport.
+   */
+  env?: {
+    [k: string]: string;
+  };
+  /**
+   * Optional HTTP headers for HTTP/SSE transports.
+   */
+  headers?: {
+    [k: string]: string;
+  };
+  /**
+   * Display name used as a tool prefix (`<server>__<tool>`).
+   */
+  name: string;
+  /**
+   * Optional per-call timeout in seconds (hard capped in validation).
+   */
+  tool_timeout_secs?: number | null;
+  /**
+   * Transport type (default: stdio).
+   */
+  transport?: "stdio" | "http" | "sse";
+  /**
+   * URL for HTTP/SSE transports.
+   */
+  url?: string | null;
+  [k: string]: unknown;
+}
+/**
  * Memory backend configuration: sqlite, markdown, embeddings (`[memory]`).
  */
 export interface MemoryConfig {
@@ -1393,6 +1555,11 @@ export interface QdrantConfig {
  */
 export interface ModelProviderConfig {
   /**
+   * Optional custom API path suffix (e.g. "/v2/generate" instead of the
+   * default "/v1/chat/completions"). Only used by OpenAI-compatible / custom providers.
+   */
+  api_path?: string | null;
+  /**
    * Azure OpenAI API version (defaults to "2024-08-01-preview").
    */
   azure_openai_api_version?: string | null;
@@ -1477,11 +1644,29 @@ export interface MultimodalConfig {
   [k: string]: unknown;
 }
 /**
+ * Dynamic node discovery configuration (`[nodes]`).
+ */
+export interface NodesConfig {
+  /**
+   * Optional bearer token for node authentication.
+   */
+  auth_token?: string | null;
+  /**
+   * Enable dynamic node discovery endpoint.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of concurrent node connections.
+   */
+  max_nodes?: number;
+  [k: string]: unknown;
+}
+/**
  * Observability backend configuration (`[observability]`).
  */
 export interface ObservabilityConfig {
   /**
-   * "none" | "log" | "prometheus" | "otel"
+   * "none" | "log" | "verbose" | "prometheus" | "otel"
    */
   backend: string;
   /**

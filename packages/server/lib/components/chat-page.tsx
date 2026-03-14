@@ -56,7 +56,10 @@ const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/
 // instead of showing "[Image blocked: ...]". Images from the agent are delivered
 // as SDK file parts, so markdown image refs to local filenames are expected to
 // be unresolvable and should be hidden.
-const hardenEntry = defaultRehypePlugins.harden as [(...args: unknown[]) => void, Record<string, unknown>];
+const hardenEntry = defaultRehypePlugins.harden as [
+  (...args: unknown[]) => void,
+  Record<string, unknown>,
+];
 const rehypePlugins = Object.values({
   ...defaultRehypePlugins,
   harden: [hardenEntry[0], { ...hardenEntry[1], imageBlockPolicy: "remove" }],

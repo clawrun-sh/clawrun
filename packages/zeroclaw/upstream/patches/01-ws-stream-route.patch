@@ -1,7 +1,7 @@
 diff --git a/src/gateway/mod.rs b/src/gateway/mod.rs
 --- a/src/gateway/mod.rs
 +++ b/src/gateway/mod.rs
-@@ -10,6 +10,7 @@
+@@ -12,6 +12,7 @@
  pub mod sse;
  pub mod static_files;
  pub mod ws;
@@ -9,10 +9,10 @@ diff --git a/src/gateway/mod.rs b/src/gateway/mod.rs
 
  use crate::channels::{
      Channel, LinqChannel, NextcloudTalkChannel, SendMessage, WatiChannel, WhatsAppChannel,
-@@ -690,6 +691,8 @@
-         .route("/api/events", get(sse::handle_sse_events))
-         // ── WebSocket agent chat ──
+@@ -696,6 +697,8 @@
          .route("/ws/chat", get(ws::handle_ws_chat))
+         // ── WebSocket node discovery ──
+         .route("/ws/nodes", get(nodes::handle_ws_nodes))
 +        // ── ClawRun streaming WebSocket channel ──
 +        .route("/ws/clawrun", get(ws_clawrun::handle_ws_clawrun))
          // ── Static assets (web dashboard) ──
