@@ -1,0 +1,94 @@
+diff --git a/src/channels/mod.rs b/src/channels/mod.rs
+index 18e0cb3..3e29567 100644
+--- a/src/channels/mod.rs
++++ b/src/channels/mod.rs
+@@ -2338,10 +2338,14 @@ async fn process_channel_message(
+     }
+ }
+ 
++/// Pre-built cost tracking context for scoping around message processing.
++type CostScopeFactory = Option<(Arc<crate::cost::CostTracker>, Arc<std::collections::HashMap<String, crate::config::schema::ModelPricing>>)>;
++
+ async fn run_message_dispatch_loop(
+     mut rx: tokio::sync::mpsc::Receiver<traits::ChannelMessage>,
+     ctx: Arc<ChannelRuntimeContext>,
+     max_in_flight_messages: usize,
++    cost_scope: CostScopeFactory,
+ ) {
+     let semaphore = Arc::new(tokio::sync::Semaphore::new(max_in_flight_messages));
+     let mut workers = tokio::task::JoinSet::new();
+@@ -2363,6 +2367,12 @@ async fn run_message_dispatch_loop(
+         let worker_ctx = Arc::clone(&ctx);
+         let in_flight = Arc::clone(&in_flight_by_sender);
+         let task_sequence = Arc::clone(&task_sequence);
++        let worker_cost_scope = cost_scope.as_ref().map(|(ct, pricing)| {
++            crate::agent::loop_::ToolLoopCostTrackingContext::new(
++                Arc::clone(ct),
++                Arc::clone(pricing),
++            )
++        });
+         workers.spawn(async move {
+             let _permit = permit;
+             let interrupt_enabled =
+@@ -2396,7 +2406,17 @@ async fn run_message_dispatch_loop(
+                 }
+             }
+ 
+-            process_channel_message(worker_ctx, msg, cancellation_token).await;
++            // Scope cost tracking task-local around message processing
++            if let Some(scope) = worker_cost_scope {
++                crate::agent::loop_::TOOL_LOOP_COST_TRACKING_CONTEXT
++                    .scope(
++                        Some(scope),
++                        process_channel_message(worker_ctx, msg, cancellation_token),
++                    )
++                    .await;
++            } else {
++                process_channel_message(worker_ctx, msg, cancellation_token).await;
++            }
+ 
+             if interrupt_enabled {
+                 let mut active = in_flight.lock().await;
+@@ -3739,7 +3759,14 @@ pub async fn start_channels(config: Config) -> Result<()> {
+         ack_reactions: config.channels_config.ack_reactions,
+     });
+ 
+-    run_message_dispatch_loop(rx, runtime_ctx, max_in_flight_messages).await;
++    // Initialize cost tracking using the process-global singleton
++    let cost_scope: CostScopeFactory = {
++        use crate::cost::CostTracker;
++        CostTracker::get_or_init_global(config.cost.clone(), &config.workspace_dir)
++            .map(|ct| (ct, Arc::new(config.cost.prices.clone())))
++    };
++
++    run_message_dispatch_loop(rx, runtime_ctx, max_in_flight_messages, cost_scope).await;
+ 
+     // Wait for all channel tasks
+     for h in handles {
+@@ -5455,7 +5482,7 @@ BTC is currently around $65,000 based on latest tool output."#
+         drop(tx);
+ 
+         let started = Instant::now();
+-        run_message_dispatch_loop(rx, runtime_ctx, 2).await;
++        run_message_dispatch_loop(rx, runtime_ctx, 2, None).await;
+         let elapsed = started.elapsed();
+ 
+         assert!(
+@@ -5539,7 +5566,7 @@ BTC is currently around $65,000 based on latest tool output."#
+             .unwrap();
+         });
+ 
+-        run_message_dispatch_loop(rx, runtime_ctx, 4).await;
++        run_message_dispatch_loop(rx, runtime_ctx, 4, None).await;
+         send_task.await.unwrap();
+ 
+         let sent_messages = channel_impl.sent_messages.lock().await;
+@@ -5634,7 +5661,7 @@ BTC is currently around $65,000 based on latest tool output."#
+             .unwrap();
+         });
+ 
+-        run_message_dispatch_loop(rx, runtime_ctx, 4).await;
++        run_message_dispatch_loop(rx, runtime_ctx, 4, None).await;
+         send_task.await.unwrap();
+ 
+         let sent_messages = channel_impl.sent_messages.lock().await;

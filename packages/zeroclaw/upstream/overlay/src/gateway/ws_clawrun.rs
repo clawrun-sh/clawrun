@@ -29,7 +29,7 @@
 use super::AppState;
 use crate::agent::loop_::{
     build_tool_instructions, run_tool_call_loop, is_tool_loop_cancelled,
-    DRAFT_CLEAR_SENTINEL,
+    DRAFT_CLEAR_SENTINEL, ToolLoopCostTrackingContext, TOOL_LOOP_COST_TRACKING_CONTEXT,
 };
 use crate::memory::MemoryCategory;
 use crate::providers::ChatMessage;
@@ -896,30 +896,55 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             ws_receiver
         });
 
+        // Prepare cost tracking scope from AppState
+        let cost_scope = state.cost_tracker.as_ref().map(|ct| {
+            let pricing = state.config.lock().cost.prices.clone();
+            ToolLoopCostTrackingContext::new(
+                Arc::clone(ct),
+                Arc::new(pricing),
+            )
+        });
+
         // Run tool loop — matches native channel calling convention.
-        let result = tokio::time::timeout(
-            Duration::from_secs(timeout_secs),
-            run_tool_call_loop(
-                state.provider.as_ref(),
-                &mut llm_history,
-                &tools_registry,
-                state.observer.as_ref(),
-                &provider_label,
-                &state.model,
-                state.temperature,
-                true,                                   // silent
-                None,                                   // approval (full autonomy)
-                "ws_clawrun",
-                &multimodal_config,
-                max_tool_iterations,
-                Some(cancellation_token.clone()),        // cancellation token
-                Some(delta_tx),                          // on_delta
-                configured_hooks.as_deref(),             // hooks
-                &excluded_tools,                         // excluded tools
-                &dedup_exempt_tools,                     // dedup exempt tools
-            ),
-        )
-        .await;
+        let tool_loop_future = run_tool_call_loop(
+            state.provider.as_ref(),
+            &mut llm_history,
+            &tools_registry,
+            state.observer.as_ref(),
+            &provider_label,
+            &state.model,
+            state.temperature,
+            true,                                   // silent
+            None,                                   // approval (full autonomy)
+            "ws_clawrun",
+            &multimodal_config,
+            max_tool_iterations,
+            Some(cancellation_token.clone()),        // cancellation token
+            Some(delta_tx),                          // on_delta
+            configured_hooks.as_deref(),             // hooks
+            &excluded_tools,                         // excluded tools
+            &dedup_exempt_tools,                     // dedup exempt tools
+        );
+
+        // Scope cost tracking task-local around the tool loop.
+        // Using match on cost_scope moves tool_loop_future into exactly one arm,
+        // ensuring the &mut llm_history borrow is released after the match.
+        let result = match cost_scope {
+            Some(scope) => {
+                tokio::time::timeout(
+                    Duration::from_secs(timeout_secs),
+                    TOOL_LOOP_COST_TRACKING_CONTEXT.scope(Some(scope), tool_loop_future),
+                )
+                .await
+            }
+            None => {
+                tokio::time::timeout(
+                    Duration::from_secs(timeout_secs),
+                    tool_loop_future,
+                )
+                .await
+            }
+        };
 
         // Wait for the delta forwarder to drain.
         let _ = delta_forwarder.await;
