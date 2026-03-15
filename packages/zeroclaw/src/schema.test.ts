@@ -17,8 +17,9 @@ describe("validateConfig", () => {
     expect(() => validateConfig("not an object")).toThrow();
   });
 
-  it("throws when default_temperature is missing", () => {
-    expect(() => validateConfig({})).toThrow();
+  it("applies default_temperature when missing", () => {
+    const result = validateConfig({});
+    expect(result.default_temperature).toBe(0.7);
   });
 
   it("accepts config with optional sections", () => {
@@ -55,8 +56,9 @@ describe("safeValidateConfig", () => {
     expect(() => safeValidateConfig(null)).not.toThrow();
   });
 
-  it("returns success false when default_temperature is missing", () => {
+  it("applies defaults when empty object is passed", () => {
     const result = safeValidateConfig({});
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.default_temperature).toBe(0.7);
   });
 });
