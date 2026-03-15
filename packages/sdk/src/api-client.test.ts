@@ -7,11 +7,11 @@ vi.mock("@clawrun/auth", () => ({
 }));
 
 describe("ApiClient", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof vi.fn<typeof fetch>>;
   let client: ApiClient;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn<typeof fetch>();
     client = new ApiClient("https://example.com", "my-secret", { fetch: mockFetch });
   });
 
@@ -237,7 +237,7 @@ describe("ApiClient", () => {
       mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
       await cookieClient.get("/test");
 
-      const callArgs = mockFetch.mock.calls[0][1];
+      const callArgs = mockFetch.mock.calls[0][1]!;
       expect(callArgs.headers).not.toHaveProperty("Authorization");
       expect(callArgs.headers).toHaveProperty("Content-Type", "application/json");
     });
@@ -277,7 +277,7 @@ describe("ApiClient", () => {
       mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
       await emptySecretClient.get("/test");
 
-      const callArgs = mockFetch.mock.calls[0][1];
+      const callArgs = mockFetch.mock.calls[0][1]!;
       expect(callArgs.headers).not.toHaveProperty("Authorization");
       expect(callArgs.credentials).toBe("same-origin");
     });
@@ -288,7 +288,7 @@ describe("ApiClient", () => {
       mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
       await client.get("/test");
 
-      const callArgs = mockFetch.mock.calls[0][1];
+      const callArgs = mockFetch.mock.calls[0][1]!;
       expect(callArgs).not.toHaveProperty("credentials");
     });
   });

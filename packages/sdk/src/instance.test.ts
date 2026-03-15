@@ -21,11 +21,11 @@ vi.mock("@clawrun/provider", () => ({
 }));
 
 describe("ClawRunInstance", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof vi.fn<typeof fetch>>;
   let config: InstanceConfig;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn<typeof fetch>();
     config = {
       api: { url: "https://my-agent.vercel.app", jwtSecret: "test-secret" },
     };
@@ -618,7 +618,7 @@ describe("ClawRunInstance", () => {
         const instance = ClawRunInstance.browser("https://my-agent.vercel.app");
         await instance.health();
 
-        const callArgs = mockFetch.mock.calls[0][1];
+        const callArgs = mockFetch.mock.calls[0][1]!;
         expect(callArgs.headers).not.toHaveProperty("Authorization");
         expect(callArgs.credentials).toBe("same-origin");
       } finally {
