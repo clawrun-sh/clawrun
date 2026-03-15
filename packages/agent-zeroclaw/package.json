@@ -1,6 +1,6 @@
 {
   "name": "@clawrun/agent-zeroclaw",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ZeroClaw agent adapter for ClawRun",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",

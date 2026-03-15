@@ -1,6 +1,6 @@
 {
   "name": "zeroclaw",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "TypeScript/JavaScript wrapper for the ZeroClaw AI agent",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",
