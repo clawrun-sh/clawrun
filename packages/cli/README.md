@@ -22,7 +22,7 @@
   <img alt="ClawRun" src="https://clawrun.sh/og.png">
 </a>
 
-ClawRun is a hosting and lifecycle layer for open-source AI agents. It deploys agents into Firecracker microVMs (e.g. Vercel Sandbox) and manages their full lifecycle, including startup, heartbeat keep-alive, snapshot/resume, and wake-on-message.
+ClawRun is a hosting and lifecycle layer for open-source AI agents. It deploys agents into secure sandboxes (Vercel Sandbox, with more providers coming) and manages their full lifecycle, including startup, heartbeat keep-alive, snapshot/resume, and wake-on-message.
 
 Learn more at [clawrun.sh](https://clawrun.sh).
 
@@ -46,7 +46,7 @@ The deploy wizard walks you through:
 1. Choosing an LLM provider and model
 2. Configuring messaging channels
 3. Setting cost limits and network policy
-4. Deploying to Vercel
+4. Deploying to your chosen provider (e.g. Vercel)
 
 Once deployed, chat with your agent from the terminal:
 
