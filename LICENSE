@@ -1,3 +1,4 @@
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -106,7 +107,7 @@
       (d) If the Work includes a "NOTICE" text file as part of its
           distribution, then any Derivative Works that You distribute must
           include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding any notices that do not
+          within such NOTICE file, excluding those notices that do not
           pertain to any part of the Derivative Works, in at least one
           of the following places: within a NOTICE text file distributed
           as part of the Derivative Works; within the Source form or
@@ -181,12 +182,12 @@
       boilerplate notice, with the fields enclosed by brackets "[]"
       replaced with your own identifying information. (Don't include
       the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. Please also append the file
-      or class name and description of purpose on the same "printed page"
-      as the copyright notice for easier identification within
-      third-party archives.
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
 
-   Copyright 2026 Afshin Mehrabani
+   Copyright [yyyy] [name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
