@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execa } from "execa";
@@ -29,6 +30,32 @@ interface InstancePackageJson {
   version?: string;
   private: boolean;
   dependencies: Record<string, string>;
+}
+
+/**
+ * Read the installed version of a package from its package.json.
+ * Uses require.resolve.paths() to find node_modules directories, then
+ * reads package.json directly (bypassing the exports map, which blocks
+ * `require.resolve("pkg/package.json")` for ESM-only packages).
+ * Throws if the package can't be found — a missing dependency means the
+ * CLI installation is broken and deploying with a wrong version would
+ * fail downstream anyway.
+ */
+export function resolvePackageVersion(name: string): string {
+  const require = createRequire(import.meta.url);
+  const lookupDirs = require.resolve.paths(name);
+  if (lookupDirs) {
+    for (const dir of lookupDirs) {
+      const pkgPath = join(dir, name, "package.json");
+      if (existsSync(pkgPath)) {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (pkg.version) return pkg.version;
+      }
+    }
+  }
+  throw new Error(
+    `Cannot resolve version for "${name}". Is it installed? Run "pnpm install" or reinstall the CLI.`,
+  );
 }
 
 export function isDevMode(): boolean {
@@ -152,16 +179,19 @@ export async function createInstance(
     onProgress?.({ step: "pack-deps", message: "Packing local packages..." });
     deps = await packLocalDeps(deployDir, config, onProgress);
   } else {
+    const agentPkg = `@clawrun/agent-${config.agent.name}`;
+    const providerPkg = `@clawrun/provider-${config.instance.provider}`;
     deps = {
-      "@clawrun/agent": "0.1.0",
-      [`@clawrun/agent-${config.agent.name}`]: "0.1.0",
-      "@clawrun/auth": "0.1.0",
-      "@clawrun/provider": "0.1.0",
-      [`@clawrun/provider-${config.instance.provider}`]: "0.1.0",
-      "@clawrun/channel": "0.1.0",
-      "@clawrun/logger": "0.1.0",
-      "@clawrun/runtime": "0.1.0",
-      "@clawrun/ui": "0.1.0",
+      "@clawrun/agent": resolvePackageVersion("@clawrun/agent"),
+      [agentPkg]: resolvePackageVersion(agentPkg),
+      "@clawrun/auth": resolvePackageVersion("@clawrun/auth"),
+      "@clawrun/provider": resolvePackageVersion("@clawrun/provider"),
+      [providerPkg]: resolvePackageVersion(providerPkg),
+      "@clawrun/channel": resolvePackageVersion("@clawrun/channel"),
+      "@clawrun/logger": resolvePackageVersion("@clawrun/logger"),
+      "@clawrun/runtime": resolvePackageVersion("@clawrun/runtime"),
+      "@clawrun/sdk": resolvePackageVersion("@clawrun/sdk"),
+      "@clawrun/ui": resolvePackageVersion("@clawrun/ui"),
       ...(opts?.presetDeps ?? {}),
     };
   }
