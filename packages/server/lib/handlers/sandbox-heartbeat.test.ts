@@ -106,7 +106,9 @@ describe("sandbox-heartbeat POST", () => {
   it("delegates to handleExtend and returns result", async () => {
     const handleExtend = vi.fn(async () => ({ action: "extended" }));
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => ({ handleExtend }) as unknown as SandboxLifecycleManager,
+      class {
+        handleExtend = handleExtend;
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest(validPayload);
@@ -125,10 +127,9 @@ describe("sandbox-heartbeat POST", () => {
 
   it("returns 500 when handleExtend returns error action", async () => {
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () =>
-        ({
-          handleExtend: vi.fn(async () => ({ action: "error", error: "boom" })),
-        }) as unknown as SandboxLifecycleManager,
+      class {
+        handleExtend = vi.fn(async () => ({ action: "error", error: "boom" }));
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest(validPayload);
@@ -140,12 +141,11 @@ describe("sandbox-heartbeat POST", () => {
 
   it("returns 500 when handleExtend throws", async () => {
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () =>
-        ({
-          handleExtend: vi.fn(async () => {
-            throw new Error("internal failure");
-          }),
-        }) as unknown as SandboxLifecycleManager,
+      class {
+        handleExtend = vi.fn(async () => {
+          throw new Error("internal failure");
+        });
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest(validPayload);
@@ -158,7 +158,9 @@ describe("sandbox-heartbeat POST", () => {
   it("passes sandboxCreatedAt when present in payload", async () => {
     const handleExtend = vi.fn(async () => ({ action: "extended" }));
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => ({ handleExtend }) as unknown as SandboxLifecycleManager,
+      class {
+        handleExtend = handleExtend;
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest({ ...validPayload, sandboxCreatedAt: 1000 });
@@ -169,7 +171,9 @@ describe("sandbox-heartbeat POST", () => {
   it("omits sandboxCreatedAt when not a number", async () => {
     const handleExtend = vi.fn(async () => ({ action: "extended" }));
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => ({ handleExtend }) as unknown as SandboxLifecycleManager,
+      class {
+        handleExtend = handleExtend;
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = heartbeatRequest({ ...validPayload, sandboxCreatedAt: "not-a-number" });

@@ -135,9 +135,9 @@ vi.mock("@clawrun/provider", async (importOriginal) => {
   return {
     ...orig,
     getProvider: vi.fn(() => _provider),
-    CountBasedRetention: vi.fn().mockImplementation(() => ({
-      selectForDeletion: vi.fn().mockReturnValue([]),
-    })),
+    CountBasedRetention: class {
+      selectForDeletion = vi.fn().mockReturnValue([]);
+    },
     sandboxId: (id: string) => id,
     snapshotId: (id: string) => id,
   };
@@ -1210,11 +1210,11 @@ describe("snapshotAndStop() / applyRetention()", () => {
     vi.mocked(_provider.listSnapshots).mockResolvedValue(snapshots);
 
     // The mock CountBasedRetention from vi.mock returns []. Override it for this test.
-    // We need the actual retention logic — re-import the mocked module and override selectForDeletion
-    const { CountBasedRetention } = await import("@clawrun/provider");
-    vi.mocked(CountBasedRetention).mockImplementation((() => ({
-      selectForDeletion: vi.fn().mockReturnValue(["snap-1"]),
-    })) as unknown as () => InstanceType<typeof CountBasedRetention>);
+    // Re-import the mocked module and swap the class to return different selectForDeletion results.
+    const providerMod = await import("@clawrun/provider");
+    (providerMod as Record<string, unknown>).CountBasedRetention = class {
+      selectForDeletion = vi.fn().mockReturnValue(["snap-1"]);
+    };
 
     SandboxLifecycleManager.setHooks({
       onSandboxStopped: vi.fn().mockResolvedValue(undefined),

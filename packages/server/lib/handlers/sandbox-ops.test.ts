@@ -7,7 +7,11 @@ const mockManager = {
 };
 
 vi.mock("@clawrun/runtime", () => ({
-  SandboxLifecycleManager: vi.fn().mockImplementation(() => mockManager),
+  SandboxLifecycleManager: class {
+    wake = mockManager.wake;
+    gracefulStop = mockManager.gracefulStop;
+    forceRestart = mockManager.forceRestart;
+  },
 }));
 
 vi.mock("@clawrun/logger", () => ({

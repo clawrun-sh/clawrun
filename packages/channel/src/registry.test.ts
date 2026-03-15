@@ -1,54 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock all channel wake-hook adapters
+// Mock all channel wake-hook adapters using class syntax (vitest v4 requires
+// constructable implementations when the code under test calls `new`).
 vi.mock("./telegram/wake-hook.js", () => ({
-  TelegramWakeHookAdapter: vi.fn().mockImplementation((token: string, secret: string) => ({
-    channelId: "telegram",
-    botToken: token,
-    webhookSecret: secret,
-    programmableWebhook: true,
-  })),
+  TelegramWakeHookAdapter: class {
+    channelId = "telegram";
+    botToken: string;
+    webhookSecret: string;
+    programmableWebhook = true;
+    constructor(token: string, secret: string) {
+      this.botToken = token;
+      this.webhookSecret = secret;
+    }
+  },
 }));
 
 vi.mock("./slack/wake-hook.js", () => ({
-  SlackWakeHookAdapter: vi.fn().mockImplementation((token: string, signingSecret: string) => ({
-    channelId: "slack",
-    botToken: token,
-    signingSecret,
-    programmableWebhook: false,
-  })),
+  SlackWakeHookAdapter: class {
+    channelId = "slack";
+    botToken: string;
+    signingSecret: string;
+    programmableWebhook = false;
+    constructor(token: string, signingSecret: string) {
+      this.botToken = token;
+      this.signingSecret = signingSecret;
+    }
+  },
 }));
 
 vi.mock("./whatsapp/wake-hook.js", () => ({
-  WhatsAppWakeHookAdapter: vi.fn().mockImplementation(() => ({
-    channelId: "whatsapp",
-    programmableWebhook: true,
-  })),
+  WhatsAppWakeHookAdapter: class {
+    channelId = "whatsapp";
+    programmableWebhook = true;
+  },
 }));
 
 vi.mock("./discord/wake-hook.js", () => ({
-  DiscordWakeHookAdapter: vi.fn().mockImplementation(() => ({
-    channelId: "discord",
-    programmableWebhook: false,
-  })),
+  DiscordWakeHookAdapter: class {
+    channelId = "discord";
+    programmableWebhook = false;
+  },
 }));
 
 vi.mock("./lark/wake-hook.js", () => ({
-  LarkWakeHookAdapter: vi
-    .fn()
-    .mockImplementation((_a: string, _b: string, _c: string, feishu: boolean) => ({
-      channelId: "lark",
-      useFeishu: feishu,
-      programmableWebhook: true,
-    })),
+  LarkWakeHookAdapter: class {
+    channelId = "lark";
+    useFeishu: boolean;
+    programmableWebhook = true;
+    constructor(_a: string, _b: string, _c: string, feishu: boolean) {
+      this.useFeishu = feishu;
+    }
+  },
 }));
 
 vi.mock("./qq/wake-hook.js", () => ({
-  QQWakeHookAdapter: vi.fn().mockImplementation((_a: string, _b: string, env: string) => ({
-    channelId: "qq",
-    environment: env,
-    programmableWebhook: true,
-  })),
+  QQWakeHookAdapter: class {
+    channelId = "qq";
+    environment: string;
+    programmableWebhook = true;
+    constructor(_a: string, _b: string, env: string) {
+      this.environment = env;
+    }
+  },
 }));
 
 beforeEach(() => {
@@ -124,7 +137,6 @@ describe("channel registry", () => {
   });
 
   it("hasWakeHook returns true for supported channels", () => {
-    // hasWakeHook checks factories, not live adapters
     expect(hasWakeHook("telegram")).toBe(true);
     expect(hasWakeHook("slack")).toBe(true);
     expect(hasWakeHook("discord")).toBe(true);

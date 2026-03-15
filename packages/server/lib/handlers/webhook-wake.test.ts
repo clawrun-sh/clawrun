@@ -193,7 +193,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager({ getStatus: vi.fn(async () => ({ running: true })) });
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = jsonRequest({ message: { text: "hi" } });
@@ -212,7 +216,11 @@ describe("handleWakeWebhook", () => {
       }),
     });
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     // Mock provider for message forwarding
@@ -235,7 +243,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({
@@ -264,7 +276,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({
@@ -290,7 +306,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({
@@ -311,7 +331,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const mockSandbox = { id: "sbx-1" };
@@ -341,7 +365,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({
@@ -366,7 +394,11 @@ describe("handleWakeWebhook", () => {
       }),
     });
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const req = jsonRequest({ message: { text: "hi" } });
@@ -383,7 +415,11 @@ describe("handleWakeWebhook", () => {
       wake: vi.fn(async () => ({ status: "failed", sandboxId: undefined })),
     });
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     const agentSendMessage = vi.fn();
@@ -400,7 +436,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({
@@ -422,7 +462,11 @@ describe("handleWakeWebhook", () => {
 
     const manager = mockManager();
     vi.mocked(SandboxLifecycleManager).mockImplementation(
-      () => manager as unknown as SandboxLifecycleManager,
+      class {
+        constructor() {
+          Object.assign(this, manager);
+        }
+      } as unknown as typeof SandboxLifecycleManager,
     );
 
     vi.mocked(getProvider).mockReturnValue({

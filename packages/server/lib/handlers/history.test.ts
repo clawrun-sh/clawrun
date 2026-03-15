@@ -4,9 +4,11 @@ import type { RuntimeConfig, SandboxLifecycleManager as SLMType } from "@clawrun
 import type { SandboxProvider } from "@clawrun/provider";
 
 vi.mock("@clawrun/runtime", () => ({
-  SandboxLifecycleManager: vi.fn().mockImplementation(() => ({
-    getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1" })),
-  })),
+  SandboxLifecycleManager: vi.fn().mockImplementation(
+    class {
+      getStatus = vi.fn(async () => ({ running: true, sandboxId: "sbx-1" }));
+    },
+  ),
   getProvider: vi.fn(() => ({
     get: vi.fn(async () => mockManagedSandbox),
   })),
@@ -61,9 +63,11 @@ describe("history handler (legacy)", () => {
       instance: { provider: "vercel" },
     } as RuntimeConfig);
     vi.mocked(runtimeMod.resolveRoot).mockResolvedValue("/home/user/.clawrun");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
-      getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
-    })) as unknown as typeof SLMType);
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
+      class {
+        getStatus = vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" }));
+      } as unknown as typeof SLMType,
+    );
 
     const providerMod = await import("@clawrun/runtime");
     vi.mocked(providerMod.getProvider).mockReturnValue({
@@ -92,9 +96,11 @@ describe("history handler (legacy)", () => {
 
   it("returns empty when sandbox is not running", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
-      getStatus: vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" })),
-    })) as unknown as typeof SLMType);
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
+      class {
+        getStatus = vi.fn(async () => ({ running: false, sandboxId: null, status: "stopped" }));
+      } as unknown as typeof SLMType,
+    );
 
     const req = new Request("http://localhost/api/v1/history?threadId=s1");
     const resp = await GET(req);

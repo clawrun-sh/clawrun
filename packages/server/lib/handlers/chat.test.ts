@@ -16,9 +16,9 @@ vi.mock("@clawrun/runtime", () => ({
     instance: { provider: "vercel" },
   })),
   resolveRoot: vi.fn(async () => "/agent"),
-  SandboxLifecycleManager: vi.fn(() => ({
-    wake: vi.fn(async () => ({ status: "ready", sandboxId: "sbx-1" })),
-  })),
+  SandboxLifecycleManager: class {
+    wake = vi.fn(async () => ({ status: "ready", sandboxId: "sbx-1" }));
+  },
 }));
 
 vi.mock("@clawrun/provider", () => ({
@@ -43,6 +43,7 @@ vi.mock("../auth/session", () => ({
 
 // Mock `ai` — we return a simple passthrough Response
 vi.mock("ai", () => ({
+  isTextUIPart: (part: { type: string }) => part?.type === "text",
   createUIMessageStreamResponse: ({ stream }: { stream: ReadableStream }) =>
     new Response(stream, { status: 200 }),
   createUIMessageStream: ({

@@ -4,9 +4,11 @@ import type { RuntimeConfig, SandboxLifecycleManager as SLMType } from "@clawrun
 import type { SandboxProvider } from "@clawrun/provider";
 
 vi.mock("@clawrun/runtime", () => ({
-  SandboxLifecycleManager: vi.fn().mockImplementation(() => ({
-    getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1" })),
-  })),
+  SandboxLifecycleManager: vi.fn().mockImplementation(
+    class {
+      getStatus = vi.fn(async () => ({ running: true, sandboxId: "sbx-1" }));
+    },
+  ),
   getRuntimeConfig: vi.fn(() => ({
     instance: { provider: "vercel" },
   })),
@@ -36,9 +38,11 @@ function applyRuntimeMocks() {
       instance: { provider: "vercel" },
     } as RuntimeConfig);
     vi.mocked(runtimeMod.resolveRoot).mockResolvedValue("/home/user/.clawrun");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
-      getStatus: vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" })),
-    })) as unknown as typeof SLMType);
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
+      class {
+        getStatus = vi.fn(async () => ({ running: true, sandboxId: "sbx-1", status: "running" }));
+      } as unknown as typeof SLMType,
+    );
   });
 }
 
@@ -80,9 +84,11 @@ describe("handleListWorkspaceFiles", () => {
 
   it("returns 503 when sandbox is offline", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
-      getStatus: vi.fn(async () => ({ running: false, sandboxId: null })),
-    })) as unknown as typeof SLMType);
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
+      class {
+        getStatus = vi.fn(async () => ({ running: false, sandboxId: null }));
+      } as unknown as typeof SLMType,
+    );
 
     const resp = await handleListWorkspaceFiles();
     expect(resp.status).toBe(503);
@@ -128,9 +134,11 @@ describe("handleGetWorkspaceFile", () => {
 
   it("returns 503 when sandbox is offline", async () => {
     const runtimeMod = await import("@clawrun/runtime");
-    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation((() => ({
-      getStatus: vi.fn(async () => ({ running: false, sandboxId: null })),
-    })) as unknown as typeof SLMType);
+    vi.mocked(runtimeMod.SandboxLifecycleManager).mockImplementation(
+      class {
+        getStatus = vi.fn(async () => ({ running: false, sandboxId: null }));
+      } as unknown as typeof SLMType,
+    );
 
     const req = new Request("http://localhost/api/v1/workspace/AGENTS.md");
     const resp = await handleGetWorkspaceFile(req, {
