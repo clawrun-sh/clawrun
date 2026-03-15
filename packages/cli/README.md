@@ -10,8 +10,11 @@
     <a href="https://www.npmjs.com/package/clawrun" target="_blank">
       <img src="https://img.shields.io/npm/l/clawrun?style=for-the-badge&labelColor=000000" alt="license" />
     </a>
+    <a href="https://discord.gg/Bm5P5Md2MY" target="_blank">
+      <img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&labelColor=000000&logoColor=white" alt="discord" />
+    </a>
     <a href="https://github.com/clawrun-sh/clawrun/discussions" target="_blank">
-      <img src="https://img.shields.io/badge/Join%20the%20community-blueviolet?style=for-the-badge&logo=Github&labelColor=000000&logoWidth=20" alt="join the community" />
+      <img src="https://img.shields.io/badge/Discussions-blueviolet?style=for-the-badge&logo=Github&labelColor=000000&logoWidth=20" alt="discussions" />
     </a>
   </p>
 </div>
