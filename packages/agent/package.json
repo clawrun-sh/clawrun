@@ -1,7 +1,7 @@
 {
   "name": "@clawrun/agent",
   "version": "0.1.0",
-  "description": "Abstract Agent interface and adapters for ClawRun",
+  "description": "Abstract Agent interface and registry for ClawRun",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",
   "homepage": "https://clawrun.sh",

@@ -1,6 +1,6 @@
 # @clawrun/channel
 
-Messaging channel adapters for ClawRun. Handles webhook ingestion and response formatting for platforms like Telegram.
+Wake hook adapters for ClawRun messaging channels. Defines the `WakeHookAdapter` interface and provides adapters for Telegram, Discord, Slack, WhatsApp, Lark, and QQ, plus channel validators for DingTalk, LinQ, and Matrix.
 
 **Docs:** [clawrun.sh/docs](https://clawrun.sh/docs)
 
