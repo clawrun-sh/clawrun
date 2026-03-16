@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # ============================================================
 
 UPSTREAM_DIR="$SCRIPT_DIR/upstream"
-ZEROCLAW_SHA=$(cat "$UPSTREAM_DIR/COMMIT" | tr -d '[:space:]')
+ZEROCLAW_VERSION=$(cat "$UPSTREAM_DIR/VERSION" | tr -d '[:space:]')
 ZEROCLAW_SRC="/tmp/zeroclaw-bin-src"
 
 apply_patches() {
@@ -27,21 +27,23 @@ apply_patches() {
 }
 
 prepare_source() {
-  # Reuse existing checkout if it's at the right commit
+  # Reuse existing checkout if it's at the right version
   if [ -d "$ZEROCLAW_SRC/.git" ]; then
-    CURRENT_SHA=$(git -C "$ZEROCLAW_SRC" rev-parse HEAD 2>/dev/null || echo "")
-    if [ "$CURRENT_SHA" = "$ZEROCLAW_SHA" ]; then
-      echo "  Reusing cached zeroclaw source at $ZEROCLAW_SHA"
+    CURRENT_TAG=$(git -C "$ZEROCLAW_SRC" describe --tags --exact-match HEAD 2>/dev/null || echo "")
+    if [ "$CURRENT_TAG" = "$ZEROCLAW_VERSION" ]; then
+      echo "  Reusing cached zeroclaw source at $ZEROCLAW_VERSION"
       git -C "$ZEROCLAW_SRC" checkout -- .
+      # Remove overlay files that aren't tracked (from previous apply)
+      git -C "$ZEROCLAW_SRC" clean -fd 2>/dev/null || true
       apply_patches
       return
     fi
     rm -rf "$ZEROCLAW_SRC"
   fi
 
-  echo "  Cloning zeroclaw at $ZEROCLAW_SHA..."
+  echo "  Cloning zeroclaw at $ZEROCLAW_VERSION..."
   git clone --filter=blob:none https://github.com/zeroclaw-labs/zeroclaw.git "$ZEROCLAW_SRC"
-  git -C "$ZEROCLAW_SRC" checkout "$ZEROCLAW_SHA"
+  git -C "$ZEROCLAW_SRC" checkout "$ZEROCLAW_VERSION"
   apply_patches
 }
 
@@ -54,6 +56,7 @@ DEST_BIN="$DIST_DIR/zeroclaw-linux-amd64"
 
 echo "=========================================="
 echo "  Building ZeroClaw binary (linux-amd64)"
+echo "  Version: $ZEROCLAW_VERSION"
 echo "=========================================="
 
 prepare_source
@@ -111,6 +114,7 @@ SIZE=$(ls -lh "$DEST_BIN" | awk '{print $5}')
 SCHEMA_SIZE=$(ls -lh "$SCRIPT_DIR/src/zeroclaw-config.schema.json" | awk '{print $5}')
 echo ""
 echo "=== Build Summary ==="
+echo "  Version: $ZEROCLAW_VERSION"
 echo "  zeroclaw-linux-amd64: $SIZE"
 echo "  zeroclaw-config.schema.json: $SCHEMA_SIZE"
 echo ""

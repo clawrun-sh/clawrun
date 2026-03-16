@@ -435,6 +435,12 @@ export interface ChannelsConfig {
    */
   qq?: QQConfig | null;
   /**
+   * Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)
+   * to channel users. When `false`, tool calls are still logged server-side but
+   * not forwarded as individual channel messages. Default: `true`.
+   */
+  show_tool_calls?: boolean;
+  /**
    * Signal channel configuration.
    */
   signal?: SignalConfig | null;
@@ -919,6 +925,11 @@ export interface SlackConfig {
    * Omit (or set `"*"`) to listen across all accessible channels.
    */
   channel_id?: string | null;
+  /**
+   * When true, a newer Slack message from the same sender in the same channel
+   * cancels the in-flight request and starts a fresh response with preserved history.
+   */
+  interrupt_on_new_message?: boolean;
   [k: string]: unknown;
 }
 /**
@@ -1264,12 +1275,20 @@ export interface HeartbeatConfig {
   message?: string | null;
   /**
    * Optional delivery channel for heartbeat output (for example: `telegram`).
+   * When omitted, auto-selects the first configured channel.
    */
   target?: string | null;
   /**
-   * Optional delivery recipient/chat identifier (required when `target` is set).
+   * Optional delivery recipient/chat identifier (required when `target` is
+   * explicitly set).
    */
   to?: string | null;
+  /**
+   * Enable two-phase heartbeat: Phase 1 asks LLM whether to run, Phase 2
+   * executes only when the LLM decides there is work to do. Saves API cost
+   * during quiet periods. Default: `true`.
+   */
+  two_phase?: boolean;
   [k: string]: unknown;
 }
 /**

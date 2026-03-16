@@ -144,6 +144,7 @@
         "nextcloud_talk": null,
         "nostr": null,
         "qq": null,
+        "show_tool_calls": true,
         "signal": null,
         "slack": null,
         "telegram": null,
@@ -292,7 +293,8 @@
         "interval_minutes": 30,
         "message": null,
         "target": null,
-        "to": null
+        "to": null,
+        "two_phase": true
       }
     },
     "hooks": {
@@ -1148,6 +1150,11 @@
               "type": "null"
             }
           ]
+        },
+        "show_tool_calls": {
+          "description": "Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)\nto channel users. When `false`, tool calls are still logged server-side but\nnot forwarded as individual channel messages. Default: `true`.",
+          "type": "boolean",
+          "default": true
         },
         "signal": {
           "description": "Signal channel configuration.",
@@ -2051,7 +2058,7 @@
           "default": null
         },
         "target": {
-          "description": "Optional delivery channel for heartbeat output (for example: `telegram`).",
+          "description": "Optional delivery channel for heartbeat output (for example: `telegram`).\nWhen omitted, auto-selects the first configured channel.",
           "type": [
             "string",
             "null"
@@ -2059,12 +2066,17 @@
           "default": null
         },
         "to": {
-          "description": "Optional delivery recipient/chat identifier (required when `target` is set).",
+          "description": "Optional delivery recipient/chat identifier (required when `target` is\nexplicitly set).",
           "type": [
             "string",
             "null"
           ],
           "default": null
+        },
+        "two_phase": {
+          "description": "Enable two-phase heartbeat: Phase 1 asks LLM whether to run, Phase 2\nexecutes only when the LLM decides there is work to do. Saves API cost\nduring quiet periods. Default: `true`.",
+          "type": "boolean",
+          "default": true
         }
       },
       "required": [
@@ -3730,6 +3742,11 @@
             "string",
             "null"
           ]
+        },
+        "interrupt_on_new_message": {
+          "description": "When true, a newer Slack message from the same sender in the same channel\ncancels the in-flight request and starts a fresh response with preserved history.",
+          "type": "boolean",
+          "default": false
         }
       },
       "required": [
