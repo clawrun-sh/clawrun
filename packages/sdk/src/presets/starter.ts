@@ -5,7 +5,8 @@ import type { Preset } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Navigate from dist/presets/ up to repo root, then into presets/
-const presetPath = join(__dirname, "..", "..", "..", "..", "presets", "starter", "preset.json");
+// Build step copies ../../presets/ into dist/presets/
+// So dist/presets/starter.js sits alongside dist/presets/starter/preset.json
+const presetPath = join(__dirname, "starter", "preset.json");
 
 export const starter: Preset = JSON.parse(readFileSync(presetPath, "utf-8"));

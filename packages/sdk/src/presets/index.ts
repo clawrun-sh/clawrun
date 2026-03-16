@@ -8,8 +8,9 @@ import { starter } from "./starter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Navigate from dist/presets/ up to repo root
-const repoRoot = join(__dirname, "..", "..", "..", "..");
+// Build step copies ../../presets/ into dist/presets/
+// So dist/presets/index.js sits alongside dist/presets/<presetId>/
+const presetsRoot = __dirname;
 
 const presets: Map<string, Preset> = new Map([["starter", starter]]);
 
@@ -62,7 +63,7 @@ export function getWorkspaceFiles(presetId: string, customDir?: string): Map<str
   }
 
   // Layer 2: Preset .md files (flat, alongside preset.json)
-  const presetDir = join(repoRoot, "presets", presetId);
+  const presetDir = join(presetsRoot, presetId);
   if (existsSync(presetDir)) {
     for (const f of readdirSync(presetDir)) {
       if (f.endsWith(".md")) {

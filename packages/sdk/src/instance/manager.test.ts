@@ -51,11 +51,13 @@ describe("resolvePackageVersion", () => {
       expect(resolvePackageVersion("@clawrun/server")).toBe(expected);
     });
 
-    it("packages with different versions resolve independently", () => {
+    it("each package resolves to its own version", () => {
       const serverVersion = resolvePackageVersion("@clawrun/server");
       const loggerVersion = resolvePackageVersion("@clawrun/logger");
-      // server is 0.1.2, logger is 0.1.0 — they must not bleed into each other
-      expect(serverVersion).not.toBe(loggerVersion);
+      const serverExpected = readActualVersion(join(repoRoot, "packages", "server"));
+      const loggerExpected = readActualVersion(join(repoRoot, "packages", "logger"));
+      expect(serverVersion).toBe(serverExpected);
+      expect(loggerVersion).toBe(loggerExpected);
     });
   });
 

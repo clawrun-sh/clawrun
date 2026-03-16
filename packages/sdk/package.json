@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc",
+    "build": "tsc && cp -r ../../presets/. dist/presets",
     "dev": "tsc --watch",
     "lint": "eslint src",
     "test": "vitest run",
