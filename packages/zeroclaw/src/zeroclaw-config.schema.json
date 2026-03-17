@@ -9,6 +9,7 @@
       "$ref": "#/$defs/AgentConfig",
       "default": {
         "compact_context": false,
+        "max_context_tokens": 32000,
         "max_history_messages": 50,
         "max_tool_iterations": 10,
         "parallel_tools": false,
@@ -101,6 +102,25 @@
         "workspace_only": true
       }
     },
+    "backup": {
+      "description": "Backup tool configuration (`[backup]`).",
+      "$ref": "#/$defs/BackupConfig",
+      "default": {
+        "compress": true,
+        "destination_dir": "state/backups",
+        "enabled": true,
+        "encrypt": false,
+        "include_dirs": [
+          "config",
+          "memory",
+          "audit",
+          "knowledge"
+        ],
+        "max_keep": 10,
+        "schedule_cron": null,
+        "schedule_timezone": null
+      }
+    },
     "browser": {
       "description": "Browser automation configuration (`[browser]`).",
       "$ref": "#/$defs/BrowserConfig",
@@ -123,6 +143,18 @@
         "session_name": null
       }
     },
+    "browser_delegate": {
+      "description": "Browser delegation configuration (`[browser_delegate]`).\n\nDelegates browser-based tasks to a browser-capable CLI subprocess (e.g.\nClaude Code with `claude-in-chrome` MCP tools). Useful for interacting\nwith corporate web apps (Teams, Outlook, Jira, Confluence) that lack\ndirect API access. A persistent Chrome profile can be configured so SSO\nsessions survive across invocations.\n\nFields:\n- `enabled` (`bool`, default `false`) — enable the browser delegation tool.\n- `cli_binary` (`String`, default `\"claude\"`) — CLI binary to spawn for browser tasks.\n- `chrome_profile_dir` (`String`, default `\"\"`) — Chrome user-data directory for\n  persistent SSO sessions. When empty, a fresh profile is used each invocation.\n- `allowed_domains` (`Vec<String>`, default `[]`) — allowlist of domains the browser\n  may navigate to. Empty means all non-blocked domains are permitted.\n- `blocked_domains` (`Vec<String>`, default `[]`) — denylist of domains. Blocked\n  domains take precedence over allowed domains.\n- `task_timeout_secs` (`u64`, default `120`) — per-task timeout in seconds.\n\nCompatibility: additive and disabled by default; existing configs remain valid when omitted.\nRollback/migration: remove `[browser_delegate]` or keep `enabled = false` to disable.",
+      "$ref": "#/$defs/BrowserDelegateConfig",
+      "default": {
+        "allowed_domains": [],
+        "blocked_domains": [],
+        "chrome_profile_dir": "",
+        "cli_binary": "claude",
+        "enabled": false,
+        "task_timeout_secs": 120
+      }
+    },
     "channels_config": {
       "description": "Channel configurations: Telegram, Discord, Slack, etc. (`[channels_config]`).",
       "$ref": "#/$defs/ChannelsConfig",
@@ -141,17 +173,42 @@
         "matrix": null,
         "mattermost": null,
         "message_timeout_secs": 300,
+        "mochat": null,
         "nextcloud_talk": null,
         "nostr": null,
         "qq": null,
+        "session_backend": "sqlite",
+        "session_persistence": true,
+        "session_ttl_hours": 0,
         "show_tool_calls": true,
         "signal": null,
         "slack": null,
         "telegram": null,
+        "twitter": null,
         "wati": null,
         "webhook": null,
         "wecom": null,
         "whatsapp": null
+      }
+    },
+    "cloud_ops": {
+      "description": "Cloud transformation accelerator configuration (`[cloud_ops]`).",
+      "$ref": "#/$defs/CloudOpsConfig",
+      "default": {
+        "cost_threshold_monthly_usd": 100.0,
+        "default_cloud": "aws",
+        "enabled": false,
+        "iac_tools": [
+          "terraform"
+        ],
+        "supported_clouds": [
+          "aws",
+          "azure",
+          "gcp"
+        ],
+        "well_architected_frameworks": [
+          "aws-waf"
+        ]
       }
     },
     "composio": {
@@ -161,6 +218,26 @@
         "api_key": null,
         "enabled": false,
         "entity_id": "default"
+      }
+    },
+    "conversational_ai": {
+      "description": "Conversational AI agent builder configuration (`[conversational_ai]`).",
+      "$ref": "#/$defs/ConversationalAiConfig",
+      "default": {
+        "analytics_enabled": false,
+        "auto_detect_language": true,
+        "conversation_timeout_secs": 1800,
+        "default_language": "en",
+        "enabled": false,
+        "escalation_confidence_threshold": 0.3,
+        "knowledge_base_tool": null,
+        "max_conversation_turns": 50,
+        "supported_languages": [
+          "en",
+          "de",
+          "fr",
+          "it"
+        ]
       }
     },
     "cost": {
@@ -218,6 +295,16 @@
       "default": {
         "enabled": true,
         "max_run_history": 50
+      }
+    },
+    "data_retention": {
+      "description": "Data retention and purge configuration (`[data_retention]`).",
+      "$ref": "#/$defs/DataRetentionConfig",
+      "default": {
+        "categories": [],
+        "dry_run": false,
+        "enabled": false,
+        "retention_days": 90
       }
     },
     "default_model": {
@@ -289,9 +376,16 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]`).",
       "$ref": "#/$defs/HeartbeatConfig",
       "default": {
+        "adaptive": false,
+        "deadman_channel": null,
+        "deadman_timeout_minutes": 0,
+        "deadman_to": null,
         "enabled": false,
         "interval_minutes": 30,
+        "max_interval_minutes": 120,
+        "max_run_history": 100,
         "message": null,
+        "min_interval_minutes": 5,
         "target": null,
         "to": null,
         "two_phase": true
@@ -318,6 +412,7 @@
       "description": "HTTP request tool configuration (`[http_request]`).",
       "$ref": "#/$defs/HttpRequestConfig",
       "default": {
+        "allow_private_hosts": false,
         "allowed_domains": [],
         "enabled": false,
         "max_response_size": 1000000,
@@ -366,12 +461,29 @@
           "url": null
         },
         "response_cache_enabled": false,
+        "response_cache_hot_entries": 256,
         "response_cache_max_entries": 5000,
         "response_cache_ttl_minutes": 60,
         "snapshot_enabled": false,
         "snapshot_on_hygiene": false,
         "sqlite_open_timeout_secs": null,
         "vector_weight": 0.7
+      }
+    },
+    "microsoft365": {
+      "description": "Microsoft 365 Graph API integration (`[microsoft365]`).",
+      "$ref": "#/$defs/Microsoft365Config",
+      "default": {
+        "auth_flow": "client_credentials",
+        "client_id": null,
+        "client_secret": null,
+        "enabled": false,
+        "scopes": [
+          "https://graph.microsoft.com/.default"
+        ],
+        "tenant_id": null,
+        "token_cache_encrypted": true,
+        "user_id": null
       }
     },
     "model_providers": {
@@ -399,6 +511,21 @@
         "max_images": 4
       }
     },
+    "node_transport": {
+      "description": "Secure inter-node transport configuration (`[node_transport]`).",
+      "$ref": "#/$defs/NodeTransportConfig",
+      "default": {
+        "allowed_peers": [],
+        "connection_pool_size": 4,
+        "enabled": true,
+        "max_request_age_secs": 300,
+        "mutual_tls": false,
+        "require_https": true,
+        "shared_secret": "",
+        "tls_cert_path": null,
+        "tls_key_path": null
+      }
+    },
     "nodes": {
       "description": "Dynamic node discovery configuration (`[nodes]`).",
       "$ref": "#/$defs/NodesConfig",
@@ -406,6 +533,21 @@
         "auth_token": null,
         "enabled": false,
         "max_nodes": 16
+      }
+    },
+    "notion": {
+      "description": "Notion integration configuration (`[notion]`).",
+      "$ref": "#/$defs/NotionConfig",
+      "default": {
+        "api_key": "",
+        "database_id": "",
+        "enabled": false,
+        "input_property": "Input",
+        "max_concurrent": 4,
+        "poll_interval_secs": 5,
+        "recover_stale": true,
+        "result_property": "Result",
+        "status_property": "Status"
       }
     },
     "observability": {
@@ -427,6 +569,20 @@
         "boards": [],
         "datasheet_dir": null,
         "enabled": false
+      }
+    },
+    "project_intel": {
+      "description": "Project delivery intelligence configuration (`[project_intel]`).",
+      "$ref": "#/$defs/ProjectIntelConfig",
+      "default": {
+        "default_language": "en",
+        "enabled": false,
+        "include_git_data": true,
+        "include_jira_data": false,
+        "jira_base_url": null,
+        "report_output_dir": "~/.zeroclaw/project-reports",
+        "risk_sensitivity": "medium",
+        "templates_dir": null
       }
     },
     "provider_timeout_secs": {
@@ -520,6 +676,18 @@
           "require_otp_to_resume": true,
           "state_file": "~/.zeroclaw/estop-state.json"
         },
+        "nevis": {
+          "client_id": "",
+          "client_secret": null,
+          "enabled": false,
+          "instance_url": "",
+          "jwks_url": null,
+          "realm": "master",
+          "require_mfa": false,
+          "role_mapping": [],
+          "session_timeout_secs": 3600,
+          "token_validation": "local"
+        },
         "otp": {
           "cache_valid_secs": 300,
           "enabled": false,
@@ -548,6 +716,19 @@
         }
       }
     },
+    "security_ops": {
+      "description": "Managed cybersecurity service configuration (`[security_ops]`).",
+      "$ref": "#/$defs/SecurityOpsConfig",
+      "default": {
+        "auto_triage": false,
+        "enabled": false,
+        "max_auto_severity": "low",
+        "playbooks_dir": "~/.zeroclaw/playbooks",
+        "report_output_dir": "~/.zeroclaw/security-reports",
+        "require_approval_for_actions": true,
+        "siem_integration": null
+      }
+    },
     "skills": {
       "description": "Skills loading and community repository behavior (`[skills]`).",
       "$ref": "#/$defs/SkillsConfig",
@@ -572,12 +753,21 @@
         }
       }
     },
+    "swarms": {
+      "description": "Swarm configurations for multi-agent orchestration.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SwarmConfig"
+      },
+      "default": {}
+    },
     "transcription": {
       "description": "Voice transcription configuration (Whisper API via Groq).",
       "$ref": "#/$defs/TranscriptionConfig",
       "default": {
         "api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
         "enabled": false,
+        "initial_prompt": null,
         "language": null,
         "max_duration_secs": 120,
         "model": "whisper-large-v3-turbo"
@@ -605,6 +795,7 @@
         "cloudflare": null,
         "custom": null,
         "ngrok": null,
+        "openvpn": null,
         "provider": "none",
         "tailscale": null
       }
@@ -632,6 +823,19 @@
         "provider": "duckduckgo",
         "timeout_secs": 15
       }
+    },
+    "workspace": {
+      "description": "Multi-client workspace isolation configuration (`[workspace]`).",
+      "$ref": "#/$defs/WorkspaceConfig",
+      "default": {
+        "active_workspace": null,
+        "cross_workspace_search": false,
+        "enabled": false,
+        "isolate_audit": true,
+        "isolate_memory": true,
+        "isolate_secrets": true,
+        "workspaces_dir": "~/.zeroclaw/workspaces"
+      }
     }
   },
   "$defs": {
@@ -643,6 +847,13 @@
           "description": "When true: bootstrap_max_chars=6000, rag_chunk_limit=2. Use for 13B or smaller models.",
           "type": "boolean",
           "default": false
+        },
+        "max_context_tokens": {
+          "description": "Maximum estimated tokens for conversation history before compaction triggers.\nUses ~4 chars/token heuristic. When this threshold is exceeded, older messages\nare summarized to preserve context while staying within budget. Default: `32000`.",
+          "type": "integer",
+          "format": "uint",
+          "default": 32000,
+          "minimum": 0
         },
         "max_history_messages": {
           "description": "Maximum conversation history messages retained per session. Default: `50`.",
@@ -835,6 +1046,68 @@
         }
       ]
     },
+    "BackupConfig": {
+      "description": "Backup tool configuration (`[backup]` section).",
+      "type": "object",
+      "properties": {
+        "compress": {
+          "description": "Compress backup archives.",
+          "type": "boolean",
+          "default": true
+        },
+        "destination_dir": {
+          "description": "Output directory for backup archives (relative to workspace root).",
+          "type": "string",
+          "default": "state/backups"
+        },
+        "enabled": {
+          "description": "Enable the `backup` tool.",
+          "type": "boolean",
+          "default": true
+        },
+        "encrypt": {
+          "description": "Encrypt backup archives (requires a configured secret store key).",
+          "type": "boolean",
+          "default": false
+        },
+        "include_dirs": {
+          "description": "Workspace subdirectories to include in backups.",
+          "type": "array",
+          "default": [
+            "config",
+            "memory",
+            "audit",
+            "knowledge"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_keep": {
+          "description": "Maximum number of backups to keep (oldest are pruned).",
+          "type": "integer",
+          "format": "uint",
+          "default": 10,
+          "minimum": 0
+        },
+        "schedule_cron": {
+          "description": "Optional cron expression for scheduled automatic backups.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "schedule_timezone": {
+          "description": "IANA timezone for `schedule_cron`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
+    },
     "BrowserComputerUseConfig": {
       "description": "Computer-use sidecar configuration (`[browser.computer_use]` section).\n\nDelegates OS-level mouse, keyboard, and screenshot actions to a local sidecar.",
       "type": "object",
@@ -955,6 +1228,50 @@
         }
       }
     },
+    "BrowserDelegateConfig": {
+      "description": "Configuration for browser delegation (`[browser_delegate]` section).",
+      "type": "object",
+      "properties": {
+        "allowed_domains": {
+          "description": "Allowed domains for browser navigation (empty = allow all non-blocked).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocked_domains": {
+          "description": "Blocked domains for browser navigation.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "chrome_profile_dir": {
+          "description": "Chrome profile directory for persistent SSO sessions.",
+          "type": "string",
+          "default": ""
+        },
+        "cli_binary": {
+          "description": "CLI binary to use for browser tasks (default: `\"claude\"`).",
+          "type": "string",
+          "default": "claude"
+        },
+        "enabled": {
+          "description": "Enable browser delegation tool.",
+          "type": "boolean",
+          "default": false
+        },
+        "task_timeout_secs": {
+          "description": "Task timeout in seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 120,
+          "minimum": 0
+        }
+      }
+    },
     "BuiltinHooksConfig": {
       "type": "object",
       "properties": {
@@ -1000,7 +1317,8 @@
         },
         "cli": {
           "description": "Enable the CLI interactive channel. Default: `true`.",
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "dingtalk": {
           "description": "DingTalk channel configuration.",
@@ -1119,6 +1437,17 @@
           "default": 300,
           "minimum": 0
         },
+        "mochat": {
+          "description": "Mochat customer service channel configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MochatConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "nextcloud_talk": {
           "description": "Nextcloud Talk bot channel configuration.",
           "anyOf": [
@@ -1150,6 +1479,23 @@
               "type": "null"
             }
           ]
+        },
+        "session_backend": {
+          "description": "Session persistence backend: `\"jsonl\"` (legacy) or `\"sqlite\"` (new default).\nSQLite provides FTS5 search, metadata tracking, and TTL cleanup.",
+          "type": "string",
+          "default": "sqlite"
+        },
+        "session_persistence": {
+          "description": "Persist channel conversation history to JSONL files so sessions survive\ndaemon restarts. Files are stored in `{workspace}/sessions/`. Default: `true`.",
+          "type": "boolean",
+          "default": true
+        },
+        "session_ttl_hours": {
+          "description": "Auto-archive stale sessions older than this many hours. `0` disables. Default: `0`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
         },
         "show_tool_calls": {
           "description": "Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)\nto channel users. When `false`, tool calls are still logged server-side but\nnot forwarded as individual channel messages. Default: `true`.",
@@ -1183,6 +1529,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/TelegramConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "twitter": {
+          "description": "X/Twitter channel configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TwitterConfig"
             },
             {
               "type": "null"
@@ -1233,10 +1590,7 @@
             }
           ]
         }
-      },
-      "required": [
-        "cli"
-      ]
+      }
     },
     "ClassificationRule": {
       "description": "A single classification rule mapping message patterns to a model hint.",
@@ -1332,6 +1686,60 @@
         "from_number"
       ]
     },
+    "CloudOpsConfig": {
+      "description": "Controls the read-only cloud transformation analysis tools:\nIaC review, migration assessment, cost analysis, and architecture review.",
+      "type": "object",
+      "properties": {
+        "cost_threshold_monthly_usd": {
+          "description": "Monthly USD threshold to flag cost items. Default: 100.0.",
+          "type": "number",
+          "format": "double",
+          "default": 100.0
+        },
+        "default_cloud": {
+          "description": "Default cloud provider for analysis context. Default: \"aws\".",
+          "type": "string",
+          "default": "aws"
+        },
+        "enabled": {
+          "description": "Enable cloud operations tools. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "iac_tools": {
+          "description": "Supported IaC tools for review. Default: [`terraform`].",
+          "type": "array",
+          "default": [
+            "terraform"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "supported_clouds": {
+          "description": "Supported cloud providers. Default: [`aws`, `azure`, `gcp`].",
+          "type": "array",
+          "default": [
+            "aws",
+            "azure",
+            "gcp"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "well_architected_frameworks": {
+          "description": "Well-Architected Frameworks to check against. Default: [`aws-waf`].",
+          "type": "array",
+          "default": [
+            "aws-waf"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "CloudflareTunnelConfig": {
       "type": "object",
       "properties": {
@@ -1365,6 +1773,73 @@
           "description": "Default entity ID for multi-user setups",
           "type": "string",
           "default": "default"
+        }
+      }
+    },
+    "ConversationalAiConfig": {
+      "description": "Conversational AI agent builder configuration (`[conversational_ai]` section).\n\nControls language detection, escalation behavior, conversation limits, and\nanalytics for conversational agent workflows. Disabled by default.",
+      "type": "object",
+      "properties": {
+        "analytics_enabled": {
+          "description": "Enable conversation analytics tracking. Default: false (privacy-by-default).",
+          "type": "boolean",
+          "default": false
+        },
+        "auto_detect_language": {
+          "description": "Automatically detect user language from message content. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "conversation_timeout_secs": {
+          "description": "Conversation timeout in seconds (inactivity). Default: 1800.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 1800,
+          "minimum": 0
+        },
+        "default_language": {
+          "description": "Default language for conversations (BCP-47 tag). Default: \"en\".",
+          "type": "string",
+          "default": "en"
+        },
+        "enabled": {
+          "description": "Enable conversational AI features. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "escalation_confidence_threshold": {
+          "description": "Intent confidence below this threshold triggers escalation. Default: 0.3.",
+          "type": "number",
+          "format": "double",
+          "default": 0.3
+        },
+        "knowledge_base_tool": {
+          "description": "Optional tool name for RAG-based knowledge base lookup during conversations.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "max_conversation_turns": {
+          "description": "Maximum conversation turns before auto-ending. Default: 50.",
+          "type": "integer",
+          "format": "uint",
+          "default": 50,
+          "minimum": 0
+        },
+        "supported_languages": {
+          "description": "Supported languages for conversations. Default: [`en`, `de`, `fr`, `it`].",
+          "type": "array",
+          "default": [
+            "en",
+            "de",
+            "fr",
+            "it"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1455,6 +1930,37 @@
       "required": [
         "start_command"
       ]
+    },
+    "DataRetentionConfig": {
+      "description": "Data retention and purge configuration (`[data_retention]` section).",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "description": "Limit retention enforcement to specific data categories (empty = all).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "dry_run": {
+          "description": "Preview what would be deleted without actually removing anything.",
+          "type": "boolean",
+          "default": false
+        },
+        "enabled": {
+          "description": "Enable the `data_management` tool.",
+          "type": "boolean",
+          "default": false
+        },
+        "retention_days": {
+          "description": "Days of data to retain before purge eligibility.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 90,
+          "minimum": 0
+        }
+      }
     },
     "DelegateAgentConfig": {
       "description": "Configuration for a delegate sub-agent used by the `delegate` tool.",
@@ -2039,6 +2545,34 @@
       "description": "Heartbeat configuration for periodic health pings (`[heartbeat]` section).",
       "type": "object",
       "properties": {
+        "adaptive": {
+          "description": "Enable adaptive intervals that back off on failures and speed up for\nhigh-priority tasks. Default: `false`.",
+          "type": "boolean",
+          "default": false
+        },
+        "deadman_channel": {
+          "description": "Channel for dead-man's switch alerts (e.g. `telegram`). Falls back to\nthe heartbeat delivery channel.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "deadman_timeout_minutes": {
+          "description": "Dead-man's switch timeout in minutes. If the heartbeat has not ticked\nwithin this window, an alert is sent. `0` disables. Default: `0`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
+        "deadman_to": {
+          "description": "Recipient for dead-man's switch alerts. Falls back to `to`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "enabled": {
           "description": "Enable periodic heartbeat pings. Default: `false`.",
           "type": "boolean"
@@ -2049,6 +2583,20 @@
           "format": "uint32",
           "minimum": 0
         },
+        "max_interval_minutes": {
+          "description": "Maximum interval in minutes when adaptive mode backs off. Default: `120`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 120,
+          "minimum": 0
+        },
+        "max_run_history": {
+          "description": "Maximum number of heartbeat run history records to retain. Default: `100`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 100,
+          "minimum": 0
+        },
         "message": {
           "description": "Optional fallback task text when `HEARTBEAT.md` has no task entries.",
           "type": [
@@ -2056,6 +2604,13 @@
             "null"
           ],
           "default": null
+        },
+        "min_interval_minutes": {
+          "description": "Minimum interval in minutes when adaptive mode is enabled. Default: `5`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 5,
+          "minimum": 0
         },
         "target": {
           "description": "Optional delivery channel for heartbeat output (for example: `telegram`).\nWhen omitted, auto-selects the first configured channel.",
@@ -2113,6 +2668,11 @@
       "description": "HTTP request tool configuration (`[http_request]` section).\n\nDeny-by-default: if `allowed_domains` is empty, all HTTP requests are rejected.",
       "type": "object",
       "properties": {
+        "allow_private_hosts": {
+          "description": "Allow requests to private/LAN hosts (RFC 1918, loopback, link-local, .local).\nDefault: false (deny private hosts for SSRF protection).",
+          "type": "boolean",
+          "default": false
+        },
         "allowed_domains": {
           "description": "Allowed domains for HTTP requests (exact or subdomain match)",
           "type": "array",
@@ -2675,6 +3235,13 @@
           "type": "boolean",
           "default": false
         },
+        "response_cache_hot_entries": {
+          "description": "Max in-memory hot cache entries for the two-tier response cache (default: 256)",
+          "type": "integer",
+          "format": "uint",
+          "default": 256,
+          "minimum": 0
+        },
         "response_cache_max_entries": {
           "description": "Max number of cached responses before LRU eviction (default: 5000)",
           "type": "integer",
@@ -2719,6 +3286,102 @@
       "required": [
         "backend",
         "auto_save"
+      ]
+    },
+    "Microsoft365Config": {
+      "description": "Microsoft 365 integration via Microsoft Graph API (`[microsoft365]` section).\n\nProvides access to Outlook mail, Teams messages, Calendar events,\nOneDrive files, and SharePoint search.",
+      "type": "object",
+      "properties": {
+        "auth_flow": {
+          "description": "Authentication flow: \"client_credentials\" or \"device_code\"",
+          "type": "string",
+          "default": "client_credentials"
+        },
+        "client_id": {
+          "description": "Azure AD application (client) ID",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "client_secret": {
+          "description": "Azure AD client secret (stored encrypted when secrets.encrypt = true)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "enabled": {
+          "description": "Enable Microsoft 365 integration",
+          "type": "boolean",
+          "default": false
+        },
+        "scopes": {
+          "description": "OAuth scopes to request",
+          "type": "array",
+          "default": [
+            "https://graph.microsoft.com/.default"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tenant_id": {
+          "description": "Azure AD tenant ID",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "token_cache_encrypted": {
+          "description": "Encrypt the token cache file on disk",
+          "type": "boolean",
+          "default": true
+        },
+        "user_id": {
+          "description": "User principal name or \"me\" (for delegated flows)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
+    },
+    "MochatConfig": {
+      "description": "Mochat channel configuration (Mochat customer service API)",
+      "type": "object",
+      "properties": {
+        "allowed_users": {
+          "description": "Allowed user IDs. Empty = deny all, \"*\" = allow all",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "api_token": {
+          "description": "Mochat API token",
+          "type": "string"
+        },
+        "api_url": {
+          "description": "Mochat API base URL",
+          "type": "string"
+        },
+        "poll_interval_secs": {
+          "description": "Poll interval in seconds for new messages. Default: 5",
+          "type": "integer",
+          "format": "uint64",
+          "default": 5,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "api_url",
+        "api_token"
       ]
     },
     "ModelPricing": {
@@ -2858,6 +3521,104 @@
         }
       }
     },
+    "NevisConfig": {
+      "description": "Nevis IAM integration configuration.\n\nWhen `enabled` is true, ZeroClaw validates incoming requests against a Nevis\nSecurity Suite instance and maps Nevis roles to tool/workspace permissions.",
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "description": "OAuth2 client ID registered in Nevis.",
+          "type": "string",
+          "default": ""
+        },
+        "client_secret": {
+          "description": "OAuth2 client secret. Encrypted via SecretStore when stored on disk.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "enabled": {
+          "description": "Enable Nevis IAM integration. Defaults to false for backward compatibility.",
+          "type": "boolean",
+          "default": false
+        },
+        "instance_url": {
+          "description": "Base URL of the Nevis instance (e.g. `https://nevis.example.com`).",
+          "type": "string",
+          "default": ""
+        },
+        "jwks_url": {
+          "description": "JWKS endpoint URL for local token validation.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "realm": {
+          "description": "Nevis realm to authenticate against.",
+          "type": "string",
+          "default": "master"
+        },
+        "require_mfa": {
+          "description": "Require MFA verification for all Nevis-authenticated requests.",
+          "type": "boolean",
+          "default": false
+        },
+        "role_mapping": {
+          "description": "Nevis role to ZeroClaw permission mappings.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NevisRoleMappingConfig"
+          }
+        },
+        "session_timeout_secs": {
+          "description": "Session timeout in seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 3600,
+          "minimum": 0
+        },
+        "token_validation": {
+          "description": "Token validation strategy: `\"local\"` (JWKS) or `\"remote\"` (introspection).",
+          "type": "string",
+          "default": "local"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NevisRoleMappingConfig": {
+      "description": "Maps a Nevis role to ZeroClaw tool permissions and workspace access.",
+      "type": "object",
+      "properties": {
+        "nevis_role": {
+          "description": "Nevis role name (case-insensitive).",
+          "type": "string"
+        },
+        "workspace_access": {
+          "description": "Workspace names this role can access. Use `\"all\"` for unrestricted.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "zeroclaw_permissions": {
+          "description": "Tool names this role can access. Use `\"all\"` for unrestricted tool access.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "nevis_role"
+      ]
+    },
     "NextcloudTalkConfig": {
       "description": "Nextcloud Talk bot configuration (webhook receive + OCS send API).",
       "type": "object",
@@ -2910,6 +3671,69 @@
       "required": [
         "auth_token"
       ]
+    },
+    "NodeTransportConfig": {
+      "description": "Secure transport configuration for inter-node communication (`[node_transport]`).",
+      "type": "object",
+      "properties": {
+        "allowed_peers": {
+          "description": "Allow specific node IPs/CIDRs.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "connection_pool_size": {
+          "description": "Maximum number of connections per peer.",
+          "type": "integer",
+          "format": "uint",
+          "default": 4,
+          "minimum": 0
+        },
+        "enabled": {
+          "description": "Enable the secure transport layer.",
+          "type": "boolean",
+          "default": true
+        },
+        "max_request_age_secs": {
+          "description": "Maximum age of signed requests in seconds (replay protection).",
+          "type": "integer",
+          "format": "int64",
+          "default": 300
+        },
+        "mutual_tls": {
+          "description": "Require client certificates (mutual TLS).",
+          "type": "boolean",
+          "default": false
+        },
+        "require_https": {
+          "description": "Require HTTPS for all node communication.",
+          "type": "boolean",
+          "default": true
+        },
+        "shared_secret": {
+          "description": "Shared secret for HMAC authentication between nodes.",
+          "type": "string",
+          "default": ""
+        },
+        "tls_cert_path": {
+          "description": "Path to TLS certificate file.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "tls_key_path": {
+          "description": "Path to TLS private key file.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
     },
     "NodesConfig": {
       "description": "Configuration for the dynamic node discovery system (`[nodes]`).\n\nWhen enabled, external processes/devices can connect via WebSocket\nat `/ws/nodes` and advertise their capabilities at runtime.",
@@ -2970,6 +3794,52 @@
       "required": [
         "private_key"
       ]
+    },
+    "NotionConfig": {
+      "description": "Notion integration configuration (`[notion]`).\n\nWhen `enabled = true`, the agent polls a Notion database for pending tasks\nand exposes a `notion` tool for querying, reading, creating, and updating pages.\nRequires `api_key` (or the `NOTION_API_KEY` env var) and `database_id`.",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "default": ""
+        },
+        "database_id": {
+          "type": "string",
+          "default": ""
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "input_property": {
+          "type": "string",
+          "default": "Input"
+        },
+        "max_concurrent": {
+          "type": "integer",
+          "format": "uint",
+          "default": 4,
+          "minimum": 0
+        },
+        "poll_interval_secs": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 5,
+          "minimum": 0
+        },
+        "recover_stale": {
+          "type": "boolean",
+          "default": true
+        },
+        "result_property": {
+          "type": "string",
+          "default": "Result"
+        },
+        "status_property": {
+          "type": "string",
+          "default": "Status"
+        }
+      }
     },
     "ObservabilityConfig": {
       "description": "Observability backend configuration (`[observability]` section).",
@@ -3041,6 +3911,50 @@
           "default": 1.0
         }
       }
+    },
+    "OpenVpnTunnelConfig": {
+      "description": "OpenVPN tunnel configuration (`[tunnel.openvpn]`).\n\nRequired when `tunnel.provider = \"openvpn\"`. Omitting this section entirely\npreserves previous behavior. Setting `tunnel.provider = \"none\"` (or removing\nthe `[tunnel.openvpn]` block) cleanly reverts to no-tunnel mode.\n\nDefaults: `connect_timeout_secs = 30`.",
+      "type": "object",
+      "properties": {
+        "advertise_address": {
+          "description": "Advertised address once VPN is connected (e.g., `\"10.8.0.2:42617\"`).\nWhen omitted the tunnel falls back to `http://{local_host}:{local_port}`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "auth_file": {
+          "description": "Optional path to auth credentials file (`--auth-user-pass`).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "config_file": {
+          "description": "Path to `.ovpn` configuration file (must not be empty).",
+          "type": "string"
+        },
+        "connect_timeout_secs": {
+          "description": "Connection timeout in seconds (default: 30, must be > 0).",
+          "type": "integer",
+          "format": "uint64",
+          "default": 30,
+          "minimum": 0
+        },
+        "extra_args": {
+          "description": "Extra openvpn CLI arguments forwarded verbatim.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "config_file"
+      ]
     },
     "OtpConfig": {
       "description": "Security OTP configuration.",
@@ -3180,6 +4094,58 @@
           "description": "Enable peripheral support (boards become agent tools)",
           "type": "boolean",
           "default": false
+        }
+      }
+    },
+    "ProjectIntelConfig": {
+      "description": "Project delivery intelligence configuration (`[project_intel]` section).",
+      "type": "object",
+      "properties": {
+        "default_language": {
+          "description": "Default report language (en, de, fr, it). Default: \"en\".",
+          "type": "string",
+          "default": "en"
+        },
+        "enabled": {
+          "description": "Enable the project_intel tool. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "include_git_data": {
+          "description": "Include git log data in reports. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "include_jira_data": {
+          "description": "Include Jira data in reports. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "jira_base_url": {
+          "description": "Jira instance base URL (required if include_jira_data is true).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "report_output_dir": {
+          "description": "Output directory for generated reports.",
+          "type": "string",
+          "default": "~/.zeroclaw/project-reports"
+        },
+        "risk_sensitivity": {
+          "description": "Risk detection sensitivity: low, medium, high. Default: \"medium\".",
+          "type": "string",
+          "default": "medium"
+        },
+        "templates_dir": {
+          "description": "Optional custom templates directory.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       }
     },
@@ -3591,6 +4557,22 @@
             "state_file": "~/.zeroclaw/estop-state.json"
           }
         },
+        "nevis": {
+          "description": "Nevis IAM integration for SSO/MFA authentication and role-based access.",
+          "$ref": "#/$defs/NevisConfig",
+          "default": {
+            "client_id": "",
+            "client_secret": null,
+            "enabled": false,
+            "instance_url": "",
+            "jwks_url": null,
+            "realm": "master",
+            "require_mfa": false,
+            "role_mapping": [],
+            "session_timeout_secs": 3600,
+            "token_validation": "local"
+          }
+        },
         "otp": {
           "description": "OTP gating configuration for sensitive actions/domains.",
           "$ref": "#/$defs/OtpConfig",
@@ -3628,6 +4610,50 @@
             "enabled": null,
             "firejail_args": []
           }
+        }
+      }
+    },
+    "SecurityOpsConfig": {
+      "description": "Managed Cybersecurity Service (MCSS) dashboard agent configuration (`[security_ops]`).",
+      "type": "object",
+      "properties": {
+        "auto_triage": {
+          "description": "Automatically triage incoming alerts without user prompt.",
+          "type": "boolean",
+          "default": false
+        },
+        "enabled": {
+          "description": "Enable security operations tools.",
+          "type": "boolean",
+          "default": false
+        },
+        "max_auto_severity": {
+          "description": "Maximum severity level that can be auto-remediated without approval.\nOne of: \"low\", \"medium\", \"high\", \"critical\". Default: \"low\".",
+          "type": "string",
+          "default": "low"
+        },
+        "playbooks_dir": {
+          "description": "Directory containing incident response playbook definitions (JSON).",
+          "type": "string",
+          "default": "~/.zeroclaw/playbooks"
+        },
+        "report_output_dir": {
+          "description": "Directory for generated security reports.",
+          "type": "string",
+          "default": "~/.zeroclaw/security-reports"
+        },
+        "require_approval_for_actions": {
+          "description": "Require human approval before executing playbook actions.",
+          "type": "boolean",
+          "default": true
+        },
+        "siem_integration": {
+          "description": "Optional SIEM webhook URL for alert ingestion.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       }
     },
@@ -3747,6 +4773,11 @@
           "description": "When true, a newer Slack message from the same sender in the same channel\ncancels the in-flight request and starts a fresh response with preserved history.",
           "type": "boolean",
           "default": false
+        },
+        "mention_only": {
+          "description": "When true, only respond to messages that @-mention the bot in groups.\nDirect messages remain allowed.",
+          "type": "boolean",
+          "default": false
         }
       },
       "required": [
@@ -3840,6 +4871,68 @@
           "description": "Update a draft message with every flush interval.",
           "type": "string",
           "const": "partial"
+        }
+      ]
+    },
+    "SwarmConfig": {
+      "description": "Configuration for a swarm of coordinated agents.",
+      "type": "object",
+      "properties": {
+        "agents": {
+          "description": "Ordered list of agent names (must reference keys in `agents`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "description": "Optional description shown to the LLM when choosing swarms.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "router_prompt": {
+          "description": "System prompt for router strategy (used to pick the best agent).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strategy": {
+          "description": "Orchestration strategy.",
+          "$ref": "#/$defs/SwarmStrategy"
+        },
+        "timeout_secs": {
+          "description": "Maximum total timeout for the swarm execution in seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 300,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "agents",
+        "strategy"
+      ]
+    },
+    "SwarmStrategy": {
+      "description": "Orchestration strategy for a swarm of agents.",
+      "oneOf": [
+        {
+          "description": "Run agents sequentially; each agent's output feeds into the next.",
+          "type": "string",
+          "const": "sequential"
+        },
+        {
+          "description": "Run agents in parallel; collect all outputs.",
+          "type": "string",
+          "const": "parallel"
+        },
+        {
+          "description": "Use the LLM to pick the best agent for the task.",
+          "type": "string",
+          "const": "router"
         }
       ]
     },
@@ -3959,6 +5052,14 @@
           "type": "boolean",
           "default": false
         },
+        "initial_prompt": {
+          "description": "Optional initial prompt to bias transcription toward expected vocabulary\n(proper nouns, technical terms, etc.). Sent as the `prompt` field in the\nWhisper API request.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "language": {
           "description": "Optional language hint (ISO-639-1, e.g. \"en\", \"ru\").",
           "type": [
@@ -4063,7 +5164,7 @@
       }
     },
     "TunnelConfig": {
-      "description": "Tunnel configuration for exposing the gateway publicly (`[tunnel]` section).\n\nSupported providers: `\"none\"` (default), `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"custom\"`.",
+      "description": "Tunnel configuration for exposing the gateway publicly (`[tunnel]` section).\n\nSupported providers: `\"none\"` (default), `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, `\"custom\"`.",
       "type": "object",
       "properties": {
         "cloudflare": {
@@ -4102,8 +5203,20 @@
           ],
           "default": null
         },
+        "openvpn": {
+          "description": "OpenVPN tunnel configuration (used when `provider = \"openvpn\"`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpenVpnTunnelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "provider": {
-          "description": "Tunnel provider: `\"none\"`, `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, or `\"custom\"`. Default: `\"none\"`.",
+          "description": "Tunnel provider: `\"none\"`, `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, or `\"custom\"`. Default: `\"none\"`.",
           "type": "string"
         },
         "tailscale": {
@@ -4121,6 +5234,27 @@
       },
       "required": [
         "provider"
+      ]
+    },
+    "TwitterConfig": {
+      "description": "X/Twitter channel configuration (Twitter API v2)",
+      "type": "object",
+      "properties": {
+        "allowed_users": {
+          "description": "Allowed usernames or user IDs. Empty = deny all, \"*\" = allow all",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "bearer_token": {
+          "description": "Twitter API v2 Bearer Token (OAuth 2.0)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bearer_token"
       ]
     },
     "WatiConfig": {
@@ -4385,6 +5519,50 @@
             "null"
           ],
           "default": null
+        }
+      }
+    },
+    "WorkspaceConfig": {
+      "description": "Multi-client workspace isolation configuration.\n\nWhen enabled, each client engagement gets an isolated workspace with\nseparate memory, audit, secrets, and tool restrictions.",
+      "type": "object",
+      "properties": {
+        "active_workspace": {
+          "description": "Currently active workspace name.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "cross_workspace_search": {
+          "description": "Allow searching across workspaces. Default: false (security).",
+          "type": "boolean",
+          "default": false
+        },
+        "enabled": {
+          "description": "Enable workspace isolation. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "isolate_audit": {
+          "description": "Isolate audit logs per workspace. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "isolate_memory": {
+          "description": "Isolate memory databases per workspace. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "isolate_secrets": {
+          "description": "Isolate secrets namespaces per workspace. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "workspaces_dir": {
+          "description": "Base directory for workspace profiles.",
+          "type": "string",
+          "default": "~/.zeroclaw/workspaces"
         }
       }
     }
