@@ -1,0 +1,54 @@
+---
+title: SDK
+description: Programmatic TypeScript API for deploying, managing, and interacting with ClawRun agent instances.
+---
+
+The `@clawrun/sdk` package provides a TypeScript API for everything the CLI does, plus streaming chat, thread management, and sandbox operations. Use it to integrate ClawRun into your own applications, build custom dashboards, or automate deployments.
+
+## Install
+
+```bash
+npm install @clawrun/sdk
+```
+
+## Quick example
+
+```typescript
+import { ClawRunClient } from "@clawrun/sdk";
+
+const client = new ClawRunClient();
+const instance = client.connect("https://my-agent.vercel.app", "jwt-secret");
+
+// Send a message and get the full response
+const response = await instance.sendMessage("What can you do?");
+console.log(response.parts);
+
+// Check agent health
+const health = await instance.health();
+console.log(health.status); // "ok"
+```
+
+## Sections
+
+<Cards>
+  <Card
+    title="Client"
+    description="Connect to deployed instances with ClawRunClient"
+    href="/docs/sdk/client"
+  />
+  <Card
+    title="Instance"
+    description="Lifecycle, agent queries, memory, cron, cost, and workspace"
+    href="/docs/sdk/instance"
+  />
+  <Card
+    title="Chat"
+    description="Streaming and batch messaging with the agent"
+    href="/docs/sdk/chat"
+  />
+  <Card
+    title="Sandbox"
+    description="Direct sandbox operations: exec, files, snapshots"
+    href="/docs/sdk/sandbox"
+  />
+</Cards>

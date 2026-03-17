@@ -1,0 +1,57 @@
+---
+title: Client
+description: Connect to deployed ClawRun instances with ClawRunClient.
+---
+
+`ClawRunClient` is the entry point for connecting to deployed agent instances. It creates `ClawRunInstance` objects that you use for all subsequent operations.
+
+## Creating a client
+
+```typescript
+import { ClawRunClient } from "@clawrun/sdk";
+
+const client = new ClawRunClient();
+```
+
+## Connecting to an instance
+
+Pass the deployed URL and the JWT secret (from `clawrun.json`):
+
+```typescript
+const instance = client.connect(
+  "https://my-agent.vercel.app",
+  "your-jwt-secret"
+);
+```
+
+The client signs a short-lived JWT for each API call. No tokens are stored.
+
+## With sandbox access
+
+To use direct sandbox operations (exec, file read/write, snapshots), provide the sandbox config:
+
+```typescript
+const instance = client.connect(
+  "https://my-agent.vercel.app",
+  "your-jwt-secret",
+  {
+    provider: "vercel",
+    providerOptions: { projectDir: "/path/to/.vercel" },
+  }
+);
+
+// Now instance.sandbox is available
+const sandboxes = await instance.sandbox.list();
+```
+
+## Browser usage
+
+For browser-based clients (web dashboards), use cookie-based auth instead of JWT:
+
+```typescript
+import { ClawRunInstance } from "@clawrun/sdk";
+
+// No JWT — relies on session cookies from /auth/accept
+const instance = ClawRunInstance.browser("https://my-agent.vercel.app");
+const health = await instance.health();
+```

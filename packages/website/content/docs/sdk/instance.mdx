@@ -1,0 +1,116 @@
+---
+title: Instance
+description: Manage the agent lifecycle, query status, and interact with memory, cron, cost, and workspace.
+---
+
+`ClawRunInstance` is the main object for interacting with a deployed agent. It provides methods for lifecycle management, agent queries, and resource operations.
+
+## Lifecycle
+
+```typescript
+await instance.start();    // Boot the sandbox
+await instance.stop();     // Snapshot and shut down
+await instance.restart();  // Force restart
+const h = await instance.health(); // { status, agent, sandbox }
+```
+
+## Agent status and config
+
+```typescript
+const status = await instance.getStatus();
+// { provider, model, uptime, memoryBackend, channels, health }
+
+const config = await instance.getConfig();
+// { format: "toml", content: "..." }
+
+const cost = await instance.getCost();
+// { sessionCost, dailyCost, monthlyCost, totalTokens, requestCount, byModel }
+
+const diag = await instance.runDiagnostics();
+// [{ category, message, severity }]
+```
+
+## Tools
+
+```typescript
+const tools = await instance.listTools();
+// { tools: [...], cliTools: [...] }
+```
+
+## Threads
+
+```typescript
+const threads = await instance.listThreads();
+// { threads: [{ id, channel, preview, messageCount, lastActivity }] }
+
+const thread = await instance.getThread("thread-id");
+// { messages: [...] }
+```
+
+## Memory
+
+```typescript
+const memories = await instance.listMemories({ query: "project goals" });
+// [{ key, content, category, timestamp }]
+
+await instance.createMemory({
+  key: "project-deadline",
+  content: "Launch by March 2026",
+  category: "facts",
+});
+
+await instance.deleteMemory("project-deadline");
+```
+
+## Cron jobs
+
+```typescript
+const jobs = await instance.listCronJobs();
+// { jobs: [{ id, schedule, command, nextRun, lastRun }] }
+
+const job = await instance.createCronJob({
+  schedule: "0 9 * * *",
+  command: "Send a daily standup summary to the team channel",
+});
+
+await instance.deleteCronJob(job.id);
+```
+
+## Logs
+
+```typescript
+const logs = await instance.readLogs({ limit: 100 });
+// { entries: [{ level, time, tag, msg }] }
+```
+
+## Workspace files
+
+```typescript
+const files = await instance.listWorkspaceFiles();
+// { files: [{ name, path }] }
+
+const file = await instance.readWorkspaceFile("AGENTS.md");
+// { name, content }
+```
+
+## Invites
+
+```typescript
+const invite = await instance.createInvite(3600); // TTL in seconds
+// { token, url }
+// url: "https://my-agent.vercel.app/auth/accept?token=..."
+```
+
+## History
+
+```typescript
+const history = await instance.getHistory("thread-id");
+// { messages: [{ role, content }] }
+```
+
+## Cleanup
+
+```typescript
+await instance.destroySandboxes();
+// Stops all running sandboxes and deletes all snapshots
+```

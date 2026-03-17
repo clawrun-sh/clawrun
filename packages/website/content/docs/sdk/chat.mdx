@@ -1,0 +1,71 @@
+---
+title: Chat
+description: Send messages to the agent with streaming or batch responses.
+---
+
+ClawRun supports two messaging modes: streaming (progressive chunks) and batch (full response).
+
+## Batch messaging
+
+Send a message and wait for the complete response:
+
+```typescript
+const response = await instance.sendMessage("Summarize the project status");
+console.log(response.role);  // "assistant"
+console.log(response.parts); // [{ type: "text", text: "..." }, ...]
+```
+
+Pass options for thread tracking or abort control:
+
+```typescript
+const controller = new AbortController();
+
+const response = await instance.sendMessage("Hello", {
+  threadId: "session-123",
+  signal: controller.signal,
+});
+```
+
+## Streaming
+
+For progressive responses, use `chat()` which returns a `ChatStream`:
+
+```typescript
+const stream = instance.chat("Explain how sandboxes work");
+
+for await (const event of stream) {
+  switch (event.type) {
+    case "text-delta":
+      process.stdout.write(event.delta);
+      break;
+    case "reasoning-delta":
+      // Model thinking/reasoning content
+      break;
+    case "tool-input-available":
+      console.log(`Tool call: ${event.name}`);
+      break;
+    case "tool-output-available":
+      console.log(`Tool result: ${event.output}`);
+      break;
+  }
+}
+```
+
+Or get the final result from a stream:
+
+```typescript
+const stream = instance.chat("Hello");
+const message = await stream.result(); // same as sendMessage()
+```
+
+## Lazy evaluation
+
+`chat()` does not trigger an HTTP request until you iterate or call `.result()`:
+
+```typescript
+const stream = instance.chat("Hello");
+// No request sent yet
+
+const message = await stream.result();
+// Request sent and completed
+```

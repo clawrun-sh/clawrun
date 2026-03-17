@@ -1,0 +1,63 @@
+---
+title: Sandbox
+description: Direct sandbox operations for executing commands, managing files, and controlling snapshots.
+---
+
+The `SandboxClient` provides direct access to the underlying sandbox (Firecracker microVM). Access it via `instance.sandbox`.
+
+## Setup
+
+Sandbox access requires provider configuration when connecting:
+
+```typescript
+const instance = client.connect(url, jwtSecret, {
+  provider: "vercel",
+  providerOptions: { projectDir: "/path/to/.vercel" },
+});
+
+const sandbox = instance.sandbox;
+```
+
+## List sandboxes
+
+```typescript
+const sandboxes = await sandbox.list();
+// [{ id, status, createdAt, timeout, memory, vcpus }]
+```
+
+## Execute commands
+
+```typescript
+const result = await sandbox.exec("sbx-123", "ls", ["-la", "/home"]);
+console.log(result.exitCode); // 0
+console.log(await result.stdout());
+```
+
+## Read and write files
+
+```typescript
+// Read
+const content = await sandbox.readFile("sbx-123", "/home/agent/config.toml");
+
+// Write
+await sandbox.writeFiles("sbx-123", [
+  { path: "/home/agent/notes.md", content: Buffer.from("# Notes\n") },
+]);
+```
+
+## Snapshots
+
+```typescript
+// List snapshots
+const snapshots = await sandbox.listSnapshots();
+// [{ id, createdAt, sandboxId }]
+
+// Delete a snapshot
+await sandbox.deleteSnapshot("snap-123");
+```
+
+## Stop a sandbox
+
+```typescript
+await sandbox.stop("sbx-123");
+```

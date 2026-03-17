@@ -1,0 +1,9 @@
+{
+  "title": "SDK",
+  "pages": [
+    "client",
+    "instance",
+    "chat",
+    "sandbox"
+  ]
+}

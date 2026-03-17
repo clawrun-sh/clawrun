@@ -8,6 +8,7 @@
     "presets",
     "tools",
     "cli",
+    "sdk",
     "troubleshooting"
   ]
 }
