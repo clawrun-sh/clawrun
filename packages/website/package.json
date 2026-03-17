@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "rm -rf .next .source",
     "dev": "next dev --turbo",
-    "build": "next build",
+    "build": "node scripts/generate-schemas.mjs && next build",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
     "lint": "eslint app lib components",

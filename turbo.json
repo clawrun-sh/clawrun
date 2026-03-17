@@ -21,6 +21,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@clawrun/website#build": {
+      "dependsOn": ["^build", "@clawrun/runtime#build", "@clawrun/sdk#build"],
+      "outputs": [".next/**"]
+    },
     "zeroclaw#build": {
       "dependsOn": ["^build", "build:bin", "generate:types"],
       "outputs": ["dist/**", "!dist/bin/**"]
