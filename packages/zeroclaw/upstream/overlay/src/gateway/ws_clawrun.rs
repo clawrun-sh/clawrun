@@ -924,6 +924,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             configured_hooks.as_deref(),             // hooks
             &excluded_tools,                         // excluded tools
             &dedup_exempt_tools,                     // dedup exempt tools
+            None,                                   // activated_tools
         );
 
         // Scope cost tracking task-local around the tool loop.

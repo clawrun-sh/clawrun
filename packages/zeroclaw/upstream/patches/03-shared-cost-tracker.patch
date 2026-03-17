@@ -1,5 +1,5 @@
 diff --git a/src/cost/tracker.rs b/src/cost/tracker.rs
-index 1905b36..0a32752 100644
+index 1905b36..776a1c1 100644
 --- a/src/cost/tracker.rs
 +++ b/src/cost/tracker.rs
 @@ -7,7 +7,7 @@ use std::collections::HashMap;
@@ -16,8 +16,8 @@ index 1905b36..0a32752 100644
  }
  
 +// ── Process-global singleton ────────────────────────────────────────
-+// Both the gateway (ws_clawrun) and the channels supervisor share a single
-+// CostTracker so that budget enforcement is consistent across all paths.
++// Both the gateway and the channels supervisor share a single CostTracker
++// so that budget enforcement is consistent across all paths.
 +
 +static GLOBAL_COST_TRACKER: OnceLock<Option<Arc<CostTracker>>> = OnceLock::new();
 +
@@ -48,10 +48,10 @@ index 1905b36..0a32752 100644
      let storage_path = workspace_dir.join("state").join("costs.jsonl");
      let legacy_path = workspace_dir.join(".zeroclaw").join("costs.db");
 diff --git a/src/gateway/mod.rs b/src/gateway/mod.rs
-index b73fd3e..54f4601 100644
+index d89d826..ca24353 100644
 --- a/src/gateway/mod.rs
 +++ b/src/gateway/mod.rs
-@@ -405,18 +405,8 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
+@@ -421,18 +421,8 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
      let tools_registry: Arc<Vec<ToolSpec>> =
          Arc::new(tools_registry_raw.iter().map(|t| t.spec()).collect());
  

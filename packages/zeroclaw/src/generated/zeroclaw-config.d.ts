@@ -27,11 +27,16 @@ export interface Config {
    */
   api_url?: string | null;
   autonomy?: AutonomyConfig;
+  backup?: BackupConfig;
   browser?: BrowserConfig;
+  browser_delegate?: BrowserDelegateConfig;
   channels_config?: ChannelsConfig;
+  cloud_ops?: CloudOpsConfig;
   composio?: ComposioConfig;
+  conversational_ai?: ConversationalAiConfig;
   cost?: CostConfig;
   cron?: CronConfig;
+  data_retention?: DataRetentionConfig;
   /**
    * Default model routed through the selected provider (e.g. `"anthropic/claude-sonnet-4-6"`).
    */
@@ -69,6 +74,7 @@ export interface Config {
   identity?: IdentityConfig;
   mcp?: McpConfig;
   memory?: MemoryConfig;
+  microsoft365?: Microsoft365Config;
   /**
    * Optional named provider profiles keyed by id (Codex app-server compatible layout).
    */
@@ -80,9 +86,12 @@ export interface Config {
    */
   model_routes?: ModelRouteConfig[];
   multimodal?: MultimodalConfig;
+  node_transport?: NodeTransportConfig;
   nodes?: NodesConfig;
+  notion?: NotionConfig;
   observability?: ObservabilityConfig;
   peripherals?: PeripheralsConfig;
+  project_intel?: ProjectIntelConfig;
   /**
    * HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
    *
@@ -97,13 +106,21 @@ export interface Config {
   scheduler?: SchedulerConfig;
   secrets?: SecretsConfig;
   security?: SecurityConfig;
+  security_ops?: SecurityOpsConfig;
   skills?: SkillsConfig;
   storage?: StorageConfig;
+  /**
+   * Swarm configurations for multi-agent orchestration.
+   */
+  swarms?: {
+    [k: string]: SwarmConfig;
+  };
   transcription?: TranscriptionConfig;
   tts?: TtsConfig;
   tunnel?: TunnelConfig;
   web_fetch?: WebFetchConfig;
   web_search?: WebSearchConfig;
+  workspace?: WorkspaceConfig;
   [k: string]: unknown;
 }
 /**
@@ -114,6 +131,12 @@ export interface AgentConfig {
    * When true: bootstrap_max_chars=6000, rag_chunk_limit=2. Use for 13B or smaller models.
    */
   compact_context?: boolean;
+  /**
+   * Maximum estimated tokens for conversation history before compaction triggers.
+   * Uses ~4 chars/token heuristic. When this threshold is exceeded, older messages
+   * are summarized to preserve context while staying within budget. Default: `32000`.
+   */
+  max_context_tokens?: number;
   /**
    * Maximum conversation history messages retained per session. Default: `50`.
    */
@@ -292,6 +315,44 @@ export interface AutonomyConfig {
   [k: string]: unknown;
 }
 /**
+ * Backup tool configuration (`[backup]`).
+ */
+export interface BackupConfig {
+  /**
+   * Compress backup archives.
+   */
+  compress?: boolean;
+  /**
+   * Output directory for backup archives (relative to workspace root).
+   */
+  destination_dir?: string;
+  /**
+   * Enable the `backup` tool.
+   */
+  enabled?: boolean;
+  /**
+   * Encrypt backup archives (requires a configured secret store key).
+   */
+  encrypt?: boolean;
+  /**
+   * Workspace subdirectories to include in backups.
+   */
+  include_dirs?: string[];
+  /**
+   * Maximum number of backups to keep (oldest are pruned).
+   */
+  max_keep?: number;
+  /**
+   * Optional cron expression for scheduled automatic backups.
+   */
+  schedule_cron?: string | null;
+  /**
+   * IANA timezone for `schedule_cron`.
+   */
+  schedule_timezone?: string | null;
+  [k: string]: unknown;
+}
+/**
  * Browser automation configuration (`[browser]`).
  */
 export interface BrowserConfig {
@@ -361,6 +422,56 @@ export interface BrowserComputerUseConfig {
   [k: string]: unknown;
 }
 /**
+ * Browser delegation configuration (`[browser_delegate]`).
+ *
+ * Delegates browser-based tasks to a browser-capable CLI subprocess (e.g.
+ * Claude Code with `claude-in-chrome` MCP tools). Useful for interacting
+ * with corporate web apps (Teams, Outlook, Jira, Confluence) that lack
+ * direct API access. A persistent Chrome profile can be configured so SSO
+ * sessions survive across invocations.
+ *
+ * Fields:
+ * - `enabled` (`bool`, default `false`) — enable the browser delegation tool.
+ * - `cli_binary` (`String`, default `"claude"`) — CLI binary to spawn for browser tasks.
+ * - `chrome_profile_dir` (`String`, default `""`) — Chrome user-data directory for
+ *   persistent SSO sessions. When empty, a fresh profile is used each invocation.
+ * - `allowed_domains` (`Vec<String>`, default `[]`) — allowlist of domains the browser
+ *   may navigate to. Empty means all non-blocked domains are permitted.
+ * - `blocked_domains` (`Vec<String>`, default `[]`) — denylist of domains. Blocked
+ *   domains take precedence over allowed domains.
+ * - `task_timeout_secs` (`u64`, default `120`) — per-task timeout in seconds.
+ *
+ * Compatibility: additive and disabled by default; existing configs remain valid when omitted.
+ * Rollback/migration: remove `[browser_delegate]` or keep `enabled = false` to disable.
+ */
+export interface BrowserDelegateConfig {
+  /**
+   * Allowed domains for browser navigation (empty = allow all non-blocked).
+   */
+  allowed_domains?: string[];
+  /**
+   * Blocked domains for browser navigation.
+   */
+  blocked_domains?: string[];
+  /**
+   * Chrome profile directory for persistent SSO sessions.
+   */
+  chrome_profile_dir?: string;
+  /**
+   * CLI binary to use for browser tasks (default: `"claude"`).
+   */
+  cli_binary?: string;
+  /**
+   * Enable browser delegation tool.
+   */
+  enabled?: boolean;
+  /**
+   * Task timeout in seconds.
+   */
+  task_timeout_secs?: number;
+  [k: string]: unknown;
+}
+/**
  * Channel configurations: Telegram, Discord, Slack, etc. (`[channels_config]`).
  */
 export interface ChannelsConfig {
@@ -376,7 +487,7 @@ export interface ChannelsConfig {
   /**
    * Enable the CLI interactive channel. Default: `true`.
    */
-  cli: boolean;
+  cli?: boolean;
   /**
    * DingTalk channel configuration.
    */
@@ -426,6 +537,10 @@ export interface ChannelsConfig {
    */
   message_timeout_secs?: number;
   /**
+   * Mochat customer service channel configuration.
+   */
+  mochat?: MochatConfig | null;
+  /**
    * Nextcloud Talk bot channel configuration.
    */
   nextcloud_talk?: NextcloudTalkConfig | null;
@@ -434,6 +549,26 @@ export interface ChannelsConfig {
    * QQ Official Bot channel configuration.
    */
   qq?: QQConfig | null;
+  /**
+   * Session persistence backend: `"jsonl"` (legacy) or `"sqlite"` (new default).
+   * SQLite provides FTS5 search, metadata tracking, and TTL cleanup.
+   */
+  session_backend?: string;
+  /**
+   * Persist channel conversation history to JSONL files so sessions survive
+   * daemon restarts. Files are stored in `{workspace}/sessions/`. Default: `true`.
+   */
+  session_persistence?: boolean;
+  /**
+   * Auto-archive stale sessions older than this many hours. `0` disables. Default: `0`.
+   */
+  session_ttl_hours?: number;
+  /**
+   * Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)
+   * to channel users. When `false`, tool calls are still logged server-side but
+   * not forwarded as individual channel messages. Default: `true`.
+   */
+  show_tool_calls?: boolean;
   /**
    * Signal channel configuration.
    */
@@ -446,6 +581,10 @@ export interface ChannelsConfig {
    * Telegram bot channel configuration.
    */
   telegram?: TelegramConfig | null;
+  /**
+   * X/Twitter channel configuration.
+   */
+  twitter?: TwitterConfig | null;
   /**
    * WATI WhatsApp Business API channel configuration.
    */
@@ -809,6 +948,28 @@ export interface MattermostConfig {
   [k: string]: unknown;
 }
 /**
+ * Mochat channel configuration (Mochat customer service API)
+ */
+export interface MochatConfig {
+  /**
+   * Allowed user IDs. Empty = deny all, "*" = allow all
+   */
+  allowed_users?: string[];
+  /**
+   * Mochat API token
+   */
+  api_token: string;
+  /**
+   * Mochat API base URL
+   */
+  api_url: string;
+  /**
+   * Poll interval in seconds for new messages. Default: 5
+   */
+  poll_interval_secs?: number;
+  [k: string]: unknown;
+}
+/**
  * Nextcloud Talk bot configuration (webhook receive + OCS send API).
  */
 export interface NextcloudTalkConfig {
@@ -919,6 +1080,16 @@ export interface SlackConfig {
    * Omit (or set `"*"`) to listen across all accessible channels.
    */
   channel_id?: string | null;
+  /**
+   * When true, a newer Slack message from the same sender in the same channel
+   * cancels the in-flight request and starts a fresh response with preserved history.
+   */
+  interrupt_on_new_message?: boolean;
+  /**
+   * When true, only respond to messages that @-mention the bot in groups.
+   * Direct messages remain allowed.
+   */
+  mention_only?: boolean;
   [k: string]: unknown;
 }
 /**
@@ -951,6 +1122,20 @@ export interface TelegramConfig {
    * Streaming mode for progressive response delivery via message edits.
    */
   stream_mode?: "off" | "partial";
+  [k: string]: unknown;
+}
+/**
+ * X/Twitter channel configuration (Twitter API v2)
+ */
+export interface TwitterConfig {
+  /**
+   * Allowed usernames or user IDs. Empty = deny all, "*" = allow all
+   */
+  allowed_users?: string[];
+  /**
+   * Twitter API v2 Bearer Token (OAuth 2.0)
+   */
+  bearer_token: string;
   [k: string]: unknown;
 }
 /**
@@ -1051,6 +1236,36 @@ export interface WhatsAppConfig {
   [k: string]: unknown;
 }
 /**
+ * Cloud transformation accelerator configuration (`[cloud_ops]`).
+ */
+export interface CloudOpsConfig {
+  /**
+   * Monthly USD threshold to flag cost items. Default: 100.0.
+   */
+  cost_threshold_monthly_usd?: number;
+  /**
+   * Default cloud provider for analysis context. Default: "aws".
+   */
+  default_cloud?: string;
+  /**
+   * Enable cloud operations tools. Default: false.
+   */
+  enabled?: boolean;
+  /**
+   * Supported IaC tools for review. Default: [`terraform`].
+   */
+  iac_tools?: string[];
+  /**
+   * Supported cloud providers. Default: [`aws`, `azure`, `gcp`].
+   */
+  supported_clouds?: string[];
+  /**
+   * Well-Architected Frameworks to check against. Default: [`aws-waf`].
+   */
+  well_architected_frameworks?: string[];
+  [k: string]: unknown;
+}
+/**
  * Composio managed OAuth tools integration (`[composio]`).
  */
 export interface ComposioConfig {
@@ -1066,6 +1281,48 @@ export interface ComposioConfig {
    * Default entity ID for multi-user setups
    */
   entity_id?: string;
+  [k: string]: unknown;
+}
+/**
+ * Conversational AI agent builder configuration (`[conversational_ai]`).
+ */
+export interface ConversationalAiConfig {
+  /**
+   * Enable conversation analytics tracking. Default: false (privacy-by-default).
+   */
+  analytics_enabled?: boolean;
+  /**
+   * Automatically detect user language from message content. Default: true.
+   */
+  auto_detect_language?: boolean;
+  /**
+   * Conversation timeout in seconds (inactivity). Default: 1800.
+   */
+  conversation_timeout_secs?: number;
+  /**
+   * Default language for conversations (BCP-47 tag). Default: "en".
+   */
+  default_language?: string;
+  /**
+   * Enable conversational AI features. Default: false.
+   */
+  enabled?: boolean;
+  /**
+   * Intent confidence below this threshold triggers escalation. Default: 0.3.
+   */
+  escalation_confidence_threshold?: number;
+  /**
+   * Optional tool name for RAG-based knowledge base lookup during conversations.
+   */
+  knowledge_base_tool?: string | null;
+  /**
+   * Maximum conversation turns before auto-ending. Default: 50.
+   */
+  max_conversation_turns?: number;
+  /**
+   * Supported languages for conversations. Default: [`en`, `de`, `fr`, `it`].
+   */
+  supported_languages?: string[];
   [k: string]: unknown;
 }
 /**
@@ -1126,6 +1383,28 @@ export interface CronConfig {
    * Maximum number of historical cron run records to retain. Default: `50`.
    */
   max_run_history?: number;
+  [k: string]: unknown;
+}
+/**
+ * Data retention and purge configuration (`[data_retention]`).
+ */
+export interface DataRetentionConfig {
+  /**
+   * Limit retention enforcement to specific data categories (empty = all).
+   */
+  categories?: string[];
+  /**
+   * Preview what would be deleted without actually removing anything.
+   */
+  dry_run?: boolean;
+  /**
+   * Enable the `data_management` tool.
+   */
+  enabled?: boolean;
+  /**
+   * Days of data to retain before purge eligibility.
+   */
+  retention_days?: number;
   [k: string]: unknown;
 }
 /**
@@ -1251,6 +1530,25 @@ export interface HardwareConfig {
  */
 export interface HeartbeatConfig {
   /**
+   * Enable adaptive intervals that back off on failures and speed up for
+   * high-priority tasks. Default: `false`.
+   */
+  adaptive?: boolean;
+  /**
+   * Channel for dead-man's switch alerts (e.g. `telegram`). Falls back to
+   * the heartbeat delivery channel.
+   */
+  deadman_channel?: string | null;
+  /**
+   * Dead-man's switch timeout in minutes. If the heartbeat has not ticked
+   * within this window, an alert is sent. `0` disables. Default: `0`.
+   */
+  deadman_timeout_minutes?: number;
+  /**
+   * Recipient for dead-man's switch alerts. Falls back to `to`.
+   */
+  deadman_to?: string | null;
+  /**
    * Enable periodic heartbeat pings. Default: `false`.
    */
   enabled: boolean;
@@ -1259,17 +1557,37 @@ export interface HeartbeatConfig {
    */
   interval_minutes: number;
   /**
+   * Maximum interval in minutes when adaptive mode backs off. Default: `120`.
+   */
+  max_interval_minutes?: number;
+  /**
+   * Maximum number of heartbeat run history records to retain. Default: `100`.
+   */
+  max_run_history?: number;
+  /**
    * Optional fallback task text when `HEARTBEAT.md` has no task entries.
    */
   message?: string | null;
   /**
+   * Minimum interval in minutes when adaptive mode is enabled. Default: `5`.
+   */
+  min_interval_minutes?: number;
+  /**
    * Optional delivery channel for heartbeat output (for example: `telegram`).
+   * When omitted, auto-selects the first configured channel.
    */
   target?: string | null;
   /**
-   * Optional delivery recipient/chat identifier (required when `target` is set).
+   * Optional delivery recipient/chat identifier (required when `target` is
+   * explicitly set).
    */
   to?: string | null;
+  /**
+   * Enable two-phase heartbeat: Phase 1 asks LLM whether to run, Phase 2
+   * executes only when the LLM decides there is work to do. Saves API cost
+   * during quiet periods. Default: `true`.
+   */
+  two_phase?: boolean;
   [k: string]: unknown;
 }
 /**
@@ -1332,6 +1650,11 @@ export interface WebhookAuditConfig {
  * HTTP request tool configuration (`[http_request]`).
  */
 export interface HttpRequestConfig {
+  /**
+   * Allow requests to private/LAN hosts (RFC 1918, loopback, link-local, .local).
+   * Default: false (deny private hosts for SSRF protection).
+   */
+  allow_private_hosts?: boolean;
   /**
    * Allowed domains for HTTP requests (exact or subdomain match)
    */
@@ -1502,6 +1825,10 @@ export interface MemoryConfig {
    */
   response_cache_enabled?: boolean;
   /**
+   * Max in-memory hot cache entries for the two-tier response cache (default: 256)
+   */
+  response_cache_hot_entries?: number;
+  /**
    * Max number of cached responses before LRU eviction (default: 5000)
    */
   response_cache_max_entries?: number;
@@ -1548,6 +1875,44 @@ export interface QdrantConfig {
    * Falls back to `QDRANT_URL` env var if not set.
    */
   url?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Microsoft 365 Graph API integration (`[microsoft365]`).
+ */
+export interface Microsoft365Config {
+  /**
+   * Authentication flow: "client_credentials" or "device_code"
+   */
+  auth_flow?: string;
+  /**
+   * Azure AD application (client) ID
+   */
+  client_id?: string | null;
+  /**
+   * Azure AD client secret (stored encrypted when secrets.encrypt = true)
+   */
+  client_secret?: string | null;
+  /**
+   * Enable Microsoft 365 integration
+   */
+  enabled?: boolean;
+  /**
+   * OAuth scopes to request
+   */
+  scopes?: string[];
+  /**
+   * Azure AD tenant ID
+   */
+  tenant_id?: string | null;
+  /**
+   * Encrypt the token cache file on disk
+   */
+  token_cache_encrypted?: boolean;
+  /**
+   * User principal name or "me" (for delegated flows)
+   */
+  user_id?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1644,6 +2009,48 @@ export interface MultimodalConfig {
   [k: string]: unknown;
 }
 /**
+ * Secure inter-node transport configuration (`[node_transport]`).
+ */
+export interface NodeTransportConfig {
+  /**
+   * Allow specific node IPs/CIDRs.
+   */
+  allowed_peers?: string[];
+  /**
+   * Maximum number of connections per peer.
+   */
+  connection_pool_size?: number;
+  /**
+   * Enable the secure transport layer.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum age of signed requests in seconds (replay protection).
+   */
+  max_request_age_secs?: number;
+  /**
+   * Require client certificates (mutual TLS).
+   */
+  mutual_tls?: boolean;
+  /**
+   * Require HTTPS for all node communication.
+   */
+  require_https?: boolean;
+  /**
+   * Shared secret for HMAC authentication between nodes.
+   */
+  shared_secret?: string;
+  /**
+   * Path to TLS certificate file.
+   */
+  tls_cert_path?: string | null;
+  /**
+   * Path to TLS private key file.
+   */
+  tls_key_path?: string | null;
+  [k: string]: unknown;
+}
+/**
  * Dynamic node discovery configuration (`[nodes]`).
  */
 export interface NodesConfig {
@@ -1659,6 +2066,21 @@ export interface NodesConfig {
    * Maximum number of concurrent node connections.
    */
   max_nodes?: number;
+  [k: string]: unknown;
+}
+/**
+ * Notion integration configuration (`[notion]`).
+ */
+export interface NotionConfig {
+  api_key?: string;
+  database_id?: string;
+  enabled?: boolean;
+  input_property?: string;
+  max_concurrent?: number;
+  poll_interval_secs?: number;
+  recover_stale?: boolean;
+  result_property?: string;
+  status_property?: string;
   [k: string]: unknown;
 }
 /**
@@ -1731,6 +2153,44 @@ export interface PeripheralBoardConfig {
    * Transport: "serial", "native", "websocket"
    */
   transport?: string;
+  [k: string]: unknown;
+}
+/**
+ * Project delivery intelligence configuration (`[project_intel]`).
+ */
+export interface ProjectIntelConfig {
+  /**
+   * Default report language (en, de, fr, it). Default: "en".
+   */
+  default_language?: string;
+  /**
+   * Enable the project_intel tool. Default: false.
+   */
+  enabled?: boolean;
+  /**
+   * Include git log data in reports. Default: true.
+   */
+  include_git_data?: boolean;
+  /**
+   * Include Jira data in reports. Default: false.
+   */
+  include_jira_data?: boolean;
+  /**
+   * Jira instance base URL (required if include_jira_data is true).
+   */
+  jira_base_url?: string | null;
+  /**
+   * Output directory for generated reports.
+   */
+  report_output_dir?: string;
+  /**
+   * Risk detection sensitivity: low, medium, high. Default: "medium".
+   */
+  risk_sensitivity?: string;
+  /**
+   * Optional custom templates directory.
+   */
+  templates_dir?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1943,6 +2403,7 @@ export interface SecretsConfig {
 export interface SecurityConfig {
   audit?: AuditConfig;
   estop?: EstopConfig;
+  nevis?: NevisConfig;
   otp?: OtpConfig;
   resources?: ResourceLimitsConfig;
   sandbox?: SandboxConfig;
@@ -1986,6 +2447,68 @@ export interface EstopConfig {
    * File path used to persist estop state.
    */
   state_file?: string;
+}
+/**
+ * Nevis IAM integration for SSO/MFA authentication and role-based access.
+ */
+export interface NevisConfig {
+  /**
+   * OAuth2 client ID registered in Nevis.
+   */
+  client_id?: string;
+  /**
+   * OAuth2 client secret. Encrypted via SecretStore when stored on disk.
+   */
+  client_secret?: string | null;
+  /**
+   * Enable Nevis IAM integration. Defaults to false for backward compatibility.
+   */
+  enabled?: boolean;
+  /**
+   * Base URL of the Nevis instance (e.g. `https://nevis.example.com`).
+   */
+  instance_url?: string;
+  /**
+   * JWKS endpoint URL for local token validation.
+   */
+  jwks_url?: string | null;
+  /**
+   * Nevis realm to authenticate against.
+   */
+  realm?: string;
+  /**
+   * Require MFA verification for all Nevis-authenticated requests.
+   */
+  require_mfa?: boolean;
+  /**
+   * Nevis role to ZeroClaw permission mappings.
+   */
+  role_mapping?: NevisRoleMappingConfig[];
+  /**
+   * Session timeout in seconds.
+   */
+  session_timeout_secs?: number;
+  /**
+   * Token validation strategy: `"local"` (JWKS) or `"remote"` (introspection).
+   */
+  token_validation?: string;
+}
+/**
+ * Maps a Nevis role to ZeroClaw tool permissions and workspace access.
+ */
+export interface NevisRoleMappingConfig {
+  /**
+   * Nevis role name (case-insensitive).
+   */
+  nevis_role: string;
+  /**
+   * Workspace names this role can access. Use `"all"` for unrestricted.
+   */
+  workspace_access?: string[];
+  /**
+   * Tool names this role can access. Use `"all"` for unrestricted tool access.
+   */
+  zeroclaw_permissions?: string[];
 }
 /**
  * OTP gating configuration for sensitive actions/domains.
@@ -2061,6 +2584,41 @@ export interface SandboxConfig {
   [k: string]: unknown;
 }
 /**
+ * Managed cybersecurity service configuration (`[security_ops]`).
+ */
+export interface SecurityOpsConfig {
+  /**
+   * Automatically triage incoming alerts without user prompt.
+   */
+  auto_triage?: boolean;
+  /**
+   * Enable security operations tools.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum severity level that can be auto-remediated without approval.
+   * One of: "low", "medium", "high", "critical". Default: "low".
+   */
+  max_auto_severity?: string;
+  /**
+   * Directory containing incident response playbook definitions (JSON).
+   */
+  playbooks_dir?: string;
+  /**
+   * Directory for generated security reports.
+   */
+  report_output_dir?: string;
+  /**
+   * Require human approval before executing playbook actions.
+   */
+  require_approval_for_actions?: boolean;
+  /**
+   * Optional SIEM webhook URL for alert ingestion.
+   */
+  siem_integration?: string | null;
+  [k: string]: unknown;
+}
+/**
  * Skills loading and community repository behavior (`[skills]`).
  */
 export interface SkillsConfig {
@@ -2123,6 +2681,32 @@ export interface StorageProviderConfig {
   [k: string]: unknown;
 }
 /**
+ * Configuration for a swarm of coordinated agents.
+ */
+export interface SwarmConfig {
+  /**
+   * Ordered list of agent names (must reference keys in `agents`).
+   */
+  agents: string[];
+  /**
+   * Optional description shown to the LLM when choosing swarms.
+   */
+  description?: string | null;
+  /**
+   * System prompt for router strategy (used to pick the best agent).
+   */
+  router_prompt?: string | null;
+  /**
+   * Orchestration strategy.
+   */
+  strategy: "sequential" | "parallel" | "router";
+  /**
+   * Maximum total timeout for the swarm execution in seconds.
+   */
+  timeout_secs?: number;
+  [k: string]: unknown;
+}
+/**
  * Voice transcription configuration (Whisper API via Groq).
  */
 export interface TranscriptionConfig {
@@ -2134,6 +2718,12 @@ export interface TranscriptionConfig {
    * Enable voice transcription for channels that support it.
    */
   enabled?: boolean;
+  /**
+   * Optional initial prompt to bias transcription toward expected vocabulary
+   * (proper nouns, technical terms, etc.). Sent as the `prompt` field in the
+   * Whisper API request.
+   */
+  initial_prompt?: string | null;
   /**
    * Optional language hint (ISO-639-1, e.g. "en", "ru").
    */
@@ -2271,7 +2861,11 @@ export interface TunnelConfig {
    */
   ngrok?: NgrokTunnelConfig | null;
   /**
-   * Tunnel provider: `"none"`, `"cloudflare"`, `"tailscale"`, `"ngrok"`, or `"custom"`. Default: `"none"`.
+   * OpenVPN tunnel configuration (used when `provider = "openvpn"`).
+   */
+  openvpn?: OpenVpnTunnelConfig | null;
+  /**
+   * Tunnel provider: `"none"`, `"cloudflare"`, `"tailscale"`, `"ngrok"`, `"openvpn"`, or `"custom"`. Default: `"none"`.
    */
   provider: string;
   /**
@@ -2312,6 +2906,39 @@ export interface NgrokTunnelConfig {
    * Optional custom domain
    */
   domain?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * OpenVPN tunnel configuration (`[tunnel.openvpn]`).
+ *
+ * Required when `tunnel.provider = "openvpn"`. Omitting this section entirely
+ * preserves previous behavior. Setting `tunnel.provider = "none"` (or removing
+ * the `[tunnel.openvpn]` block) cleanly reverts to no-tunnel mode.
+ *
+ * Defaults: `connect_timeout_secs = 30`.
+ */
+export interface OpenVpnTunnelConfig {
+  /**
+   * Advertised address once VPN is connected (e.g., `"10.8.0.2:42617"`).
+   * When omitted the tunnel falls back to `http://{local_host}:{local_port}`.
+   */
+  advertise_address?: string | null;
+  /**
+   * Optional path to auth credentials file (`--auth-user-pass`).
+   */
+  auth_file?: string | null;
+  /**
+   * Path to `.ovpn` configuration file (must not be empty).
+   */
+  config_file: string;
+  /**
+   * Connection timeout in seconds (default: 30, must be > 0).
+   */
+  connect_timeout_secs?: number;
+  /**
+   * Extra openvpn CLI arguments forwarded verbatim.
+   */
+  extra_args?: string[];
   [k: string]: unknown;
 }
 export interface TailscaleTunnelConfig {
@@ -2375,5 +3002,39 @@ export interface WebSearchConfig {
    * Request timeout in seconds
    */
   timeout_secs?: number;
+  [k: string]: unknown;
+}
+/**
+ * Multi-client workspace isolation configuration (`[workspace]`).
+ */
+export interface WorkspaceConfig {
+  /**
+   * Currently active workspace name.
+   */
+  active_workspace?: string | null;
+  /**
+   * Allow searching across workspaces. Default: false (security).
+   */
+  cross_workspace_search?: boolean;
+  /**
+   * Enable workspace isolation. Default: false.
+   */
+  enabled?: boolean;
+  /**
+   * Isolate audit logs per workspace. Default: true.
+   */
+  isolate_audit?: boolean;
+  /**
+   * Isolate memory databases per workspace. Default: true.
+   */
+  isolate_memory?: boolean;
+  /**
+   * Isolate secrets namespaces per workspace. Default: true.
+   */
+  isolate_secrets?: boolean;
+  /**
+   * Base directory for workspace profiles.
+   */
+  workspaces_dir?: string;
   [k: string]: unknown;
 }
