@@ -41,7 +41,8 @@ export function Navbar() {
               BETA
             </a>
           </div>
-          <div className="flex items-center gap-5">
+          {/* Desktop */}
+          <div className="hidden items-center gap-5 md:flex">
             <Link
               href="/docs"
               className={`inline-flex items-center gap-1.5 text-sm no-underline transition-colors hover:text-heading ${pathname === "/docs" ? "text-heading" : "text-dim"}`}
@@ -77,7 +78,63 @@ export function Navbar() {
               Discord
             </a>
           </div>
+          {/* Mobile */}
+          <div className="flex items-center gap-3 md:hidden">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="cursor-pointer border-none bg-transparent p-0"
+              aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? (
+                <X size={22} className="text-foreground" aria-hidden="true" />
+              ) : (
+                <Menu size={22} className="text-foreground" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
+        {/* Mobile menu */}
+        {menuOpen && (
+          <div className="flex flex-col gap-4 border-t border-border bg-background px-6 py-5 md:hidden">
+            <Link
+              href="/docs"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex items-center gap-2 text-base text-muted-foreground no-underline transition-colors hover:text-heading"
+            >
+              <BookOpen size={16} aria-hidden="true" />
+              Docs
+            </Link>
+            <Link
+              href="/docs/getting-started/quickstart"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex items-center gap-2 text-base text-muted-foreground no-underline transition-colors hover:text-heading"
+            >
+              <Rocket size={16} aria-hidden="true" />
+              Quickstart
+            </Link>
+            <a
+              href="https://github.com/clawrun-sh/clawrun"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex items-center gap-2 text-base text-muted-foreground no-underline transition-colors hover:text-heading"
+            >
+              <Github size={16} aria-hidden="true" />
+              GitHub
+            </a>
+            <a
+              href="https://discord.gg/Bm5P5Md2MY"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex items-center gap-2 text-base text-muted-foreground no-underline transition-colors hover:text-heading"
+            >
+              <MessageCircle size={16} aria-hidden="true" />
+              Discord
+            </a>
+          </div>
+        )}
       </nav>
     );
   }
