@@ -21,9 +21,11 @@
 
 ## Overview
 
-<a href="https://clawrun.sh" target="_blank">
-  <img alt="ClawRun" src="https://clawrun.sh/og.png">
-</a>
+<p align="center">
+  <a href="https://clawrun.sh" target="_blank">
+    <img alt="ClawRun" src="https://clawrun.sh/og.png">
+  </a>
+</p>
 
 ClawRun is a hosting and lifecycle layer for open-source AI agents. It deploys agents into secure sandboxes (Vercel Sandbox, with more providers coming) and manages their full lifecycle, including startup, heartbeat keep-alive, snapshot/resume, and wake-on-message.
 
