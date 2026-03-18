@@ -13,7 +13,7 @@ export const SANDBOX_DEFAULTS = {
   vcpus: 2,
 } as const;
 
-export const cloudClawConfigSchema = z.object({
+export const clawRunConfigSchema = z.object({
   $schema: z.string().optional(),
   instance: z.object({
     name: z.string().default("default"),
@@ -71,4 +71,4 @@ export const cloudClawConfigSchema = z.object({
   state: stateSchema.optional(),
 });
 
-export type ClawRunConfig = z.infer<typeof cloudClawConfigSchema>;
+export type ClawRunConfig = z.infer<typeof clawRunConfigSchema>;

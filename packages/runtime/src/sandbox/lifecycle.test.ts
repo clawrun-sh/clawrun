@@ -178,7 +178,7 @@ vi.mock("node:fs", async (importOriginal) => {
   return {
     ...actual,
     readFileSync: vi.fn().mockImplementation((...args: unknown[]) => {
-      // Return string when encoding is specified (readBundledSecretKey, readBundledCloudclawJson)
+      // Return string when encoding is specified (readBundledSecretKey, readBundledClawrunJson)
       // Return Buffer when no encoding (sidecar bundle read)
       const encoding = typeof args[1] === "string" ? args[1] : undefined;
       if (encoding) return "mock-file-content";

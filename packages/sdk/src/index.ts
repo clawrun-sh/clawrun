@@ -92,7 +92,7 @@ export {
   copyMirroredFiles,
   isDevMode,
   copyServerApp,
-  cloudClawConfigSchema,
+  clawRunConfigSchema,
   buildConfig,
   toEnvVars,
   sanitizeConfig,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SANDBOX_DEFAULTS, cloudClawConfigSchema } from "./schema.js";
+import { SANDBOX_DEFAULTS, clawRunConfigSchema } from "./schema.js";
 
 describe("SANDBOX_DEFAULTS", () => {
   it("has activeDuration of 600", () => {
@@ -19,7 +19,7 @@ describe("SANDBOX_DEFAULTS", () => {
   });
 });
 
-describe("cloudClawConfigSchema — instance defaults", () => {
+describe("clawRunConfigSchema — instance defaults", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -27,22 +27,22 @@ describe("cloudClawConfigSchema — instance defaults", () => {
   };
 
   it("defaults instance.name to 'default'", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.instance.name).toBe("default");
   });
 
   it("defaults instance.sandboxRoot to '.clawrun'", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.instance.sandboxRoot).toBe(".clawrun");
   });
 
   it("leaves instance.preset as undefined when omitted", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.instance.preset).toBeUndefined();
   });
 
   it("leaves instance.deployedUrl as undefined when omitted", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.instance.deployedUrl).toBeUndefined();
   });
 
@@ -51,12 +51,12 @@ describe("cloudClawConfigSchema — instance defaults", () => {
       ...minInput,
       instance: { ...minInput.instance, name: "my-instance" },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.instance.name).toBe("my-instance");
   });
 });
 
-describe("cloudClawConfigSchema — agent defaults", () => {
+describe("clawRunConfigSchema — agent defaults", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -64,12 +64,12 @@ describe("cloudClawConfigSchema — agent defaults", () => {
   };
 
   it("defaults agent.config to 'agent/config.toml'", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.agent.config).toBe("agent/config.toml");
   });
 
   it("defaults agent.bundlePaths to empty array", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.agent.bundlePaths).toEqual([]);
   });
 
@@ -78,12 +78,12 @@ describe("cloudClawConfigSchema — agent defaults", () => {
       ...minInput,
       agent: { ...minInput.agent, config: "custom/path.toml" },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.agent.config).toBe("custom/path.toml");
   });
 });
 
-describe("cloudClawConfigSchema — sandbox defaults from SANDBOX_DEFAULTS", () => {
+describe("clawRunConfigSchema — sandbox defaults from SANDBOX_DEFAULTS", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -91,32 +91,32 @@ describe("cloudClawConfigSchema — sandbox defaults from SANDBOX_DEFAULTS", () 
   };
 
   it("defaults sandbox.activeDuration to SANDBOX_DEFAULTS.activeDuration", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.sandbox.activeDuration).toBe(SANDBOX_DEFAULTS.activeDuration);
   });
 
   it("defaults sandbox.cronKeepAliveWindow to SANDBOX_DEFAULTS.cronKeepAliveWindow", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.sandbox.cronKeepAliveWindow).toBe(SANDBOX_DEFAULTS.cronKeepAliveWindow);
   });
 
   it("defaults sandbox.cronWakeLeadTime to SANDBOX_DEFAULTS.cronWakeLeadTime", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.sandbox.cronWakeLeadTime).toBe(SANDBOX_DEFAULTS.cronWakeLeadTime);
   });
 
   it("defaults sandbox.resources.vcpus to SANDBOX_DEFAULTS.vcpus", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.sandbox.resources.vcpus).toBe(SANDBOX_DEFAULTS.vcpus);
   });
 
   it("defaults sandbox.networkPolicy to 'allow-all'", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.sandbox.networkPolicy).toBe("allow-all");
   });
 });
 
-describe("cloudClawConfigSchema — sandbox overrides", () => {
+describe("clawRunConfigSchema — sandbox overrides", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -125,19 +125,19 @@ describe("cloudClawConfigSchema — sandbox overrides", () => {
 
   it("accepts custom activeDuration", () => {
     const input = { ...minInput, sandbox: { activeDuration: 300 } };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.activeDuration).toBe(300);
   });
 
   it("accepts custom cronKeepAliveWindow", () => {
     const input = { ...minInput, sandbox: { cronKeepAliveWindow: 1200 } };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.cronKeepAliveWindow).toBe(1200);
   });
 
   it("accepts custom cronWakeLeadTime", () => {
     const input = { ...minInput, sandbox: { cronWakeLeadTime: 120 } };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.cronWakeLeadTime).toBe(120);
   });
 
@@ -146,12 +146,12 @@ describe("cloudClawConfigSchema — sandbox overrides", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 4 } },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.resources.vcpus).toBe(4);
   });
 });
 
-describe("cloudClawConfigSchema — vcpus validation", () => {
+describe("clawRunConfigSchema — vcpus validation", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -163,7 +163,7 @@ describe("cloudClawConfigSchema — vcpus validation", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 1 } },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 
   it("rejects vcpus greater than 8", () => {
@@ -171,7 +171,7 @@ describe("cloudClawConfigSchema — vcpus validation", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 9 } },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 
   it("accepts vcpus of exactly 2", () => {
@@ -179,7 +179,7 @@ describe("cloudClawConfigSchema — vcpus validation", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 2 } },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.resources.vcpus).toBe(2);
   });
 
@@ -188,7 +188,7 @@ describe("cloudClawConfigSchema — vcpus validation", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 8 } },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.resources.vcpus).toBe(8);
   });
 
@@ -197,11 +197,11 @@ describe("cloudClawConfigSchema — vcpus validation", () => {
       ...minInput,
       sandbox: { resources: { vcpus: 2.5 } },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 });
 
-describe("cloudClawConfigSchema — networkPolicy variants", () => {
+describe("clawRunConfigSchema — networkPolicy variants", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -210,13 +210,13 @@ describe("cloudClawConfigSchema — networkPolicy variants", () => {
 
   it("accepts 'allow-all' network policy", () => {
     const input = { ...minInput, sandbox: { networkPolicy: "allow-all" } };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.networkPolicy).toBe("allow-all");
   });
 
   it("accepts 'deny-all' network policy", () => {
     const input = { ...minInput, sandbox: { networkPolicy: "deny-all" } };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.sandbox.networkPolicy).toBe("deny-all");
   });
 
@@ -225,7 +225,7 @@ describe("cloudClawConfigSchema — networkPolicy variants", () => {
       ...minInput,
       sandbox: { networkPolicy: { allow: ["api.example.com"] } },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(
       typeof parsed.sandbox.networkPolicy === "object" && parsed.sandbox.networkPolicy.allow,
     ).toEqual(["api.example.com"]);
@@ -240,7 +240,7 @@ describe("cloudClawConfigSchema — networkPolicy variants", () => {
         },
       },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(
       typeof parsed.sandbox.networkPolicy === "object" &&
         parsed.sandbox.networkPolicy.subnets?.deny,
@@ -252,11 +252,11 @@ describe("cloudClawConfigSchema — networkPolicy variants", () => {
       ...minInput,
       sandbox: { networkPolicy: "invalid-policy" },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 });
 
-describe("cloudClawConfigSchema — secrets", () => {
+describe("clawRunConfigSchema — secrets", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -264,7 +264,7 @@ describe("cloudClawConfigSchema — secrets", () => {
   };
 
   it("leaves secrets undefined when omitted", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.secrets).toBeUndefined();
   });
 
@@ -277,7 +277,7 @@ describe("cloudClawConfigSchema — secrets", () => {
         sandboxSecret: "ss",
       },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.secrets?.cronSecret).toBe("cs");
   });
 
@@ -291,7 +291,7 @@ describe("cloudClawConfigSchema — secrets", () => {
         webhookSecrets: { telegram: "tg-secret" },
       },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.secrets?.webhookSecrets?.telegram).toBe("tg-secret");
   });
 
@@ -300,7 +300,7 @@ describe("cloudClawConfigSchema — secrets", () => {
       ...minInput,
       secrets: { cronSecret: "cs", sandboxSecret: "ss" },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 
   it("rejects secrets missing sandboxSecret", () => {
@@ -308,11 +308,11 @@ describe("cloudClawConfigSchema — secrets", () => {
       ...minInput,
       secrets: { cronSecret: "cs", jwtSecret: "js" },
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 });
 
-describe("cloudClawConfigSchema — state", () => {
+describe("clawRunConfigSchema — state", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -320,7 +320,7 @@ describe("cloudClawConfigSchema — state", () => {
   };
 
   it("leaves state undefined when omitted", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.state).toBeUndefined();
   });
 
@@ -329,7 +329,7 @@ describe("cloudClawConfigSchema — state", () => {
       ...minInput,
       state: { redisUrl: "rediss://default:tok@redis.example.com:6379" },
     };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.state?.redisUrl).toBe("rediss://default:tok@redis.example.com:6379");
   });
 
@@ -338,14 +338,14 @@ describe("cloudClawConfigSchema — state", () => {
       ...minInput,
       state: {},
     };
-    expect(() => cloudClawConfigSchema.parse(input)).toThrow();
+    expect(() => clawRunConfigSchema.parse(input)).toThrow();
   });
 });
 
-describe("cloudClawConfigSchema — required fields", () => {
+describe("clawRunConfigSchema — required fields", () => {
   it("rejects input missing instance", () => {
     expect(() =>
-      cloudClawConfigSchema.parse({
+      clawRunConfigSchema.parse({
         agent: { name: "zeroclaw" },
         sandbox: {},
       }),
@@ -354,7 +354,7 @@ describe("cloudClawConfigSchema — required fields", () => {
 
   it("rejects input missing agent", () => {
     expect(() =>
-      cloudClawConfigSchema.parse({
+      clawRunConfigSchema.parse({
         instance: { provider: "vercel" },
         sandbox: {},
       }),
@@ -363,7 +363,7 @@ describe("cloudClawConfigSchema — required fields", () => {
 
   it("rejects input missing sandbox", () => {
     expect(() =>
-      cloudClawConfigSchema.parse({
+      clawRunConfigSchema.parse({
         instance: { provider: "vercel" },
         agent: { name: "zeroclaw" },
       }),
@@ -372,7 +372,7 @@ describe("cloudClawConfigSchema — required fields", () => {
 
   it("rejects input missing instance.provider", () => {
     expect(() =>
-      cloudClawConfigSchema.parse({
+      clawRunConfigSchema.parse({
         instance: { name: "test" },
         agent: { name: "zeroclaw" },
         sandbox: {},
@@ -382,7 +382,7 @@ describe("cloudClawConfigSchema — required fields", () => {
 
   it("rejects input missing agent.name", () => {
     expect(() =>
-      cloudClawConfigSchema.parse({
+      clawRunConfigSchema.parse({
         instance: { provider: "vercel" },
         agent: {},
         sandbox: {},
@@ -391,7 +391,7 @@ describe("cloudClawConfigSchema — required fields", () => {
   });
 });
 
-describe("cloudClawConfigSchema — $schema field", () => {
+describe("clawRunConfigSchema — $schema field", () => {
   const minInput = {
     instance: { provider: "vercel" },
     agent: { name: "zeroclaw" },
@@ -400,12 +400,12 @@ describe("cloudClawConfigSchema — $schema field", () => {
 
   it("accepts optional $schema field", () => {
     const input = { ...minInput, $schema: "https://clawrun.sh/schema.json" };
-    const parsed = cloudClawConfigSchema.parse(input);
+    const parsed = clawRunConfigSchema.parse(input);
     expect(parsed.$schema).toBe("https://clawrun.sh/schema.json");
   });
 
   it("leaves $schema undefined when omitted", () => {
-    const parsed = cloudClawConfigSchema.parse(minInput);
+    const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.$schema).toBeUndefined();
   });
 });

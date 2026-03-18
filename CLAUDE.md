@@ -11,7 +11,7 @@ The architecture is a **persistent sandbox** model: the agent daemon runs contin
 ## Repo Structure
 
 ```
-cloudclaw/
+clawrun/
 ├── CLAUDE.md
 ├── AGENTS.md
 ├── packages/

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cloudClawConfigSchema, type ClawRunConfig } from "./schema.js";
+import { clawRunConfigSchema, type ClawRunConfig } from "./schema.js";
 import type { ProviderId } from "@clawrun/provider";
 
 export interface RuntimeConfig {
@@ -45,7 +45,7 @@ let cached: RuntimeConfig | null = null;
 export function getRuntimeConfig(): RuntimeConfig {
   if (cached) return cached;
   const raw = JSON.parse(readFileSync(join(process.cwd(), "clawrun.json"), "utf-8"));
-  const parsed = cloudClawConfigSchema.parse(raw);
+  const parsed = clawRunConfigSchema.parse(raw);
   cached = {
     instance: {
       name: parsed.instance.name,

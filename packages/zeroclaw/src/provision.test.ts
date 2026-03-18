@@ -225,7 +225,7 @@ describe("provision", () => {
 
     const content = profile!.content.toString();
     // binPath is /home/user/.clawrun/bin/zeroclaw → binDir is /home/user/.clawrun/bin → root is /home/user/.clawrun
-    expect(content).toContain('CLOUDCLAW_ROOT="/home/user/.clawrun"');
+    expect(content).toContain('CLAWRUN_ROOT="/home/user/.clawrun"');
     expect(content).toContain('ZEROCLAW_WORKSPACE="/home/user/.clawrun/agent"');
     expect(content).toContain('ZEROCLAW_CONFIG_DIR="/home/user/.clawrun/agent"');
   });

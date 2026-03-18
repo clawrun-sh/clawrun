@@ -31,7 +31,7 @@ export const connect = command({
     const deployDir = instanceDeployDir(instanceName);
     const platform = getPlatformProvider(conn.config.instance.provider);
     try {
-      await connectToSandbox(sandboxId, deployDir, platform);
+      await connectToSandbox(sandboxId, deployDir, platform, conn.config.instance.sandboxRoot);
     } catch (err) {
       clack.log.error(
         `Failed to connect to sandbox: ${err instanceof Error ? err.message : String(err)}`,

@@ -76,7 +76,7 @@ function readBundledSecretKey(): string {
 }
 
 /** Read the clawrun.json content for writing into the sandbox. */
-function readBundledCloudclawJson(): string {
+function readBundledClawrunJson(): string {
   return readFileSync(join(process.cwd(), "clawrun.json"), "utf-8");
 }
 
@@ -658,7 +658,7 @@ export class SandboxLifecycleManager {
       const root = await resolveRoot(sandbox);
 
       // Write clawrun.json into the sandbox workspace
-      const clawrunJson = readBundledCloudclawJson();
+      const clawrunJson = readBundledClawrunJson();
       await sandbox.runCommand("mkdir", ["-p", root]);
       await sandbox.writeFiles([
         { path: `${root}/clawrun.json`, content: Buffer.from(clawrunJson) },

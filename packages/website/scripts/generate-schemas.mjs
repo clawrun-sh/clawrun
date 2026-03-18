@@ -21,7 +21,7 @@ const runtimeRequire = createRequire(join(runtimeDir, "package.json"));
 const zodPath = runtimeRequire.resolve("zod");
 const { z } = await import(zodPath);
 
-const { cloudClawConfigSchema } = await import(
+const { clawRunConfigSchema } = await import(
   join(runtimeDir, "dist", "schema.js")
 );
 const { presetSchema } = await import(
@@ -29,7 +29,7 @@ const { presetSchema } = await import(
 );
 
 // --- clawrun.json schema ---
-const configSchema = z.toJSONSchema(cloudClawConfigSchema, {
+const configSchema = z.toJSONSchema(clawRunConfigSchema, {
   target: "draft-2020-12",
 });
 configSchema.title = "ClawRun Instance Configuration";

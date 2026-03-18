@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cloudClawConfigSchema, type ClawRunConfig } from "@clawrun/runtime";
-export { cloudClawConfigSchema };
+import { clawRunConfigSchema, type ClawRunConfig } from "@clawrun/runtime";
+export { clawRunConfigSchema };
 import { generateSecret } from "@clawrun/auth";
 export { generateSecret };
 import type { ProviderId } from "@clawrun/provider";
@@ -43,7 +43,7 @@ export function buildConfig(
     platformUrlEnvVars?: string[];
   },
 ): ClawRunConfigWithSecrets {
-  return cloudClawConfigSchema.parse({
+  return clawRunConfigSchema.parse({
     $schema: SCHEMA_URL,
     instance: {
       name,
@@ -135,7 +135,7 @@ export function readConfig(name: string): ClawRunConfigWithSecrets | null {
   if (!existsSync(path)) return null;
 
   const raw = JSON.parse(readFileSync(path, "utf-8"));
-  const result = cloudClawConfigSchema.safeParse(raw);
+  const result = clawRunConfigSchema.safeParse(raw);
 
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");

@@ -93,17 +93,17 @@ export async function provision(sandbox: ZeroclawSandbox, opts: ProvisionOptions
 
   // Write .profile so interactive shells (connect) get the right env.
   // Do NOT override HOME — the sandbox's native HOME is correct.
-  // Set CLOUDCLAW_ROOT so scripts can find the instance layout.
+  // Set CLAWRUN_ROOT so scripts can find the instance layout.
   const root = binDir.substring(0, binDir.lastIndexOf("/"));
   const profile = [
-    `export CLOUDCLAW_ROOT="${root}"`,
+    `export CLAWRUN_ROOT="${root}"`,
     `export ZEROCLAW_WORKSPACE="${agentDir}"`,
     `export ZEROCLAW_CONFIG_DIR="${agentDir}"`,
     `export SHELL="\${SHELL:-/bin/bash}"`,
     "",
   ].join("\n");
 
-  // Write .profile to $HOME (not to root, which is $HOME/.cloudclaw)
+  // Write .profile to $HOME (not to root, which is $HOME/.clawrun)
   const homeResult = await sandbox.runCommand("sh", ["-c", "echo $HOME"]);
   const home = (await homeResult.stdout()).trim();
   await sandbox.writeFiles([{ path: `${home}/.profile`, content: Buffer.from(profile) }]);
