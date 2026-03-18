@@ -119,7 +119,7 @@ function HeroTerminal() {
   );
 }
 
-export function Hero() {
+export function Hero({ version }: { version: string }) {
   return (
     <div className="relative overflow-hidden px-6 py-20 md:py-32">
       {/* Grid background */}
@@ -143,7 +143,9 @@ export function Hero() {
           className="mb-6 inline-flex items-center gap-2 border border-border px-3 py-1.5 no-underline transition-colors hover:bg-surface-hover"
         >
           <div className="h-2 w-2 rounded-full bg-term-green shadow-[0_0_6px_#22c55e]" />
-          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">v0.1.0</span>
+          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
+            v{version}
+          </span>
           <span className="text-[8px] text-muted-foreground/50" aria-hidden="true">
             &#x2022;
           </span>

@@ -1,6 +1,9 @@
 import { Workflow, Zap, Terminal } from "lucide-react";
 import { Section } from "@/components/landing/section";
 import { Hero } from "@/components/landing/hero";
+import cliPkg from "../../../cli/package.json";
+
+const cliVersion = cliPkg.version;
 import { Stats } from "@/components/landing/stats";
 import { Architecture } from "@/components/landing/architecture";
 import { Features } from "@/components/landing/features";
@@ -10,7 +13,7 @@ export default function HomePage() {
   return (
     <>
       <Section>
-        <Hero />
+        <Hero version={cliVersion} />
       </Section>
 
       <Stats />
