@@ -67,11 +67,14 @@ export interface Config {
     [k: string]: string;
   };
   gateway?: GatewayConfig;
+  google_workspace?: GoogleWorkspaceConfig;
   hardware?: HardwareConfig;
   heartbeat?: HeartbeatConfig;
   hooks?: HooksConfig;
   http_request?: HttpRequestConfig;
   identity?: IdentityConfig;
+  knowledge?: KnowledgeConfig;
+  linkedin?: LinkedInConfig;
   mcp?: McpConfig;
   memory?: MemoryConfig;
   microsoft365?: Microsoft365Config;
@@ -91,6 +94,7 @@ export interface Config {
   notion?: NotionConfig;
   observability?: ObservabilityConfig;
   peripherals?: PeripheralsConfig;
+  plugins?: PluginsConfig;
   project_intel?: ProjectIntelConfig;
   /**
    * HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
@@ -254,7 +258,7 @@ export interface AutonomyConfig {
   /**
    * Allowlist of executable names permitted for shell execution.
    */
-  allowed_commands: string[];
+  allowed_commands?: string[];
   /**
    * Extra directory roots the agent may read/write outside the workspace.
    * Supports absolute, `~/...`, and workspace-relative entries.
@@ -276,19 +280,19 @@ export interface AutonomyConfig {
   /**
    * Explicit path denylist. Default includes system-critical paths and sensitive dotdirs.
    */
-  forbidden_paths: string[];
+  forbidden_paths?: string[];
   /**
    * Autonomy level: `read_only`, `supervised` (default), or `full`.
    */
-  level: "readonly" | "supervised" | "full";
+  level?: "readonly" | "supervised" | "full";
   /**
    * Maximum actions allowed per hour per policy. Default: `100`.
    */
-  max_actions_per_hour: number;
+  max_actions_per_hour?: number;
   /**
    * Maximum cost per day in cents per policy. Default: `1000`.
    */
-  max_cost_per_day_cents: number;
+  max_cost_per_day_cents?: number;
   /**
    * Tools to exclude from non-CLI channels (e.g. Telegram, Discord).
    *
@@ -311,7 +315,7 @@ export interface AutonomyConfig {
    * Restrict absolute filesystem paths to workspace-relative references. Default: `true`.
    * Resolved paths outside the workspace still require `allowed_roots`.
    */
-  workspace_only: boolean;
+  workspace_only?: boolean;
   [k: string]: unknown;
 }
 /**
@@ -481,6 +485,10 @@ export interface ChannelsConfig {
    */
   ack_reactions?: boolean;
   /**
+   * Bluesky channel configuration (AT Protocol).
+   */
+  bluesky?: BlueskyConfig | null;
+  /**
    * ClawdTalk voice channel configuration.
    */
   clawdtalk?: ClawdTalkConfig | null;
@@ -550,6 +558,10 @@ export interface ChannelsConfig {
    */
   qq?: QQConfig | null;
   /**
+   * Reddit channel configuration (OAuth2 bot).
+   */
+  reddit?: RedditConfig | null;
+  /**
    * Session persistence backend: `"jsonl"` (legacy) or `"sqlite"` (new default).
    * SQLite provides FTS5 search, metadata tracking, and TTL cleanup.
    */
@@ -566,7 +578,7 @@ export interface ChannelsConfig {
   /**
    * Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)
    * to channel users. When `false`, tool calls are still logged server-side but
-   * not forwarded as individual channel messages. Default: `true`.
+   * not forwarded as individual channel messages. Default: `false`.
    */
   show_tool_calls?: boolean;
   /**
@@ -601,6 +613,20 @@ export interface ChannelsConfig {
    * WhatsApp channel configuration (Cloud API or Web mode).
    */
   whatsapp?: WhatsAppConfig | null;
+  [k: string]: unknown;
+}
+/**
+ * Bluesky channel configuration (AT Protocol).
+ */
+export interface BlueskyConfig {
+  /**
+   * App-specific password (from Bluesky settings).
+   */
+  app_password: string;
+  /**
+   * Bluesky handle (e.g. `"mybot.bsky.social"`).
+   */
+  handle: string;
   [k: string]: unknown;
 }
 /**
@@ -1029,6 +1055,33 @@ export interface QQConfig {
   app_secret: string;
   [k: string]: unknown;
 }
+/**
+ * Reddit channel configuration (OAuth2 bot).
+ */
+export interface RedditConfig {
+  /**
+   * Reddit OAuth2 client ID.
+   */
+  client_id: string;
+  /**
+   * Reddit OAuth2 client secret.
+   */
+  client_secret: string;
+  /**
+   * Reddit OAuth2 refresh token for persistent access.
+   */
+  refresh_token: string;
+  /**
+   * Optional subreddit to filter messages (without `r/` prefix).
+   * When set, only messages from this subreddit are processed.
+   */
+  subreddit?: string | null;
+  /**
+   * Reddit bot username (without `u/` prefix).
+   */
+  username: string;
+  [k: string]: unknown;
+}
 export interface SignalConfig {
   /**
    * E.164 phone number of the signal-cli account (e.g. "+1234567890").
@@ -1162,16 +1215,35 @@ export interface WatiConfig {
 }
 /**
  * Webhook channel configuration.
+ *
+ * Receives messages via HTTP POST and sends replies to a configurable outbound URL.
+ * This is the "universal adapter" for any system that supports webhooks.
  */
 export interface WebhookConfig {
+  /**
+   * Optional `Authorization` header value for outbound requests.
+   */
+  auth_header?: string | null;
+  /**
+   * URL path to listen on (default: `/webhook`).
+   */
+  listen_path?: string | null;
   /**
    * Port to listen on for incoming webhooks.
    */
   port: number;
   /**
-   * Optional shared secret for webhook signature verification.
+   * Optional shared secret for webhook signature verification (HMAC-SHA256).
    */
   secret?: string | null;
+  /**
+   * HTTP method for outbound messages (`POST` or `PUT`). Default: `POST`.
+   */
+  send_method?: string | null;
+  /**
+   * URL to POST/PUT outbound messages to.
+   */
+  send_url?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1472,6 +1544,7 @@ export interface GatewayConfig {
    * Paired bearer tokens (managed automatically, not user-edited)
    */
   paired_tokens?: string[];
+  pairing_dashboard?: PairingDashboardConfig;
   /**
    * Gateway port (default: 42617)
    */
@@ -1485,6 +1558,14 @@ export interface GatewayConfig {
    */
   require_pairing?: boolean;
   /**
+   * Persist gateway WebSocket chat sessions to SQLite. Default: true.
+   */
+  session_persistence?: boolean;
+  /**
+   * Auto-archive stale gateway sessions older than N hours. 0 = disabled. Default: 0.
+   */
+  session_ttl_hours?: number;
+  /**
    * Trust proxy-forwarded client IP headers (`X-Forwarded-For`, `X-Real-IP`).
    * Disabled by default; enable only behind a trusted reverse proxy.
    */
@@ -1493,6 +1574,78 @@ export interface GatewayConfig {
    * Max `/webhook` requests per minute per client key.
    */
   webhook_rate_limit_per_minute?: number;
+  [k: string]: unknown;
+}
+/**
+ * Pairing dashboard configuration
+ */
+export interface PairingDashboardConfig {
+  /**
+   * Length of pairing codes (default: 8)
+   */
+  code_length?: number;
+  /**
+   * Time-to-live for pending pairing codes in seconds (default: 3600)
+   */
+  code_ttl_secs?: number;
+  /**
+   * Lockout duration in seconds after max attempts (default: 300)
+   */
+  lockout_secs?: number;
+  /**
+   * Maximum failed pairing attempts before lockout (default: 5)
+   */
+  max_failed_attempts?: number;
+  /**
+   * Maximum concurrent pending pairing codes (default: 3)
+   */
+  max_pending_codes?: number;
+  [k: string]: unknown;
+}
+/**
+ * Google Workspace CLI (`gws`) tool configuration (`[google_workspace]`).
+ */
+export interface GoogleWorkspaceConfig {
+  /**
+   * Restrict which Google Workspace services the agent can access.
+   *
+   * When empty (the default), the full default service set is allowed (see
+   * struct-level docs). When non-empty, only the listed service IDs are
+   * permitted. Each entry must be non-empty, lowercase alphanumeric with
+   * optional underscores/hyphens, and unique.
+   */
+  allowed_services?: string[];
+  /**
+   * Enable audit logging of every `gws` invocation (service, resource,
+   * method, timestamp). Default: `false`.
+   */
+  audit_log?: boolean;
+  /**
+   * Path to service account JSON or OAuth client credentials file.
+   *
+   * When `None`, the tool relies on the default `gws` credential discovery
+   * (`gws auth login`). Set this to point at a service-account key or an
+   * OAuth client-secrets JSON for headless / CI environments.
+   */
+  credentials_path?: string | null;
+  /**
+   * Default Google account email to pass to `gws --account`.
+   *
+   * When `None`, the currently active `gws` account is used.
+   */
+  default_account?: string | null;
+  /**
+   * Enable the `google_workspace` tool. Default: `false`.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of `gws` API calls allowed per minute. Default: `60`.
+   */
+  rate_limit_per_minute?: number;
+  /**
+   * Command execution timeout in seconds. Default: `30`.
+   */
+  timeout_secs?: number;
   [k: string]: unknown;
 }
 /**
@@ -1689,6 +1842,176 @@ export interface IdentityConfig {
    * Identity format: "openclaw" (default) or "aieos"
    */
   format?: string;
+  [k: string]: unknown;
+}
+/**
+ * Knowledge graph configuration (`[knowledge]`).
+ */
+export interface KnowledgeConfig {
+  /**
+   * Automatically capture knowledge from conversations. Default: false.
+   */
+  auto_capture?: boolean;
+  /**
+   * Allow searching across workspaces (disabled by default for client data isolation).
+   */
+  cross_workspace_search?: boolean;
+  /**
+   * Path to the knowledge graph SQLite database.
+   */
+  db_path?: string;
+  /**
+   * Enable the knowledge graph tool. Default: false.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of knowledge nodes. Default: 100000.
+   */
+  max_nodes?: number;
+  /**
+   * Proactively suggest relevant knowledge on queries. Default: true.
+   */
+  suggest_on_query?: boolean;
+  [k: string]: unknown;
+}
+/**
+ * LinkedIn integration configuration (`[linkedin]`).
+ */
+export interface LinkedInConfig {
+  /**
+   * LinkedIn REST API version header (YYYYMM format).
+   */
+  api_version?: string;
+  content?: LinkedInContentConfig;
+  /**
+   * Enable the LinkedIn tool.
+   */
+  enabled?: boolean;
+  image?: LinkedInImageConfig;
+  [k: string]: unknown;
+}
+/**
+ * Content strategy for automated posting.
+ */
+export interface LinkedInContentConfig {
+  /**
+   * GitHub repositories to highlight (format: `owner/repo`).
+   */
+  github_repos?: string[];
+  /**
+   * GitHub usernames whose public activity to reference.
+   */
+  github_users?: string[];
+  /**
+   * Freeform posting instructions for the AI agent.
+   */
+  instructions?: string;
+  /**
+   * Professional persona description (name, role, expertise).
+   */
+  persona?: string;
+  /**
+   * RSS feed URLs to monitor for topic inspiration (titles only).
+   */
+  rss_feeds?: string[];
+  /**
+   * Topics of expertise and interest for post themes.
+   */
+  topics?: string[];
+  [k: string]: unknown;
+}
+/**
+ * Image generation for posts (`[linkedin.image]`).
+ */
+export interface LinkedInImageConfig {
+  /**
+   * Accent color for the fallback card (CSS hex).
+   */
+  card_accent_color?: string;
+  dalle?: ImageProviderDalleConfig;
+  /**
+   * Enable image generation for posts.
+   */
+  enabled?: boolean;
+  /**
+   * Generate a branded SVG text card when all AI providers fail.
+   */
+  fallback_card?: boolean;
+  flux?: ImageProviderFluxConfig;
+  imagen?: ImageProviderImagenConfig;
+  /**
+   * Provider priority order. Tried in sequence; first success wins.
+   */
+  providers?: string[];
+  stability?: ImageProviderStabilityConfig;
+  /**
+   * Temp directory for generated images, relative to workspace.
+   */
+  temp_dir?: string;
+  [k: string]: unknown;
+}
+/**
+ * OpenAI DALL-E provider settings.
+ */
+export interface ImageProviderDalleConfig {
+  /**
+   * Environment variable name holding the OpenAI API key.
+   */
+  api_key_env?: string;
+  /**
+   * DALL-E model identifier.
+   */
+  model?: string;
+  /**
+   * Image dimensions.
+   */
+  size?: string;
+  [k: string]: unknown;
+}
+/**
+ * Flux (fal.ai) provider settings.
+ */
+export interface ImageProviderFluxConfig {
+  /**
+   * Environment variable name holding the fal.ai API key.
+   */
+  api_key_env?: string;
+  /**
+   * Flux model identifier.
+   */
+  model?: string;
+  [k: string]: unknown;
+}
+/**
+ * Google Imagen (Vertex AI) provider settings.
+ */
+export interface ImageProviderImagenConfig {
+  /**
+   * Environment variable name holding the API key.
+   */
+  api_key_env?: string;
+  /**
+   * Environment variable for the Google Cloud project ID.
+   */
+  project_id_env?: string;
+  /**
+   * Vertex AI region.
+   */
+  region?: string;
+  [k: string]: unknown;
+}
+/**
+ * Stability AI provider settings.
+ */
+export interface ImageProviderStabilityConfig {
+  /**
+   * Environment variable name holding the API key.
+   */
+  api_key_env?: string;
+  /**
+   * Stability model identifier.
+   */
+  model?: string;
   [k: string]: unknown;
 }
 /**
@@ -2156,6 +2479,28 @@ export interface PeripheralBoardConfig {
   [k: string]: unknown;
 }
 /**
+ * Plugin system configuration (`[plugins]`).
+ */
+export interface PluginsConfig {
+  /**
+   * Auto-discover and load plugins on startup
+   */
+  auto_discover?: boolean;
+  /**
+   * Enable the plugin system (default: false)
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of plugins that can be loaded
+   */
+  max_plugins?: number;
+  /**
+   * Directory where plugins are stored
+   */
+  plugins_dir?: string;
+  [k: string]: unknown;
+}
+/**
  * Project delivery intelligence configuration (`[project_intel]`).
  */
 export interface ProjectIntelConfig {
@@ -2326,6 +2671,10 @@ export interface RuntimeConfig {
    * Runtime kind (`native` | `docker`).
    */
   kind?: string;
+  /**
+   * Optional reasoning effort for providers that expose a level control.
+   */
+  reasoning_effort?: string | null;
   /**
    * Global reasoning override for providers that expose explicit controls.
    * - `None`: provider default behavior
@@ -2711,13 +3060,35 @@ export interface SwarmConfig {
  */
 export interface TranscriptionConfig {
   /**
-   * Whisper API endpoint URL.
+   * API key used for transcription requests (Groq provider).
+   *
+   * If unset, runtime falls back to `GROQ_API_KEY` for backward compatibility.
+   */
+  api_key?: string | null;
+  /**
+   * Whisper API endpoint URL (Groq provider).
    */
   api_url?: string;
+  /**
+   * AssemblyAI STT provider configuration.
+   */
+  assemblyai?: AssemblyAiSttConfig | null;
+  /**
+   * Deepgram STT provider configuration.
+   */
+  deepgram?: DeepgramSttConfig | null;
+  /**
+   * Default STT provider: "groq", "openai", "deepgram", "assemblyai", "google".
+   */
+  default_provider?: string;
   /**
    * Enable voice transcription for channels that support it.
    */
   enabled?: boolean;
+  /**
+   * Google Cloud Speech-to-Text provider configuration.
+   */
+  google?: GoogleSttConfig | null;
   /**
    * Optional initial prompt to bias transcription toward expected vocabulary
    * (proper nouns, technical terms, etc.). Sent as the `prompt` field in the
@@ -2725,7 +3096,7 @@ export interface TranscriptionConfig {
    */
   initial_prompt?: string | null;
   /**
-   * Optional language hint (ISO-639-1, e.g. "en", "ru").
+   * Optional language hint (ISO-639-1, e.g. "en", "ru") for Groq provider.
    */
   language?: string | null;
   /**
@@ -2733,7 +3104,63 @@ export interface TranscriptionConfig {
    */
   max_duration_secs?: number;
   /**
-   * Whisper model name.
+   * Whisper model name (Groq provider).
+   */
+  model?: string;
+  /**
+   * OpenAI Whisper STT provider configuration.
+   */
+  openai?: OpenAiSttConfig | null;
+  [k: string]: unknown;
+}
+/**
+ * AssemblyAI STT provider configuration (`[transcription.assemblyai]`).
+ */
+export interface AssemblyAiSttConfig {
+  /**
+   * AssemblyAI API key.
+   */
+  api_key?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Deepgram STT provider configuration (`[transcription.deepgram]`).
+ */
+export interface DeepgramSttConfig {
+  /**
+   * Deepgram API key.
+   */
+  api_key?: string | null;
+  /**
+   * Deepgram model name (default: "nova-2").
+   */
+  model?: string;
+  [k: string]: unknown;
+}
+/**
+ * Google Cloud Speech-to-Text provider configuration (`[transcription.google]`).
+ */
+export interface GoogleSttConfig {
+  /**
+   * Google Cloud API key.
+   */
+  api_key?: string | null;
+  /**
+   * BCP-47 language code (default: "en-US").
+   */
+  language_code?: string;
+  [k: string]: unknown;
+}
+/**
+ * OpenAI Whisper STT provider configuration (`[transcription.openai]`).
+ */
+export interface OpenAiSttConfig {
+  /**
+   * OpenAI API key for Whisper transcription.
+   */
+  api_key?: string | null;
+  /**
+   * Whisper model name (default: "whisper-1").
    */
   model?: string;
   [k: string]: unknown;

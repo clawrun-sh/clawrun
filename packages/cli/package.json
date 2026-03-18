@@ -58,5 +58,15 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "deploy",
+    "cli",
+    "sandbox",
+    "microvm",
+    "ai-agent",
+    "clawrun"
+  ]
 }

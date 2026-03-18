@@ -160,6 +160,7 @@
       "$ref": "#/$defs/ChannelsConfig",
       "default": {
         "ack_reactions": true,
+        "bluesky": null,
         "clawdtalk": null,
         "cli": true,
         "dingtalk": null,
@@ -177,10 +178,11 @@
         "nextcloud_talk": null,
         "nostr": null,
         "qq": null,
+        "reddit": null,
         "session_backend": "sqlite",
         "session_persistence": true,
         "session_ttl_hours": 0,
-        "show_tool_calls": true,
+        "show_tool_calls": false,
         "signal": null,
         "slack": null,
         "telegram": null,
@@ -353,11 +355,33 @@
         "idempotency_ttl_secs": 300,
         "pair_rate_limit_per_minute": 10,
         "paired_tokens": [],
+        "pairing_dashboard": {
+          "code_length": 8,
+          "code_ttl_secs": 3600,
+          "lockout_secs": 300,
+          "max_failed_attempts": 5,
+          "max_pending_codes": 3
+        },
         "port": 42617,
         "rate_limit_max_keys": 10000,
         "require_pairing": true,
+        "session_persistence": true,
+        "session_ttl_hours": 0,
         "trust_forwarded_headers": false,
         "webhook_rate_limit_per_minute": 60
+      }
+    },
+    "google_workspace": {
+      "description": "Google Workspace CLI (`gws`) tool configuration (`[google_workspace]`).",
+      "$ref": "#/$defs/GoogleWorkspaceConfig",
+      "default": {
+        "allowed_services": [],
+        "audit_log": false,
+        "credentials_path": null,
+        "default_account": null,
+        "enabled": false,
+        "rate_limit_per_minute": 60,
+        "timeout_secs": 30
       }
     },
     "hardware": {
@@ -426,6 +450,64 @@
         "aieos_inline": null,
         "aieos_path": null,
         "format": "openclaw"
+      }
+    },
+    "knowledge": {
+      "description": "Knowledge graph configuration (`[knowledge]`).",
+      "$ref": "#/$defs/KnowledgeConfig",
+      "default": {
+        "auto_capture": false,
+        "cross_workspace_search": false,
+        "db_path": "~/.zeroclaw/knowledge.db",
+        "enabled": false,
+        "max_nodes": 100000,
+        "suggest_on_query": true
+      }
+    },
+    "linkedin": {
+      "description": "LinkedIn integration configuration (`[linkedin]`).",
+      "$ref": "#/$defs/LinkedInConfig",
+      "default": {
+        "api_version": "202602",
+        "content": {
+          "github_repos": [],
+          "github_users": [],
+          "instructions": "",
+          "persona": "",
+          "rss_feeds": [],
+          "topics": []
+        },
+        "enabled": false,
+        "image": {
+          "card_accent_color": "#0A66C2",
+          "dalle": {
+            "api_key_env": "OPENAI_API_KEY",
+            "model": "dall-e-3",
+            "size": "1024x1024"
+          },
+          "enabled": false,
+          "fallback_card": true,
+          "flux": {
+            "api_key_env": "FAL_API_KEY",
+            "model": "fal-ai/flux/schnell"
+          },
+          "imagen": {
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
+            "project_id_env": "GOOGLE_CLOUD_PROJECT",
+            "region": "us-central1"
+          },
+          "providers": [
+            "stability",
+            "imagen",
+            "dalle",
+            "flux"
+          ],
+          "stability": {
+            "api_key_env": "STABILITY_API_KEY",
+            "model": "stable-diffusion-xl-1024-v1-0"
+          },
+          "temp_dir": "linkedin/images"
+        }
       }
     },
     "mcp": {
@@ -571,6 +653,16 @@
         "enabled": false
       }
     },
+    "plugins": {
+      "description": "Plugin system configuration (`[plugins]`).",
+      "$ref": "#/$defs/PluginsConfig",
+      "default": {
+        "auto_discover": false,
+        "enabled": false,
+        "max_plugins": 50,
+        "plugins_dir": "~/.zeroclaw/plugins"
+      }
+    },
     "project_intel": {
       "description": "Project delivery intelligence configuration (`[project_intel]`).",
       "$ref": "#/$defs/ProjectIntelConfig",
@@ -642,6 +734,7 @@
           "read_only_rootfs": true
         },
         "kind": "native",
+        "reasoning_effort": null,
         "reasoning_enabled": null
       }
     },
@@ -765,12 +858,18 @@
       "description": "Voice transcription configuration (Whisper API via Groq).",
       "$ref": "#/$defs/TranscriptionConfig",
       "default": {
+        "api_key": null,
         "api_url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "assemblyai": null,
+        "deepgram": null,
+        "default_provider": "groq",
         "enabled": false,
+        "google": null,
         "initial_prompt": null,
         "language": null,
         "max_duration_secs": 120,
-        "model": "whisper-large-v3-turbo"
+        "model": "whisper-large-v3-turbo",
+        "openai": null
       }
     },
     "tts": {
@@ -897,6 +996,20 @@
         }
       }
     },
+    "AssemblyAiSttConfig": {
+      "description": "AssemblyAI STT provider configuration (`[transcription.assemblyai]`).",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "description": "AssemblyAI API key.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
+    },
     "AuditConfig": {
       "description": "Audit logging configuration",
       "type": "object",
@@ -932,6 +1045,21 @@
         "allowed_commands": {
           "description": "Allowlist of executable names permitted for shell execution.",
           "type": "array",
+          "default": [
+            "git",
+            "npm",
+            "cargo",
+            "ls",
+            "cat",
+            "grep",
+            "find",
+            "echo",
+            "pwd",
+            "wc",
+            "head",
+            "tail",
+            "date"
+          ],
           "items": {
             "type": "string"
           }
@@ -971,24 +1099,47 @@
         "forbidden_paths": {
           "description": "Explicit path denylist. Default includes system-critical paths and sensitive dotdirs.",
           "type": "array",
+          "default": [
+            "/etc",
+            "/root",
+            "/home",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/lib",
+            "/opt",
+            "/boot",
+            "/dev",
+            "/proc",
+            "/sys",
+            "/var",
+            "/tmp",
+            "~/.ssh",
+            "~/.gnupg",
+            "~/.aws",
+            "~/.config"
+          ],
           "items": {
             "type": "string"
           }
         },
         "level": {
           "description": "Autonomy level: `read_only`, `supervised` (default), or `full`.",
-          "$ref": "#/$defs/AutonomyLevel"
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "supervised"
         },
         "max_actions_per_hour": {
           "description": "Maximum actions allowed per hour per policy. Default: `100`.",
           "type": "integer",
           "format": "uint32",
+          "default": 20,
           "minimum": 0
         },
         "max_cost_per_day_cents": {
           "description": "Maximum cost per day in cents per policy. Default: `1000`.",
           "type": "integer",
           "format": "uint32",
+          "default": 500,
           "minimum": 0
         },
         "non_cli_excluded_tools": {
@@ -1014,17 +1165,10 @@
         },
         "workspace_only": {
           "description": "Restrict absolute filesystem paths to workspace-relative references. Default: `true`.\nResolved paths outside the workspace still require `allowed_roots`.",
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         }
-      },
-      "required": [
-        "level",
-        "workspace_only",
-        "allowed_commands",
-        "forbidden_paths",
-        "max_actions_per_hour",
-        "max_cost_per_day_cents"
-      ]
+      }
     },
     "AutonomyLevel": {
       "description": "How much autonomy the agent has",
@@ -1107,6 +1251,24 @@
           "default": null
         }
       }
+    },
+    "BlueskyConfig": {
+      "description": "Bluesky channel configuration (AT Protocol).",
+      "type": "object",
+      "properties": {
+        "app_password": {
+          "description": "App-specific password (from Bluesky settings).",
+          "type": "string"
+        },
+        "handle": {
+          "description": "Bluesky handle (e.g. `\"mybot.bsky.social\"`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "handle",
+        "app_password"
+      ]
     },
     "BrowserComputerUseConfig": {
       "description": "Computer-use sidecar configuration (`[browser.computer_use]` section).\n\nDelegates OS-level mouse, keyboard, and screenshot actions to a local sidecar.",
@@ -1304,6 +1466,17 @@
           "type": "boolean",
           "default": true
         },
+        "bluesky": {
+          "description": "Bluesky channel configuration (AT Protocol).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlueskyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "clawdtalk": {
           "description": "ClawdTalk voice channel configuration.",
           "anyOf": [
@@ -1480,6 +1653,17 @@
             }
           ]
         },
+        "reddit": {
+          "description": "Reddit channel configuration (OAuth2 bot).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RedditConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "session_backend": {
           "description": "Session persistence backend: `\"jsonl\"` (legacy) or `\"sqlite\"` (new default).\nSQLite provides FTS5 search, metadata tracking, and TTL cleanup.",
           "type": "string",
@@ -1498,9 +1682,9 @@
           "minimum": 0
         },
         "show_tool_calls": {
-          "description": "Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)\nto channel users. When `false`, tool calls are still logged server-side but\nnot forwarded as individual channel messages. Default: `true`.",
+          "description": "Whether to send tool-call notification messages (e.g. `🔧 web_search_tool: …`)\nto channel users. When `false`, tool calls are still logged server-side but\nnot forwarded as individual channel messages. Default: `false`.",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "signal": {
           "description": "Signal channel configuration.",
@@ -1959,6 +2143,25 @@
           "format": "uint64",
           "default": 90,
           "minimum": 0
+        }
+      }
+    },
+    "DeepgramSttConfig": {
+      "description": "Deepgram STT provider configuration (`[transcription.deepgram]`).",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "description": "Deepgram API key.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "model": {
+          "description": "Deepgram model name (default: \"nova-2\").",
+          "type": "string",
+          "default": "nova-2"
         }
       }
     },
@@ -2434,6 +2637,17 @@
             "type": "string"
           }
         },
+        "pairing_dashboard": {
+          "description": "Pairing dashboard configuration",
+          "$ref": "#/$defs/PairingDashboardConfig",
+          "default": {
+            "code_length": 8,
+            "code_ttl_secs": 3600,
+            "lockout_secs": 300,
+            "max_failed_attempts": 5,
+            "max_pending_codes": 3
+          }
+        },
         "port": {
           "description": "Gateway port (default: 42617)",
           "type": "integer",
@@ -2454,6 +2668,18 @@
           "type": "boolean",
           "default": true
         },
+        "session_persistence": {
+          "description": "Persist gateway WebSocket chat sessions to SQLite. Default: true.",
+          "type": "boolean",
+          "default": true
+        },
+        "session_ttl_hours": {
+          "description": "Auto-archive stale gateway sessions older than N hours. 0 = disabled. Default: 0.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
         "trust_forwarded_headers": {
           "description": "Trust proxy-forwarded client IP headers (`X-Forwarded-For`, `X-Real-IP`).\nDisabled by default; enable only behind a trusted reverse proxy.",
           "type": "boolean",
@@ -2465,6 +2691,25 @@
           "format": "uint32",
           "default": 60,
           "minimum": 0
+        }
+      }
+    },
+    "GoogleSttConfig": {
+      "description": "Google Cloud Speech-to-Text provider configuration (`[transcription.google]`).",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "description": "Google Cloud API key.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "language_code": {
+          "description": "BCP-47 language code (default: \"en-US\").",
+          "type": "string",
+          "default": "en-US"
         }
       }
     },
@@ -2484,6 +2729,60 @@
           "description": "Language code (default `\"en-US\"`).",
           "type": "string",
           "default": "en-US"
+        }
+      }
+    },
+    "GoogleWorkspaceConfig": {
+      "description": "Google Workspace CLI (`gws`) tool configuration (`[google_workspace]` section).\n\n## Defaults\n- `enabled`: `false` (tool is not registered unless explicitly opted-in).\n- `allowed_services`: empty vector, which grants access to the full default\n  service set: `drive`, `sheets`, `gmail`, `calendar`, `docs`, `slides`,\n  `tasks`, `people`, `chat`, `classroom`, `forms`, `keep`, `meet`, `events`.\n- `credentials_path`: `None` (uses default `gws` credential discovery).\n- `default_account`: `None` (uses the `gws` active account).\n- `rate_limit_per_minute`: `60`.\n- `timeout_secs`: `30`.\n- `audit_log`: `false`.\n- `credentials_path`: `None` (uses default `gws` credential discovery).\n- `default_account`: `None` (uses the `gws` active account).\n- `rate_limit_per_minute`: `60`.\n- `timeout_secs`: `30`.\n- `audit_log`: `false`.\n\n## Compatibility\nConfigs that omit the `[google_workspace]` section entirely are treated as\n`GoogleWorkspaceConfig::default()` (disabled, all defaults allowed). Adding\nthe section is purely opt-in and does not affect other config sections.\n\n## Rollback / Migration\nTo revert, remove the `[google_workspace]` section from the config file (or\nset `enabled = false`). No data migration is required; the tool simply stops\nbeing registered.",
+      "type": "object",
+      "properties": {
+        "allowed_services": {
+          "description": "Restrict which Google Workspace services the agent can access.\n\nWhen empty (the default), the full default service set is allowed (see\nstruct-level docs). When non-empty, only the listed service IDs are\npermitted. Each entry must be non-empty, lowercase alphanumeric with\noptional underscores/hyphens, and unique.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "audit_log": {
+          "description": "Enable audit logging of every `gws` invocation (service, resource,\nmethod, timestamp). Default: `false`.",
+          "type": "boolean",
+          "default": false
+        },
+        "credentials_path": {
+          "description": "Path to service account JSON or OAuth client credentials file.\n\nWhen `None`, the tool relies on the default `gws` credential discovery\n(`gws auth login`). Set this to point at a service-account key or an\nOAuth client-secrets JSON for headless / CI environments.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "default_account": {
+          "description": "Default Google account email to pass to `gws --account`.\n\nWhen `None`, the currently active `gws` account is used.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "enabled": {
+          "description": "Enable the `google_workspace` tool. Default: `false`.",
+          "type": "boolean",
+          "default": false
+        },
+        "rate_limit_per_minute": {
+          "description": "Maximum number of `gws` API calls allowed per minute. Default: `60`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 60,
+          "minimum": 0
+        },
+        "timeout_secs": {
+          "description": "Command execution timeout in seconds. Default: `30`.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 30,
+          "minimum": 0
         }
       }
     },
@@ -2745,6 +3044,80 @@
         }
       }
     },
+    "ImageProviderDalleConfig": {
+      "description": "OpenAI DALL-E settings (`[linkedin.image.dalle]`).",
+      "type": "object",
+      "properties": {
+        "api_key_env": {
+          "description": "Environment variable name holding the OpenAI API key.",
+          "type": "string",
+          "default": "OPENAI_API_KEY"
+        },
+        "model": {
+          "description": "DALL-E model identifier.",
+          "type": "string",
+          "default": "dall-e-3"
+        },
+        "size": {
+          "description": "Image dimensions.",
+          "type": "string",
+          "default": "1024x1024"
+        }
+      }
+    },
+    "ImageProviderFluxConfig": {
+      "description": "Flux (fal.ai) image generation settings (`[linkedin.image.flux]`).",
+      "type": "object",
+      "properties": {
+        "api_key_env": {
+          "description": "Environment variable name holding the fal.ai API key.",
+          "type": "string",
+          "default": "FAL_API_KEY"
+        },
+        "model": {
+          "description": "Flux model identifier.",
+          "type": "string",
+          "default": "fal-ai/flux/schnell"
+        }
+      }
+    },
+    "ImageProviderImagenConfig": {
+      "description": "Google Imagen (Vertex AI) settings (`[linkedin.image.imagen]`).",
+      "type": "object",
+      "properties": {
+        "api_key_env": {
+          "description": "Environment variable name holding the API key.",
+          "type": "string",
+          "default": "GOOGLE_VERTEX_API_KEY"
+        },
+        "project_id_env": {
+          "description": "Environment variable for the Google Cloud project ID.",
+          "type": "string",
+          "default": "GOOGLE_CLOUD_PROJECT"
+        },
+        "region": {
+          "description": "Vertex AI region.",
+          "type": "string",
+          "default": "us-central1"
+        }
+      }
+    },
+    "ImageProviderStabilityConfig": {
+      "description": "Stability AI image generation settings (`[linkedin.image.stability]`).",
+      "type": "object",
+      "properties": {
+        "api_key_env": {
+          "description": "Environment variable name holding the API key.",
+          "type": "string",
+          "default": "STABILITY_API_KEY"
+        },
+        "model": {
+          "description": "Stability model identifier.",
+          "type": "string",
+          "default": "stable-diffusion-xl-1024-v1-0"
+        }
+      }
+    },
     "IrcConfig": {
       "description": "IRC channel configuration.",
       "type": "object",
@@ -2822,6 +3195,44 @@
         "nickname"
       ]
     },
+    "KnowledgeConfig": {
+      "description": "Knowledge graph configuration for capturing and reusing expertise.",
+      "type": "object",
+      "properties": {
+        "auto_capture": {
+          "description": "Automatically capture knowledge from conversations. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "cross_workspace_search": {
+          "description": "Allow searching across workspaces (disabled by default for client data isolation).",
+          "type": "boolean",
+          "default": false
+        },
+        "db_path": {
+          "description": "Path to the knowledge graph SQLite database.",
+          "type": "string",
+          "default": "~/.zeroclaw/knowledge.db"
+        },
+        "enabled": {
+          "description": "Enable the knowledge graph tool. Default: false.",
+          "type": "boolean",
+          "default": false
+        },
+        "max_nodes": {
+          "description": "Maximum number of knowledge nodes. Default: 100000.",
+          "type": "integer",
+          "format": "uint",
+          "default": 100000,
+          "minimum": 0
+        },
+        "suggest_on_query": {
+          "description": "Proactively suggest relevant knowledge on queries. Default: true.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
     "LarkConfig": {
       "description": "Lark/Feishu configuration for messaging integration.\nLark is the international version; Feishu is the Chinese version.",
       "type": "object",
@@ -2897,6 +3308,189 @@
         "websocket",
         "webhook"
       ]
+    },
+    "LinkedInConfig": {
+      "description": "LinkedIn integration configuration (`[linkedin]` section).\n\nWhen enabled, the `linkedin` tool is registered in the agent tool surface.\nRequires `LINKEDIN_*` credentials in the workspace `.env` file.",
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "description": "LinkedIn REST API version header (YYYYMM format).",
+          "type": "string",
+          "default": "202602"
+        },
+        "content": {
+          "description": "Content strategy for automated posting.",
+          "$ref": "#/$defs/LinkedInContentConfig",
+          "default": {
+            "github_repos": [],
+            "github_users": [],
+            "instructions": "",
+            "persona": "",
+            "rss_feeds": [],
+            "topics": []
+          }
+        },
+        "enabled": {
+          "description": "Enable the LinkedIn tool.",
+          "type": "boolean",
+          "default": false
+        },
+        "image": {
+          "description": "Image generation for posts (`[linkedin.image]`).",
+          "$ref": "#/$defs/LinkedInImageConfig",
+          "default": {
+            "card_accent_color": "#0A66C2",
+            "dalle": {
+              "api_key_env": "OPENAI_API_KEY",
+              "model": "dall-e-3",
+              "size": "1024x1024"
+            },
+            "enabled": false,
+            "fallback_card": true,
+            "flux": {
+              "api_key_env": "FAL_API_KEY",
+              "model": "fal-ai/flux/schnell"
+            },
+            "imagen": {
+              "api_key_env": "GOOGLE_VERTEX_API_KEY",
+              "project_id_env": "GOOGLE_CLOUD_PROJECT",
+              "region": "us-central1"
+            },
+            "providers": [
+              "stability",
+              "imagen",
+              "dalle",
+              "flux"
+            ],
+            "stability": {
+              "api_key_env": "STABILITY_API_KEY",
+              "model": "stable-diffusion-xl-1024-v1-0"
+            },
+            "temp_dir": "linkedin/images"
+          }
+        }
+      }
+    },
+    "LinkedInContentConfig": {
+      "description": "Content strategy configuration for LinkedIn auto-posting (`[linkedin.content]`).\n\nThe agent reads this via the `linkedin get_content_strategy` action to know\nwhat feeds to check, which repos to highlight, and how to write posts.",
+      "type": "object",
+      "properties": {
+        "github_repos": {
+          "description": "GitHub repositories to highlight (format: `owner/repo`).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "github_users": {
+          "description": "GitHub usernames whose public activity to reference.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "instructions": {
+          "description": "Freeform posting instructions for the AI agent.",
+          "type": "string",
+          "default": ""
+        },
+        "persona": {
+          "description": "Professional persona description (name, role, expertise).",
+          "type": "string",
+          "default": ""
+        },
+        "rss_feeds": {
+          "description": "RSS feed URLs to monitor for topic inspiration (titles only).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "topics": {
+          "description": "Topics of expertise and interest for post themes.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "LinkedInImageConfig": {
+      "description": "Image generation configuration for LinkedIn posts (`[linkedin.image]`).",
+      "type": "object",
+      "properties": {
+        "card_accent_color": {
+          "description": "Accent color for the fallback card (CSS hex).",
+          "type": "string",
+          "default": "#0A66C2"
+        },
+        "dalle": {
+          "description": "OpenAI DALL-E provider settings.",
+          "$ref": "#/$defs/ImageProviderDalleConfig",
+          "default": {
+            "api_key_env": "OPENAI_API_KEY",
+            "model": "dall-e-3",
+            "size": "1024x1024"
+          }
+        },
+        "enabled": {
+          "description": "Enable image generation for posts.",
+          "type": "boolean",
+          "default": false
+        },
+        "fallback_card": {
+          "description": "Generate a branded SVG text card when all AI providers fail.",
+          "type": "boolean",
+          "default": true
+        },
+        "flux": {
+          "description": "Flux (fal.ai) provider settings.",
+          "$ref": "#/$defs/ImageProviderFluxConfig",
+          "default": {
+            "api_key_env": "FAL_API_KEY",
+            "model": "fal-ai/flux/schnell"
+          }
+        },
+        "imagen": {
+          "description": "Google Imagen (Vertex AI) provider settings.",
+          "$ref": "#/$defs/ImageProviderImagenConfig",
+          "default": {
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
+            "project_id_env": "GOOGLE_CLOUD_PROJECT",
+            "region": "us-central1"
+          }
+        },
+        "providers": {
+          "description": "Provider priority order. Tried in sequence; first success wins.",
+          "type": "array",
+          "default": [
+            "stability",
+            "imagen",
+            "dalle",
+            "flux"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "stability": {
+          "description": "Stability AI provider settings.",
+          "$ref": "#/$defs/ImageProviderStabilityConfig",
+          "default": {
+            "api_key_env": "STABILITY_API_KEY",
+            "model": "stable-diffusion-xl-1024-v1-0"
+          }
+        },
+        "temp_dir": {
+          "description": "Temp directory for generated images, relative to workspace.",
+          "type": "string",
+          "default": "linkedin/images"
+        }
+      }
     },
     "LinqConfig": {
       "type": "object",
@@ -3887,6 +4481,25 @@
         "backend"
       ]
     },
+    "OpenAiSttConfig": {
+      "description": "OpenAI Whisper STT provider configuration (`[transcription.openai]`).",
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "description": "OpenAI API key for Whisper transcription.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "model": {
+          "description": "Whisper model name (default: \"whisper-1\").",
+          "type": "string",
+          "default": "whisper-1"
+        }
+      }
+    },
     "OpenAiTtsConfig": {
       "description": "OpenAI TTS provider configuration.",
       "type": "object",
@@ -4037,6 +4650,47 @@
         }
       ]
     },
+    "PairingDashboardConfig": {
+      "description": "Pairing dashboard configuration (`[gateway.pairing_dashboard]`).",
+      "type": "object",
+      "properties": {
+        "code_length": {
+          "description": "Length of pairing codes (default: 8)",
+          "type": "integer",
+          "format": "uint",
+          "default": 8,
+          "minimum": 0
+        },
+        "code_ttl_secs": {
+          "description": "Time-to-live for pending pairing codes in seconds (default: 3600)",
+          "type": "integer",
+          "format": "uint64",
+          "default": 3600,
+          "minimum": 0
+        },
+        "lockout_secs": {
+          "description": "Lockout duration in seconds after max attempts (default: 300)",
+          "type": "integer",
+          "format": "uint64",
+          "default": 300,
+          "minimum": 0
+        },
+        "max_failed_attempts": {
+          "description": "Maximum failed pairing attempts before lockout (default: 5)",
+          "type": "integer",
+          "format": "uint32",
+          "default": 5,
+          "minimum": 0
+        },
+        "max_pending_codes": {
+          "description": "Maximum concurrent pending pairing codes (default: 3)",
+          "type": "integer",
+          "format": "uint",
+          "default": 3,
+          "minimum": 0
+        }
+      }
+    },
     "PeripheralBoardConfig": {
       "description": "Configuration for a single peripheral board (e.g. STM32, RPi GPIO).",
       "type": "object",
@@ -4094,6 +4748,34 @@
           "description": "Enable peripheral support (boards become agent tools)",
           "type": "boolean",
           "default": false
+        }
+      }
+    },
+    "PluginsConfig": {
+      "description": "Plugin system configuration.",
+      "type": "object",
+      "properties": {
+        "auto_discover": {
+          "description": "Auto-discover and load plugins on startup",
+          "type": "boolean",
+          "default": false
+        },
+        "enabled": {
+          "description": "Enable the plugin system (default: false)",
+          "type": "boolean",
+          "default": false
+        },
+        "max_plugins": {
+          "description": "Maximum number of plugins that can be loaded",
+          "type": "integer",
+          "format": "uint",
+          "default": 50,
+          "minimum": 0
+        },
+        "plugins_dir": {
+          "description": "Directory where plugins are stored",
+          "type": "string",
+          "default": "~/.zeroclaw/plugins"
         }
       }
     },
@@ -4297,6 +4979,42 @@
         }
       }
     },
+    "RedditConfig": {
+      "description": "Reddit channel configuration (OAuth2 bot).",
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "description": "Reddit OAuth2 client ID.",
+          "type": "string"
+        },
+        "client_secret": {
+          "description": "Reddit OAuth2 client secret.",
+          "type": "string"
+        },
+        "refresh_token": {
+          "description": "Reddit OAuth2 refresh token for persistent access.",
+          "type": "string"
+        },
+        "subreddit": {
+          "description": "Optional subreddit to filter messages (without `r/` prefix).\nWhen set, only messages from this subreddit are processed.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "username": {
+          "description": "Reddit bot username (without `u/` prefix).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret",
+        "refresh_token",
+        "username"
+      ]
+    },
     "ReliabilityConfig": {
       "description": "Reliability and supervision configuration (`[reliability]` section).\n\nControls provider retries, fallback chains, API key rotation, and channel restart backoff.",
       "type": "object",
@@ -4425,6 +5143,14 @@
           "description": "Runtime kind (`native` | `docker`).",
           "type": "string",
           "default": "native"
+        },
+        "reasoning_effort": {
+          "description": "Optional reasoning effort for providers that expose a level control.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "reasoning_enabled": {
           "description": "Global reasoning override for providers that expose explicit controls.\n- `None`: provider default behavior\n- `Some(true)`: request reasoning/thinking when supported\n- `Some(false)`: disable reasoning/thinking when supported",
@@ -5039,18 +5765,67 @@
       ]
     },
     "TranscriptionConfig": {
-      "description": "Voice transcription configuration (Whisper API via Groq).",
+      "description": "Voice transcription configuration with multi-provider support.\n\nThe top-level `api_url`, `model`, and `api_key` fields remain for backward\ncompatibility with existing Groq-based configurations.",
       "type": "object",
       "properties": {
+        "api_key": {
+          "description": "API key used for transcription requests (Groq provider).\n\nIf unset, runtime falls back to `GROQ_API_KEY` for backward compatibility.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "api_url": {
-          "description": "Whisper API endpoint URL.",
+          "description": "Whisper API endpoint URL (Groq provider).",
           "type": "string",
           "default": "https://api.groq.com/openai/v1/audio/transcriptions"
+        },
+        "assemblyai": {
+          "description": "AssemblyAI STT provider configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssemblyAiSttConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "deepgram": {
+          "description": "Deepgram STT provider configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeepgramSttConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "default_provider": {
+          "description": "Default STT provider: \"groq\", \"openai\", \"deepgram\", \"assemblyai\", \"google\".",
+          "type": "string",
+          "default": "groq"
         },
         "enabled": {
           "description": "Enable voice transcription for channels that support it.",
           "type": "boolean",
           "default": false
+        },
+        "google": {
+          "description": "Google Cloud Speech-to-Text provider configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GoogleSttConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "initial_prompt": {
           "description": "Optional initial prompt to bias transcription toward expected vocabulary\n(proper nouns, technical terms, etc.). Sent as the `prompt` field in the\nWhisper API request.",
@@ -5061,7 +5836,7 @@
           "default": null
         },
         "language": {
-          "description": "Optional language hint (ISO-639-1, e.g. \"en\", \"ru\").",
+          "description": "Optional language hint (ISO-639-1, e.g. \"en\", \"ru\") for Groq provider.",
           "type": [
             "string",
             "null"
@@ -5076,9 +5851,21 @@
           "minimum": 0
         },
         "model": {
-          "description": "Whisper model name.",
+          "description": "Whisper model name (Groq provider).",
           "type": "string",
           "default": "whisper-large-v3-turbo"
+        },
+        "openai": {
+          "description": "OpenAI Whisper STT provider configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpenAiSttConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       }
     },
@@ -5430,9 +6217,25 @@
       }
     },
     "WebhookConfig": {
-      "description": "Webhook channel configuration.",
+      "description": "Webhook channel configuration.\n\nReceives messages via HTTP POST and sends replies to a configurable outbound URL.\nThis is the \"universal adapter\" for any system that supports webhooks.",
       "type": "object",
       "properties": {
+        "auth_header": {
+          "description": "Optional `Authorization` header value for outbound requests.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "listen_path": {
+          "description": "URL path to listen on (default: `/webhook`).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "port": {
           "description": "Port to listen on for incoming webhooks.",
           "type": "integer",
@@ -5441,11 +6244,27 @@
           "minimum": 0
         },
         "secret": {
-          "description": "Optional shared secret for webhook signature verification.",
+          "description": "Optional shared secret for webhook signature verification (HMAC-SHA256).",
           "type": [
             "string",
             "null"
           ]
+        },
+        "send_method": {
+          "description": "HTTP method for outbound messages (`POST` or `PUT`). Default: `POST`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "send_url": {
+          "description": "URL to POST/PUT outbound messages to.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
