@@ -1,9 +1,4 @@
 {
   "title": "SDK",
-  "pages": [
-    "client",
-    "instance",
-    "chat",
-    "sandbox"
-  ]
+  "pages": ["client", "instance", "chat", "sandbox"]
 }

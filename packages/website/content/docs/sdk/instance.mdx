@@ -8,9 +8,9 @@ description: Manage the agent lifecycle, query status, and interact with memory,
 ## Lifecycle
 
 ```typescript
-await instance.start();    // Boot the sandbox
-await instance.stop();     // Snapshot and shut down
-await instance.restart();  // Force restart
+await instance.start(); // Boot the sandbox
+await instance.stop(); // Snapshot and shut down
+await instance.restart(); // Force restart
 const h = await instance.health(); // { status, agent, sandbox }
 ```
 

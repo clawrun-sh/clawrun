@@ -11,7 +11,7 @@ Send a message and wait for the complete response:
 
 ```typescript
 const response = await instance.sendMessage("Summarize the project status");
-console.log(response.role);  // "assistant"
+console.log(response.role); // "assistant"
 console.log(response.parts); // [{ type: "text", text: "..." }, ...]
 ```
 

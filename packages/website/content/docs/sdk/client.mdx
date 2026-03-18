@@ -18,10 +18,7 @@ const client = new ClawRunClient();
 Pass the deployed URL and the JWT secret (from `clawrun.json`):
 
 ```typescript
-const instance = client.connect(
-  "https://my-agent.vercel.app",
-  "your-jwt-secret"
-);
+const instance = client.connect("https://my-agent.vercel.app", "your-jwt-secret");
 ```
 
 The client signs a short-lived JWT for each API call. No tokens are stored.
@@ -31,14 +28,10 @@ The client signs a short-lived JWT for each API call. No tokens are stored.
 To use direct sandbox operations (exec, file read/write, snapshots), provide the sandbox config:
 
 ```typescript
-const instance = client.connect(
-  "https://my-agent.vercel.app",
-  "your-jwt-secret",
-  {
-    provider: "vercel",
-    providerOptions: { projectDir: "/path/to/.vercel" },
-  }
-);
+const instance = client.connect("https://my-agent.vercel.app", "your-jwt-secret", {
+  provider: "vercel",
+  providerOptions: { projectDir: "/path/to/.vercel" },
+});
 
 // Now instance.sandbox is available
 const sandboxes = await instance.sandbox.list();
