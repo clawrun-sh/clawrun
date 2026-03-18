@@ -1,5 +1,11 @@
 {
   "title": "Getting Started",
   "defaultOpen": true,
-  "pages": ["quickstart", "installation", "configuration", "providers-and-agents", "cost-estimation"]
+  "pages": [
+    "quickstart",
+    "installation",
+    "configuration",
+    "providers-and-agents",
+    "cost-estimation"
+  ]
 }

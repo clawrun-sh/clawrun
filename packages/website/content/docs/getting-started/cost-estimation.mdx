@@ -5,19 +5,21 @@ icon: DollarSign
 ---
 
 <Callout>
-These are rough estimates based on published pricing as of March 2026. Actual costs depend on your usage patterns, provider plan, and LLM choice. Always check your provider's current pricing page for the latest numbers.
+  These are rough estimates based on published pricing as of March 2026. Actual costs depend on your
+  usage patterns, provider plan, and LLM choice. Always check your provider's current pricing page
+  for the latest numbers.
 </Callout>
 
 ## Cost components
 
 Running a ClawRun instance involves four cost areas:
 
-| Component | What it is | Typical cost |
-|---|---|---|
-| **Sandbox compute** | The microVM where your agent runs | Varies by usage (free on Hobby) |
-| **Serverless functions** | The orchestrator (webhooks, heartbeat, chat API) | Minimal |
-| **State store** | Redis for lifecycle state (locks, wake times) | Free for light usage |
-| **LLM API** | Token costs from your chosen provider | Varies by provider and model |
+| Component                | What it is                                       | Typical cost                    |
+| ------------------------ | ------------------------------------------------ | ------------------------------- |
+| **Sandbox compute**      | The microVM where your agent runs                | Varies by usage (free on Hobby) |
+| **Serverless functions** | The orchestrator (webhooks, heartbeat, chat API) | Minimal                         |
+| **State store**          | Redis for lifecycle state (locks, wake times)    | Free for light usage            |
+| **LLM API**              | Token costs from your chosen provider            | Varies by provider and model    |
 
 ClawRun itself is free and open source. You only pay for the infrastructure it runs on and the LLM API calls your agent makes.
 
@@ -27,12 +29,12 @@ ClawRun itself is free and open source. You only pay for the infrastructure it r
 
 ClawRun creates sandboxes with **2 vCPUs and 4 GB memory** by default. Sandboxes automatically [sleep when idle](/docs/sandbox/snapshot-resume) (default: 10 minutes of inactivity), so you're not paying for a 24/7 VM.
 
-| Metric | Hobby (free) | Pro ($20/month) |
-|---|---|---|
-| Active CPU | 5 hours/month included | $0.128/hour |
-| Provisioned memory | 420 GB-hours/month included | $0.0212/GB-hour |
-| Snapshot storage | Included | $0.08/GB-month |
-| Max sandbox duration | 45 minutes | 5 hours |
+| Metric               | Hobby (free)                | Pro ($20/month) |
+| -------------------- | --------------------------- | --------------- |
+| Active CPU           | 5 hours/month included      | $0.128/hour     |
+| Provisioned memory   | 420 GB-hours/month included | $0.0212/GB-hour |
+| Snapshot storage     | Included                    | $0.08/GB-month  |
+| Max sandbox duration | 45 minutes                  | 5 hours         |
 
 **Active CPU** is only charged when the CPU is actually computing. Time spent waiting for network, database, or LLM responses does not count. A typical agent session has very low CPU utilization since most time is spent waiting for I/O.
 
@@ -42,19 +44,19 @@ ClawRun creates sandboxes with **2 vCPUs and 4 GB memory** by default. Sandboxes
 
 The Next.js orchestrator runs as serverless functions. These handle webhooks, heartbeats, chat streaming, and API routes. Usage is minimal since each invocation is short-lived.
 
-| Metric | Hobby (free) | Pro ($20/month) |
-|---|---|---|
-| Invocations | 1M/month included | $0.60/1M |
-| Active CPU | 4 hours/month included | $0.128/hour |
+| Metric      | Hobby (free)           | Pro ($20/month) |
+| ----------- | ---------------------- | --------------- |
+| Invocations | 1M/month included      | $0.60/1M        |
+| Active CPU  | 4 hours/month included | $0.128/hour     |
 
 ### State store (Redis)
 
 ClawRun uses Redis ([Upstash](https://upstash.com)) for sandbox lifecycle state: creation locks, next wake times, and webhook registrations. Usage is very light — a few commands per heartbeat cycle.
 
-| Metric | Free tier | Pay-as-you-go |
-|---|---|---|
+| Metric   | Free tier  | Pay-as-you-go  |
+| -------- | ---------- | -------------- |
 | Commands | 500K/month | $0.20 per 100K |
-| Storage | 256 MB | Included |
+| Storage  | 256 MB     | Included       |
 
 A single ClawRun instance typically uses fewer than 10K commands per month, well within the free tier.
 
@@ -62,60 +64,49 @@ A single ClawRun instance typically uses fewer than 10K commands per month, well
 
 ### Casual use (Hobby plan)
 
-A personal agent you message a few times a day.
+A personal agent used a few times a day. The sandbox wakes when you send a message and sleeps after 10 minutes of inactivity. While awake, it handles any number of messages.
 
-| | Estimate |
-|---|---|
-| Messages | 2-3 per day |
-| Sandbox sessions | ~3 wakes/day, ~10 min each |
-| Active CPU | ~0.75 hours/month |
-| Provisioned memory | ~60 GB-hours/month |
-| Redis | ~5K commands/month |
+|                         | Estimate                        |
+| ----------------------- | ------------------------------- |
+| Sandbox sessions        | ~3 wakes/day, ~10 min each      |
+| Active CPU              | ~0.75 hours/month               |
+| Provisioned memory      | ~60 GB-hours/month              |
+| Redis                   | ~5K commands/month              |
 | **Infrastructure cost** | **$0** (within Hobby free tier) |
-| LLM cost | $1-5/month (depends on provider) |
+| LLM cost                | Separate (see below)            |
 
 ### Regular use (Pro plan)
 
-An agent connected to Telegram or Discord, handling 10-20 messages per day.
+An agent connected to Telegram or Discord. The sandbox wakes on each incoming message and stays alive for longer sessions as conversations continue.
 
-| | Estimate |
-|---|---|
-| Messages | 10-20 per day |
-| Sandbox sessions | ~5 wakes/day, ~20 min each |
-| Active CPU | ~5 hours/month → $0.64 |
-| Provisioned memory | ~200 GB-hours/month → $4.24 |
-| Snapshots | 1.5 GB → $0.12 |
-| Serverless + Redis | ~$1 |
+|                         | Estimate                                  |
+| ----------------------- | ----------------------------------------- |
+| Sandbox sessions        | ~5 wakes/day, ~20 min each                |
+| Active CPU              | ~5 hours/month → $0.64                    |
+| Provisioned memory      | ~200 GB-hours/month → $4.24               |
+| Snapshots               | 1.5 GB → $0.12                            |
+| Serverless + Redis      | ~$1                                       |
 | **Infrastructure cost** | **~$6/month** (covered by $20 Pro credit) |
-| LLM cost | $5-20/month (depends on provider) |
+| LLM cost                | Separate (see below)                      |
 
 ### Heavy use (Pro plan)
 
-An agent with multiple active channels, frequent interactions, sandbox running ~8 hours per day.
+An agent with multiple active channels keeping the sandbox awake for extended periods throughout the day.
 
-| | Estimate |
-|---|---|
-| Messages | 50+ per day |
-| Sandbox uptime | ~8 hours/day |
-| Active CPU | ~36 hours/month → $4.61 |
-| Provisioned memory | ~960 GB-hours/month → $20.35 |
-| Snapshots + serverless + Redis | ~$2 |
-| **Infrastructure cost** | **~$27/month** ($20 credit + ~$7 overage) |
-| LLM cost | $20-100/month (depends on provider) |
+|                                | Estimate                                  |
+| ------------------------------ | ----------------------------------------- |
+| Sandbox uptime                 | ~8 hours/day                              |
+| Active CPU                     | ~36 hours/month → $4.61                   |
+| Provisioned memory             | ~960 GB-hours/month → $20.35              |
+| Snapshots + serverless + Redis | ~$2                                       |
+| **Infrastructure cost**        | **~$27/month** ($20 credit + ~$7 overage) |
+| LLM cost                       | Separate (see below)                      |
 
 ## LLM costs (separate)
 
-LLM API costs are paid directly to your chosen provider. They vary significantly by model and usage. Some examples:
+LLM API costs are paid directly to your chosen provider and are not included in the estimates above. Costs vary widely depending on the provider, model, and how much your agent uses them. Check your provider's pricing page for current rates.
 
-| Provider | Model | Input (per 1M tokens) | Output (per 1M tokens) |
-|---|---|---|---|
-| OpenRouter | Claude Sonnet 4 | $3.00 | $15.00 |
-| Anthropic | Claude Sonnet 4 | $3.00 | $15.00 |
-| OpenAI | GPT-4o | $2.50 | $10.00 |
-| Groq | Llama 4 Scout | Free tier available | Free tier available |
-| DeepSeek | DeepSeek V3 | $0.27 | $1.10 |
-
-ClawRun includes built-in [cost tracking and budget enforcement](/docs/getting-started/configuration) so you can set daily and monthly limits.
+ClawRun includes built-in [cost tracking and budget enforcement](/docs/getting-started/configuration) so you can set daily and monthly limits to stay in control.
 
 ## Tips for reducing costs
 
