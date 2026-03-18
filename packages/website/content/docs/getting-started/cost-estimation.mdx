@@ -29,12 +29,14 @@ ClawRun itself is free and open source. You only pay for the infrastructure it r
 
 ClawRun creates sandboxes with **2 vCPUs and 4 GB memory** by default. Sandboxes automatically [sleep when idle](/docs/sandbox/snapshot-resume) (default: 10 minutes of inactivity), so you're not paying for a 24/7 VM.
 
-| Metric               | Hobby (free)                | Pro ($20/month) |
-| -------------------- | --------------------------- | --------------- |
-| Active CPU           | 5 hours/month included      | $0.128/hour     |
-| Provisioned memory   | 420 GB-hours/month included | $0.0212/GB-hour |
-| Snapshot storage     | Included                    | $0.08/GB-month  |
-| Max sandbox duration | 45 minutes                  | 5 hours         |
+| Metric             | Hobby (free)                | Pro ($20/month)  |
+| ------------------ | --------------------------- | ---------------- |
+| Active CPU         | 5 hours/month included      | $0.128/hour      |
+| Provisioned memory | 420 GB-hours/month included | $0.0212/GB-hour  |
+| Snapshot storage   | Included                    | $0.08/GB-month   |
+| Max session length | 45 minutes per wake         | 5 hours per wake |
+
+**Max session length** is the longest a sandbox can run continuously in a single wake. There is no limit on total monthly runtime. When a session ends, the sandbox [snapshots and sleeps](/docs/sandbox/snapshot-resume). The next message or scheduled task wakes it again and the clock resets.
 
 **Active CPU** is only charged when the CPU is actually computing. Time spent waiting for network, database, or LLM responses does not count. A typical agent session has very low CPU utilization since most time is spent waiting for I/O.
 
@@ -111,7 +113,7 @@ ClawRun includes built-in [cost tracking and budget enforcement](/docs/getting-s
 ## Tips for reducing costs
 
 - **Let sandboxes sleep.** The default 10-minute idle timeout is a good balance. Don't increase `activeDuration` unless you have a specific reason.
-- **Use cost limits.** Set `daily_limit_usd` and `monthly_limit_usd` in your agent config to prevent runaway spending on LLM calls.
+- **Use cost limits.** Configure daily and monthly spending caps during deploy to prevent runaway LLM costs.
 - **Right-size vCPUs.** The default 2 vCPUs is sufficient for most agents. Only increase if your agent runs CPU-intensive tools.
 - **Choose your model wisely.** Smaller, faster models (Groq, DeepSeek) cost a fraction of frontier models for many tasks.
 
