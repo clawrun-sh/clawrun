@@ -1,6 +1,6 @@
 {
   "name": "@clawrun/channel",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Wake hook adapters for ClawRun messaging channels",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",

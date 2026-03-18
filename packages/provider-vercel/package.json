@@ -1,6 +1,6 @@
 {
   "name": "@clawrun/provider-vercel",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Vercel Sandbox provider for ClawRun",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",
