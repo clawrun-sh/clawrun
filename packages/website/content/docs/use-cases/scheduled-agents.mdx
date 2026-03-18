@@ -30,7 +30,23 @@ If the agent has no cron jobs, nothing is stored and the sandbox will only wake 
 
 The heartbeat endpoint runs on a schedule configured during deploy. On each tick, it checks whether a cron job is due within the **lead time** (default 60 seconds). If so, it wakes the sandbox from its last snapshot, giving the agent time to boot before the job fires.
 
-On paid Vercel plans, the heartbeat runs every minute for precise scheduling. On hobby plans, it runs daily, so cron timing is less granular.
+On paid Vercel plans, the heartbeat runs every minute for precise scheduling.
+
+<Callout type="warn">
+On Vercel's free (Hobby) plan, cron jobs are limited to once per day. This means the heartbeat that checks for upcoming agent tasks only runs once every 24 hours, so scheduled agents cannot wake on a precise schedule.
+
+**Workarounds:**
+
+- **Upgrade to a paid Vercel plan** for per-minute heartbeats.
+- **Use an external cron service** (e.g. [cron-job.org](https://cron-job.org), [Upstash QStash](https://upstash.com/docs/qstash), or a GitHub Actions scheduled workflow) to call your heartbeat endpoint at the frequency you need:
+  ```
+  POST https://<your-deployment>/api/v1/heartbeat
+  Authorization: Bearer <CLAWRUN_CRON_SECRET>
+  ```
+
+This is a Vercel platform limitation, not a ClawRun one. Other providers may not have this restriction.
+
+</Callout>
 
 ### Keep-alive window
 

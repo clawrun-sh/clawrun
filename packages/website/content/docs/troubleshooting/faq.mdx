@@ -51,6 +51,10 @@ Yes. Each channel is independent. You can have the same agent responding on Tele
 
 The [`SandboxProvider`](/docs/sandbox/providers) interface is pluggable. Vercel Sandbox is currently the only built-in provider. You can implement a custom provider for other runtimes by implementing the `SandboxProvider` and `ManagedSandbox` interfaces.
 
+### My scheduled agents aren't running on time
+
+If you're on Vercel's free (Hobby) plan, the heartbeat that checks for upcoming cron jobs only runs once per day. This means scheduled tasks can't wake the sandbox at precise times. Upgrade to a paid plan for per-minute heartbeats, or use an external cron service to call the heartbeat endpoint at the frequency you need. See [Scheduled Agents](/docs/use-cases/scheduled-agents#wake-timing) for details and workarounds.
+
 ### Where does state live?
 
 Orchestration state (sandbox metadata, locks, webhook registrations) lives in Redis, prefixed per instance. Agent state (files, databases, config) lives inside the sandbox filesystem and is preserved via [snapshots](/docs/sandbox/snapshot-resume).
