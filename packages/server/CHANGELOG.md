@@ -1,5 +1,12 @@
 # @clawrun/server
 
+## 0.1.6
+
+### Patch Changes
+
+- 6a6a877: Pin Next.js to 16.1 until the NFT tracing issues are resolved
+  - @clawrun/sdk@0.1.6
+
 ## 0.1.5
 
 ### Patch Changes
