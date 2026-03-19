@@ -14,7 +14,7 @@ import { version } from "./pkg.js";
 
 export const app = subcommands({
   name: "clawrun",
-  description: "AI agent hosting, simplified.",
+  description: "Deploy and manage AI agents in seconds.",
   version,
   cmds: {
     deploy,
