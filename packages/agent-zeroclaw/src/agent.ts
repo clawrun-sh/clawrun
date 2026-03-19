@@ -6,7 +6,6 @@ import {
 } from "zeroclaw";
 import type { ZeroClawConfig } from "zeroclaw";
 import * as TOML from "@iarna/toml";
-import type { JsonMap } from "@iarna/toml";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
@@ -25,8 +24,6 @@ import type {
   UIMessageStreamWriter,
   AgentStatus,
   AgentConfig,
-  RuntimeToolInfo,
-  CliToolInfo,
   CronJob,
   MemoryEntryInfo,
   CostInfo,

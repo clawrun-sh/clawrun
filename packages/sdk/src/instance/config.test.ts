@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { toEnvVars, sanitizeConfig, buildConfig, readConfig, writeConfig } from "./config.js";
+import { toEnvVars, sanitizeConfig, readConfig } from "./config.js";
 
 // Use a temp directory for tests that need filesystem access
 const TEST_HOME = join("/tmp", `clawrun-config-test-${process.pid}`);
@@ -29,7 +29,9 @@ describe("sanitizeConfig", () => {
       state: { redisUrl: "redis://localhost" },
     };
 
-    const sanitized = sanitizeConfig(config as any);
+    const sanitized = sanitizeConfig(
+      config as unknown as import("./config.js").ClawRunConfigWithSecrets,
+    );
 
     expect(sanitized).toHaveProperty("instance");
     expect(sanitized).toHaveProperty("agent");
@@ -46,7 +48,9 @@ describe("sanitizeConfig", () => {
       sandbox: {},
     };
 
-    const sanitized = sanitizeConfig(config as any);
+    const sanitized = sanitizeConfig(
+      config as unknown as import("./config.js").ClawRunConfigWithSecrets,
+    );
     expect(sanitized.$schema).toBe("https://clawrun.sh/schema.json");
   });
 });
@@ -67,7 +71,7 @@ describe("toEnvVars", () => {
       },
     };
 
-    const vars = toEnvVars(config as any);
+    const vars = toEnvVars(config as unknown as import("./config.js").ClawRunConfigWithSecrets);
 
     expect(vars["CLAWRUN_CRON_SECRET"]).toBe("cron-secret-value");
     expect(vars["CLAWRUN_JWT_SECRET"]).toBe("jwt-secret-value");
@@ -87,7 +91,7 @@ describe("toEnvVars", () => {
       },
     };
 
-    const vars = toEnvVars(config as any);
+    const vars = toEnvVars(config as unknown as import("./config.js").ClawRunConfigWithSecrets);
 
     expect(vars["CLAWRUN_WEBHOOK_SECRET_TELEGRAM"]).toBe("tg-secret");
     expect(vars["CLAWRUN_WEBHOOK_SECRET_DISCORD"]).toBe("dc-secret");
@@ -102,7 +106,7 @@ describe("toEnvVars", () => {
       },
     };
 
-    const vars = toEnvVars(config as any);
+    const vars = toEnvVars(config as unknown as import("./config.js").ClawRunConfigWithSecrets);
     expect(vars["CLAWRUN_WEBHOOK_SECRET_SLACK"]).toBe("slack-secret");
     expect(vars).not.toHaveProperty("CLAWRUN_WEBHOOK_SECRET_slack");
   });
@@ -113,12 +117,12 @@ describe("toEnvVars", () => {
       state: { redisUrl: "redis://localhost:6379" },
     };
 
-    const vars = toEnvVars(config as any);
+    const vars = toEnvVars(config as unknown as import("./config.js").ClawRunConfigWithSecrets);
     expect(vars["REDIS_URL"]).toBe("redis://localhost:6379");
   });
 
   it("omits REDIS_URL when state is not configured", () => {
-    const vars = toEnvVars(baseConfig as any);
+    const vars = toEnvVars(baseConfig as unknown as import("./config.js").ClawRunConfigWithSecrets);
     expect(vars).not.toHaveProperty("REDIS_URL");
   });
 });

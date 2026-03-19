@@ -25,7 +25,6 @@ import {
   instanceAgentDir,
   instanceDeployDir,
   saveDeployedUrl,
-  copyMirroredFiles,
 } from "./instance/index.js";
 import { getPreset, listPresets, getWorkspaceFiles } from "./presets/index.js";
 import { ClawRunInstance } from "./instance.js";

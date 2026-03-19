@@ -320,7 +320,7 @@ export class VercelPlatformProvider implements PlatformProvider {
         step: "connect-state-store",
         message: `Connected "${store.name}" to project.`,
       });
-    } catch (err) {
+    } catch {
       onProgress?.({
         step: "connect-state-store",
         message: "Failed to connect store.",

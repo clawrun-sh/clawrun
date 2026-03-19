@@ -23,7 +23,7 @@ vi.mock("./config-reader.js", () => ({
   readParsedConfig: vi.fn(() => ({ default_provider: "openrouter" })),
 }));
 
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 
 interface SandboxFile {
   path: string;

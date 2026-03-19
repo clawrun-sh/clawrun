@@ -20,6 +20,26 @@ import { createLogger } from "@clawrun/logger";
 
 const log = createLogger("zeroclaw:ws");
 
+// --- Daemon response shapes (snake_case JSON from the ZeroClaw binary) ---
+
+/** Raw health component from the daemon /status endpoint. */
+interface DaemonHealthComponent {
+  status?: string;
+  restart_count?: number;
+  restarts?: number;
+}
+
+/** Raw per-model cost entry from the daemon /cost endpoint. */
+interface DaemonModelCost {
+  cost_usd?: number;
+  cost?: number;
+  total_tokens?: number;
+  tokens?: number;
+  request_count?: number;
+  requests?: number;
+  share?: number;
+}
+
 // --- Daemon WS protocol types ---
 
 /** History entry from the agent daemon. */
@@ -1425,7 +1445,7 @@ export async function fetchAgentStatus(
   const health: AgentStatus["health"] = [];
   const comps = raw.health?.components;
   if (comps && typeof comps === "object") {
-    for (const [name, c] of Object.entries(comps) as [string, any][]) {
+    for (const [name, c] of Object.entries(comps) as [string, DaemonHealthComponent][]) {
       health.push({
         name,
         status: c.status ?? "unknown",
@@ -1621,7 +1641,7 @@ export async function fetchCostInfo(
     byModel: Array.isArray(c.by_model)
       ? c.by_model
       : c.by_model && typeof c.by_model === "object"
-        ? Object.entries(c.by_model).map(([model, v]: [string, any]) => ({
+        ? (Object.entries(c.by_model) as [string, DaemonModelCost][]).map(([model, v]) => ({
             model,
             cost: v.cost_usd ?? v.cost ?? 0,
             tokens: v.total_tokens ?? v.tokens ?? 0,

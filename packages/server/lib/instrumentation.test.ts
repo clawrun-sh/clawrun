@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -23,10 +23,13 @@ describe("instrumentation register()", () => {
 
     expect(() => createAgent("test-agent")).toThrow(/Unknown agent/);
 
-    registerAgentFactory("test-agent", () => ({ name: "test" }) as any);
+    registerAgentFactory(
+      "test-agent",
+      () => ({ name: "test" }) as unknown as import("@clawrun/agent").Agent,
+    );
     const agent = createAgent("test-agent");
     expect(agent).toBeDefined();
-    expect((agent as any).name).toBe("test");
+    expect((agent as unknown as { name: string }).name).toBe("test");
   });
 
   it("registerAgent + getAgent share the same agents map (no module duplication)", async () => {
@@ -35,7 +38,10 @@ describe("instrumentation register()", () => {
 
     // Simulate what instrumentation-node.ts does:
     // 1. Factory registration (from agent-zeroclaw/register side-effect)
-    registerAgentFactory("zeroclaw", () => ({ name: "zeroclaw" }) as any);
+    registerAgentFactory(
+      "zeroclaw",
+      () => ({ name: "zeroclaw" }) as unknown as import("@clawrun/agent").Agent,
+    );
     // 2. Create instance from factory
     const instance = createAgent("zeroclaw");
     // 3. Register in runtime registry

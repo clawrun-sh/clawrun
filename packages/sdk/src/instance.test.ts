@@ -7,7 +7,7 @@ import type { UIMessage } from "ai";
 // Mock dependencies
 vi.mock("@clawrun/auth", () => ({
   signUserToken: vi.fn(async (secret: string) => `user-jwt-${secret}`),
-  signInviteToken: vi.fn(async (secret: string, ttl?: string) => `invite-jwt-${secret}`),
+  signInviteToken: vi.fn(async (secret: string, _ttl?: string) => `invite-jwt-${secret}`),
 }));
 
 vi.mock("@clawrun/provider", () => ({
