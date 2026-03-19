@@ -27,6 +27,7 @@
   "files": [
     "app",
     "lib",
+    "public",
     "deploy",
     "proxy.ts",
     "postcss.config.mjs",
