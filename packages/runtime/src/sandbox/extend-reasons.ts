@@ -35,7 +35,10 @@ export class FileActivityReason implements ExtendReason {
 
   evaluate(payload: ExtendPayload, now: number): string | null {
     const idleMs = now - payload.lastChangedAt;
-    return idleMs < this.activeDurationMs ? `active (idle ${Math.round(idleMs / 1000)}s)` : null;
+    if (idleMs >= this.activeDurationMs) return null;
+    const idleS = Math.round(idleMs / 1000);
+    const thresholdS = Math.round(this.activeDurationMs / 1000);
+    return `active (idle ${idleS}s, stops after ${thresholdS}s)`;
   }
 }
 

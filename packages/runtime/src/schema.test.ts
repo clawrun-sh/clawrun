@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { SANDBOX_DEFAULTS, clawRunConfigSchema } from "./schema.js";
 
 describe("SANDBOX_DEFAULTS", () => {
-  it("has activeDuration of 600", () => {
-    expect(SANDBOX_DEFAULTS.activeDuration).toBe(600);
+  it("has activeDuration of 300", () => {
+    expect(SANDBOX_DEFAULTS.activeDuration).toBe(300);
   });
 
   it("has cronKeepAliveWindow of 900", () => {

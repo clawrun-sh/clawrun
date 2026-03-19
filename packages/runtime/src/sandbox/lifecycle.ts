@@ -105,6 +105,12 @@ export interface ExtendResult {
   action: "extended" | "stopped" | "error";
   error?: string;
   nextWakeAt?: string;
+  /** Human-readable reason for the action (e.g. "active (idle 45s)"). */
+  reason?: string;
+  /** Seconds the sandbox has been idle (no file changes). */
+  idleSeconds?: number;
+  /** Seconds of TTL remaining after extension. */
+  remainingSeconds?: number;
 }
 
 export interface SandboxStatus {
@@ -425,18 +431,22 @@ export class SandboxLifecycleManager {
       if (reason) break;
     }
 
+    const idleSeconds = Math.round((now - payload.lastChangedAt) / 1000);
+
     if (reason) {
       const deadline = sandbox.createdAt + sandbox.timeout;
       const remaining = deadline - now;
+      const remainingSeconds = Math.round(remaining / 1000);
 
       if (remaining < TTL_BUFFER_MS) {
         try {
           await sandbox.extendTimeout(EXTEND_DURATION_MS);
+          const newRemaining = Math.round(EXTEND_DURATION_MS / 1000);
           log.info(
             `Extended TTL (+${EXTEND_DURATION_MS / 1000}s, reason: ${reason},` +
-              ` remaining was ${Math.round(remaining / 1000)}s)`,
+              ` remaining was ${remainingSeconds}s)`,
           );
-          return { action: "extended" };
+          return { action: "extended", reason, idleSeconds, remainingSeconds: newRemaining };
         } catch (err) {
           // Extension failed (plan ceiling, API error) — fall through to
           // graceful stop instead of leaving sandbox in limbo
@@ -444,15 +454,14 @@ export class SandboxLifecycleManager {
         }
       } else {
         log.info(
-          `Skipping extend (reason: ${reason},` +
-            ` TTL ok: ${Math.round(remaining / 1000)}s remaining)`,
+          `Skipping extend (reason: ${reason},` + ` TTL ok: ${remainingSeconds}s remaining)`,
         );
-        return { action: "extended" };
+        return { action: "extended", reason, idleSeconds, remainingSeconds };
       }
     }
 
     // No reason to extend (or extend failed) → snapshot + stop
-    log.info(`No activity, stopping sandbox ${payload.sandboxId}`);
+    log.info(`No activity, stopping sandbox ${payload.sandboxId} (idle ${idleSeconds}s)`);
     try {
       await this.snapshotAndStop(payload.sandboxId);
     } catch (err) {
@@ -482,7 +491,12 @@ export class SandboxLifecycleManager {
       );
     }
 
-    return { action: "stopped", nextWakeAt: nextCronAt ?? undefined };
+    return {
+      action: "stopped",
+      reason: `idle ${idleSeconds}s`,
+      idleSeconds,
+      nextWakeAt: nextCronAt ?? undefined,
+    };
   }
 
   async forceRestart(): Promise<SandboxResult> {

@@ -43,11 +43,11 @@ function delay(ms: number): Promise<void> {
 export async function installTools(tools: ToolConfig[]): Promise<void> {
   if (tools.length === 0) return;
 
-  getLog().info(`installing: ${tools.map((t) => t.id).join(", ")}`);
+  getLog().info(`Installing tools: ${tools.map((t) => t.id).join(", ")}`);
 
   for (const tool of tools) {
     if (await isInstalled(tool)) {
-      getLog().info(`${tool.id}: already installed, skipped`);
+      getLog().info(`Tool ${tool.id} already installed`);
       continue;
     }
 
@@ -57,22 +57,23 @@ export async function installTools(tools: ToolConfig[]): Promise<void> {
         for (const step of tool.install) {
           await installStep(step);
         }
-        getLog().info(`${tool.id}: installed`);
+        getLog().info(`Tool ${tool.id} installed`);
         lastErr = null;
         break;
       } catch (err) {
         lastErr = err;
         const msg = err instanceof Error ? err.message : String(err);
-        getLog().error(`${tool.id}: attempt ${attempt}/${MAX_ATTEMPTS} failed: ${msg}`);
+        getLog().error(
+          `Tool ${tool.id}: install attempt ${attempt}/${MAX_ATTEMPTS} failed: ${msg}`,
+        );
         if (attempt < MAX_ATTEMPTS) {
-          getLog().info(`retrying in ${RETRY_DELAY_MS / 1000}s...`);
           await delay(RETRY_DELAY_MS);
         }
       }
     }
 
     if (lastErr) {
-      getLog().error(`${tool.id}: all ${MAX_ATTEMPTS} attempts failed, continuing without it`);
+      getLog().error(`Tool ${tool.id}: failed to install after ${MAX_ATTEMPTS} attempts`);
     }
   }
 }

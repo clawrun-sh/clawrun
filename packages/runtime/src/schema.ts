@@ -7,7 +7,7 @@ const stateSchema = z.object({
 
 /** Default values for the sandbox config, used by the Zod schema and importable by other packages. */
 export const SANDBOX_DEFAULTS = {
-  activeDuration: 600,
+  activeDuration: 300,
   cronKeepAliveWindow: 900,
   cronWakeLeadTime: 60,
   vcpus: 2,

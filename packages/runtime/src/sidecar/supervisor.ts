@@ -45,16 +45,17 @@ export function superviseDaemon(
     if (shuttingDown) return;
 
     if (state.daemonRestarts >= MAX_RESTARTS) {
-      getLog().error(`daemon failed after ${MAX_RESTARTS} restarts, giving up`);
+      getLog().error(`Agent failed to start after ${MAX_RESTARTS} attempts`);
       state.daemonStatus = "failed";
       return;
     }
 
     state.daemonStatus = "starting";
-    getLog().info(
-      `spawning: ${config.daemon.cmd} ${config.daemon.args.join(" ")}` +
-        (state.daemonRestarts > 0 ? ` (restart #${state.daemonRestarts})` : ""),
-    );
+    if (state.daemonRestarts > 0) {
+      getLog().info(`Agent restarting (attempt ${state.daemonRestarts + 1}/${MAX_RESTARTS})`);
+    } else {
+      getLog().info("Agent starting");
+    }
 
     const home = process.env.HOME!;
     const child = spawn(config.daemon.cmd, config.daemon.args, {
@@ -93,15 +94,14 @@ export function superviseDaemon(
                 state.daemonRestarts = 0;
               }
             }, STABLE_RESET_MS);
-            getLog().info(
-              `daemon running` +
-                ` (pid=${state.daemonPid}, port=${config.daemon.port}, ready in ${Date.now() - start}ms)`,
-            );
+            getLog().info(`Agent ready (${((Date.now() - start) / 1000).toFixed(1)}s)`);
           }
           return;
         }
         if (!warned && Date.now() - start > config.daemon.readyTimeout) {
-          getLog().warn(`daemon not ready after ${config.daemon.readyTimeout}ms, still probing`);
+          getLog().warn(
+            `Agent not ready after ${Math.round(config.daemon.readyTimeout / 1000)}s, still waiting`,
+          );
           warned = true;
         }
         await new Promise((r) => setTimeout(r, PROBE_INTERVAL_MS));
@@ -112,7 +112,8 @@ export function superviseDaemon(
       if (exited) return;
       exited = true;
 
-      getLog().info(`daemon exited (code=${code}, signal=${signal})`);
+      const detail = signal ? `signal ${signal}` : `exit code ${code}`;
+      getLog().info(`Agent stopped (${detail})`);
 
       if (currentChild === child) currentChild = null;
       state.daemonPid = null;
@@ -126,7 +127,7 @@ export function superviseDaemon(
     }
 
     child.on("error", (err) => {
-      getLog().error(`spawn error: ${err.message}`);
+      getLog().error(`Agent failed to start: ${err.message}`);
       handleExit(null, null);
     });
 

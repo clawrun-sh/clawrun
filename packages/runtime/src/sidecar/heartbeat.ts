@@ -1,11 +1,35 @@
 import { getMaxMtime } from "./mtime.js";
 import type { SidecarConfig, SidecarState } from "./types.js";
+import type { ExtendResult } from "../sandbox/lifecycle.js";
 import { createLogger } from "./log.js";
 
 let log: ReturnType<typeof createLogger>;
 function getLog() {
   if (!log) log = createLogger("heartbeat");
   return log;
+}
+
+function formatResult(result: ExtendResult): string {
+  switch (result.action) {
+    case "extended": {
+      const parts = ["Session extended"];
+      if (result.reason) parts.push(result.reason);
+      if (result.remainingSeconds != null) {
+        const mins = Math.floor(result.remainingSeconds / 60);
+        const secs = result.remainingSeconds % 60;
+        parts.push(`${mins}m${secs}s remaining`);
+      }
+      return parts.join(", ");
+    }
+    case "stopped": {
+      const parts = ["Sandbox stopping"];
+      if (result.reason) parts.push(result.reason);
+      if (result.nextWakeAt) parts.push(`next wake: ${result.nextWakeAt}`);
+      return parts.join(", ");
+    }
+    case "error":
+      return `Heartbeat error: ${result.error ?? "unknown"}`;
+  }
 }
 
 async function heartbeatTick(
@@ -38,17 +62,22 @@ async function heartbeatTick(
     });
     if (res.ok) {
       state.lastHeartbeatSuccess = true;
-      getLog().info(await res.text());
+      try {
+        const result: ExtendResult = await res.json();
+        getLog().info(formatResult(result));
+      } catch {
+        getLog().info("Heartbeat acknowledged");
+      }
     } else {
       state.lastHeartbeatSuccess = false;
-      getLog().error(`HTTP ${res.status}: ${await res.text()}`);
+      getLog().error(`Heartbeat failed (HTTP ${res.status}): ${await res.text()}`);
     }
     state.lastHeartbeatTick = Date.now();
   } catch (err: unknown) {
     state.lastHeartbeatSuccess = false;
     state.lastHeartbeatTick = Date.now();
     const message = err instanceof Error ? err.message : String(err);
-    getLog().error(message);
+    getLog().error(`Heartbeat failed: ${message}`);
   }
 }
 
@@ -61,7 +90,7 @@ export function startHeartbeat(config: SidecarConfig, state: SidecarState): { st
 
   const safeTick = () => {
     heartbeatTick(config, state, secret).catch((err) => {
-      getLog().error("tick failed: %o", err);
+      getLog().error("Heartbeat tick failed: %o", err);
     });
   };
 

@@ -38,11 +38,16 @@ export async function POST(req: Request) {
   const sandboxCreatedAt =
     typeof body.sandboxCreatedAt === "number" ? body.sandboxCreatedAt : undefined;
 
+  const daemonStatus = typeof body.daemonStatus === "string" ? body.daemonStatus : undefined;
+  const daemonRestarts = typeof body.daemonRestarts === "number" ? body.daemonRestarts : undefined;
+
   const payload: ExtendPayload = {
     sandboxId: toSandboxId(sandboxId as string),
     lastChangedAt,
     sandboxCreatedAt,
     root,
+    daemonStatus,
+    daemonRestarts,
   };
 
   try {

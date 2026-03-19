@@ -39,11 +39,7 @@ function main(): void {
     createdAt: Date.now(),
   };
 
-  log.info(
-    `starting: daemon=${config.daemon.cmd}, ` +
-      `heartbeat=${config.heartbeat.url}, ` +
-      `health=:${config.health.port}`,
-  );
+  log.info("Sandbox starting");
 
   // Merge tool runtime env vars into daemon env (resolve $HOME placeholders)
   // Also add ~/.local/bin to PATH so the daemon can find tool binaries.
@@ -75,7 +71,7 @@ function main(): void {
 
   // Graceful shutdown — stop restarting daemon, drain heartbeat, exit
   process.on("SIGTERM", async () => {
-    log.info("SIGTERM received, shutting down");
+    log.info("Sandbox shutting down");
     heartbeat.stop();
     await supervisor.shutdown();
     process.exit(0);
