@@ -1,5 +1,11 @@
 # @clawrun/provider
 
+## 0.1.4
+
+### Patch Changes
+
+- eb6f18e: Update the ClawRun config schema, fix the NFT tracing issues for Agent and Provider packages
+
 ## 0.1.3
 
 ### Patch Changes

@@ -1,5 +1,17 @@
 # clawrun
 
+## 0.1.5
+
+### Patch Changes
+
+- eb6f18e: Update the ClawRun config schema, fix the NFT tracing issues for Agent and Provider packages
+- Updated dependencies [eb6f18e]
+  - @clawrun/provider-vercel@0.1.4
+  - @clawrun/provider@0.1.4
+  - @clawrun/runtime@0.1.4
+  - @clawrun/server@0.1.5
+  - @clawrun/sdk@0.1.5
+
 ## 0.1.4
 
 ### Patch Changes
