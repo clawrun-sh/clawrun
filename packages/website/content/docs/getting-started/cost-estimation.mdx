@@ -16,7 +16,7 @@ Running a ClawRun instance involves four cost areas:
 
 | Component                | What it is                                       | Typical cost                    |
 | ------------------------ | ------------------------------------------------ | ------------------------------- |
-| **Sandbox compute**      | The microVM where your agent runs                | Varies by usage (free on Hobby) |
+| **Sandbox compute**      | The sandbox where your agent runs                | Varies by usage (free on Hobby) |
 | **Serverless functions** | The orchestrator (webhooks, heartbeat, chat API) | Minimal                         |
 | **State store**          | Redis for lifecycle state (locks, wake times)    | Free for light usage            |
 | **LLM API**              | Token costs from your chosen provider            | Varies by provider and model    |
@@ -25,7 +25,7 @@ ClawRun itself is free and open source. You only pay for the infrastructure it r
 
 ## Vercel pricing breakdown
 
-### Sandbox (the agent's microVM)
+### Sandbox
 
 ClawRun creates sandboxes with **2 vCPUs and 4 GB memory** by default. Sandboxes automatically [sleep when idle](/docs/sandbox/snapshot-resume) (default: 10 minutes of inactivity), so you're not paying for a 24/7 VM.
 
