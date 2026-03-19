@@ -17,7 +17,7 @@ export function connectInstance(name: string): InstanceConnection | null {
 
   const { deployedUrl } = config.instance;
   const { jwtSecret } = config.secrets;
-  if (!deployedUrl || !jwtSecret) return null;
+  if (!jwtSecret) return null;
 
   const client = new ClawRunClient();
   const instance = client.connect(deployedUrl, jwtSecret, {

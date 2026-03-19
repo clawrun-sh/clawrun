@@ -502,7 +502,7 @@ async function handleNewInstance(
     tools: selectedTools.map((t) => t.id),
     networkPolicy,
     serverExternalPackages: platform.getServerExternalPackages(),
-    platformUrlEnvVars: platform.getUrlEnvVars(),
+    deployedUrl: platform.getProjectUrl(name),
   });
 
   // Derive env vars: ClawRun secrets (channel tokens live in bundled config.toml)
@@ -563,8 +563,6 @@ async function handleNewInstance(
   try {
     url = await platform.deploy(deployDir, allEnvVars);
     saveDeployedUrl(name, url);
-    deploySpinner.message("Persisting deployment URL...");
-    await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
     deploySpinner.stop(`Deployed to ${chalk.cyan(url)}`);
   } catch (err) {
     deploySpinner.stop(chalk.red("Deployment failed"));
@@ -900,13 +898,13 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   copyMirroredFiles(name);
 
   // Derive env vars: ClawRun secrets (channel tokens live in bundled config.toml)
-  const clawrunEnv = toEnvVars(config);
+  const redeployEnvVars = toEnvVars(config);
 
   // Persist env vars to .deploy/
   const reEnvSpinner = clack.spinner();
   reEnvSpinner.start("Persisting env vars...");
   try {
-    await platform.persistEnvVars(deployDir, clawrunEnv);
+    await platform.persistEnvVars(deployDir, redeployEnvVars);
     reEnvSpinner.stop("Env vars persisted");
   } catch (err) {
     reEnvSpinner.stop(chalk.red("Failed to persist env vars"));
@@ -919,10 +917,8 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   reDeploySpinner.start("Deploying...");
   let url: string;
   try {
-    url = await platform.deploy(deployDir, clawrunEnv);
+    url = await platform.deploy(deployDir, redeployEnvVars);
     saveDeployedUrl(name, url);
-    reDeploySpinner.message("Persisting deployment URL...");
-    await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url });
     reDeploySpinner.stop(`Deployed to ${chalk.cyan(url)}`);
   } catch (err) {
     reDeploySpinner.stop(chalk.red("Deployment failed"));
@@ -931,7 +927,7 @@ async function handleExistingInstance(name: string, options: { yes?: boolean }):
   }
 
   // Restart sandbox
-  const upgradeJwtSecret = clawrunEnv["CLAWRUN_JWT_SECRET"];
+  const upgradeJwtSecret = redeployEnvVars["CLAWRUN_JWT_SECRET"];
   if (upgradeJwtSecret) {
     const sandboxSpinner = clack.spinner();
     sandboxSpinner.start("Restarting sandbox...");

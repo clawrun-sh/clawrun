@@ -21,14 +21,19 @@ describe("SANDBOX_DEFAULTS", () => {
 
 describe("clawRunConfigSchema — instance defaults", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
 
-  it("defaults instance.name to 'default'", () => {
-    const parsed = clawRunConfigSchema.parse(minInput);
-    expect(parsed.instance.name).toBe("default");
+  it("requires instance.name", () => {
+    const { name: _, ...noName } = minInput.instance;
+    expect(() => clawRunConfigSchema.parse({ ...minInput, instance: noName })).toThrow();
+  });
+
+  it("requires instance.deployedUrl", () => {
+    const { deployedUrl: _, ...noUrl } = minInput.instance;
+    expect(() => clawRunConfigSchema.parse({ ...minInput, instance: noUrl })).toThrow();
   });
 
   it("defaults instance.sandboxRoot to '.clawrun'", () => {
@@ -39,11 +44,6 @@ describe("clawRunConfigSchema — instance defaults", () => {
   it("leaves instance.preset as undefined when omitted", () => {
     const parsed = clawRunConfigSchema.parse(minInput);
     expect(parsed.instance.preset).toBeUndefined();
-  });
-
-  it("leaves instance.deployedUrl as undefined when omitted", () => {
-    const parsed = clawRunConfigSchema.parse(minInput);
-    expect(parsed.instance.deployedUrl).toBeUndefined();
   });
 
   it("preserves explicitly provided instance.name", () => {
@@ -58,7 +58,7 @@ describe("clawRunConfigSchema — instance defaults", () => {
 
 describe("clawRunConfigSchema — agent defaults", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -85,7 +85,7 @@ describe("clawRunConfigSchema — agent defaults", () => {
 
 describe("clawRunConfigSchema — sandbox defaults from SANDBOX_DEFAULTS", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -118,7 +118,7 @@ describe("clawRunConfigSchema — sandbox defaults from SANDBOX_DEFAULTS", () =>
 
 describe("clawRunConfigSchema — sandbox overrides", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -153,7 +153,7 @@ describe("clawRunConfigSchema — sandbox overrides", () => {
 
 describe("clawRunConfigSchema — vcpus validation", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -203,7 +203,7 @@ describe("clawRunConfigSchema — vcpus validation", () => {
 
 describe("clawRunConfigSchema — networkPolicy variants", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -258,7 +258,7 @@ describe("clawRunConfigSchema — networkPolicy variants", () => {
 
 describe("clawRunConfigSchema — secrets", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -314,7 +314,7 @@ describe("clawRunConfigSchema — secrets", () => {
 
 describe("clawRunConfigSchema — state", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };
@@ -355,7 +355,7 @@ describe("clawRunConfigSchema — required fields", () => {
   it("rejects input missing agent", () => {
     expect(() =>
       clawRunConfigSchema.parse({
-        instance: { provider: "vercel" },
+        instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
         sandbox: {},
       }),
     ).toThrow();
@@ -364,7 +364,7 @@ describe("clawRunConfigSchema — required fields", () => {
   it("rejects input missing sandbox", () => {
     expect(() =>
       clawRunConfigSchema.parse({
-        instance: { provider: "vercel" },
+        instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
         agent: { name: "zeroclaw" },
       }),
     ).toThrow();
@@ -373,7 +373,7 @@ describe("clawRunConfigSchema — required fields", () => {
   it("rejects input missing instance.provider", () => {
     expect(() =>
       clawRunConfigSchema.parse({
-        instance: { name: "test" },
+        instance: { name: "test", deployedUrl: "https://test.vercel.app" },
         agent: { name: "zeroclaw" },
         sandbox: {},
       }),
@@ -383,7 +383,7 @@ describe("clawRunConfigSchema — required fields", () => {
   it("rejects input missing agent.name", () => {
     expect(() =>
       clawRunConfigSchema.parse({
-        instance: { provider: "vercel" },
+        instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
         agent: {},
         sandbox: {},
       }),
@@ -393,7 +393,7 @@ describe("clawRunConfigSchema — required fields", () => {
 
 describe("clawRunConfigSchema — $schema field", () => {
   const minInput = {
-    instance: { provider: "vercel" },
+    instance: { provider: "vercel", name: "test", deployedUrl: "https://test.vercel.app" },
     agent: { name: "zeroclaw" },
     sandbox: {},
   };

@@ -1518,22 +1518,6 @@ describe("handleExtend() eventual consistency", () => {
 });
 
 describe("hook precondition guards", () => {
-  it("registerWakeHooks throws when baseUrl is not configured", async () => {
-    _configOverride = mockRuntimeConfig({
-      instance: { name: "test", provider: "vercel", baseUrl: undefined, sandboxRoot: ".clawrun" },
-    } as Partial<RuntimeConfig>);
-    vi.mocked(_provider.list).mockResolvedValue([]);
-    SandboxLifecycleManager.setHooks({
-      onSandboxStopped: vi.fn().mockResolvedValue(undefined),
-    });
-
-    const mgr = createManager();
-    const result = await mgr.gracefulStop();
-
-    expect(result.status).toBe("stopped");
-    expect(result.error).toContain("baseUrl");
-  });
-
   it("registerWakeHooks throws when onSandboxStopped hook not initialized", async () => {
     vi.mocked(_provider.list).mockResolvedValue([]);
     // Hooks NOT set — onSandboxStopped is undefined
@@ -1706,21 +1690,6 @@ describe("startSidecar() health check loop", () => {
 
     expect(result.status).toBe("failed");
     expect(result.error).toContain("CLAWRUN_SANDBOX_SECRET");
-  });
-
-  it("missing baseUrl — returns failed", async () => {
-    _configOverride = mockRuntimeConfig({
-      instance: { name: "test", provider: "vercel", baseUrl: undefined, sandboxRoot: ".clawrun" },
-    } as Partial<RuntimeConfig>);
-    vi.mocked(_provider.list).mockResolvedValue([]);
-    vi.mocked(_provider.listSnapshots).mockResolvedValue([]);
-    vi.mocked(_provider.create).mockResolvedValue(mockManagedSandbox());
-
-    const mgr = createManager();
-    const result = await mgr.wake();
-
-    expect(result.status).toBe("failed");
-    expect(result.error).toContain("baseUrl");
   });
 
   it("sidecar bundle not found — returns failed", async () => {

@@ -53,6 +53,7 @@ const ROOT_CONFIG_FILES = ["proxy.ts", "next.config.ts", "postcss.config.mjs"];
  */
 const DEPLOY_ONLY_FILES: Record<string, string> = {
   "deploy/instrumentation.ts": "instrumentation.ts",
+  "deploy/instrumentation-node.ts": "instrumentation-node.ts",
 };
 
 /** CSS path fixups for monorepo → deployed layout transition. */

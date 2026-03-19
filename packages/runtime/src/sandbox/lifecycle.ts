@@ -231,12 +231,6 @@ export class SandboxLifecycleManager {
    */
   private async registerWakeHooks(): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
-    if (!baseUrl) {
-      throw new Error(
-        "Cannot register wake hooks: baseUrl is not configured." +
-          " Set deployedUrl in clawrun.json or the CLAWRUN_BASE_URL env var.",
-      );
-    }
     if (!SandboxLifecycleManager.hooks.onSandboxStopped) {
       throw new Error(
         "Cannot register wake hooks: lifecycle hooks not initialized." +
@@ -703,12 +697,8 @@ export class SandboxLifecycleManager {
   private async startSidecar(sandbox: ManagedSandbox, root: string): Promise<void> {
     const baseUrl = getRuntimeConfig().instance.baseUrl;
     const secret = process.env.CLAWRUN_SANDBOX_SECRET;
-    if (!baseUrl || !secret) {
-      const missing = [
-        !baseUrl && "baseUrl (set CLAWRUN_BASE_URL or deployedUrl in clawrun.json)",
-        !secret && "CLAWRUN_SANDBOX_SECRET",
-      ].filter(Boolean);
-      throw new Error(`Cannot start sidecar — missing: ${missing.join(", ")}`);
+    if (!secret) {
+      throw new Error("Cannot start sidecar — missing: CLAWRUN_SANDBOX_SECRET");
     }
 
     const daemonCmd = this.agent.getDaemonCommand(root, {});

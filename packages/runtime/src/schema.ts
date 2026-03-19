@@ -16,12 +16,11 @@ export const SANDBOX_DEFAULTS = {
 export const clawRunConfigSchema = z.object({
   $schema: z.string().optional(),
   instance: z.object({
-    name: z.string().default("default"),
+    name: z.string(),
     preset: z.string().optional(),
     provider: z.enum(PROVIDER_IDS),
-    deployedUrl: z.string().optional(),
+    deployedUrl: z.string(),
     sandboxRoot: z.string().default(".clawrun"),
-    platformUrlEnvVars: z.array(z.string()).default([]),
   }),
   agent: z.object({
     name: z.string(),

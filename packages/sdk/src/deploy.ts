@@ -339,7 +339,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       tools: toolIds,
       networkPolicy,
       serverExternalPackages: platform.getServerExternalPackages(),
-      platformUrlEnvVars: platform.getUrlEnvVars(),
+      deployedUrl: platform.getProjectUrl(name),
     });
 
     // 13. Create instance
@@ -371,7 +371,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     progress("deploy", "Deploying...");
     const url = await platform.deploy(deployDir, allEnvVars, subProgress);
     saveDeployedUrl(name, url);
-    await platform.persistEnvVars(deployDir, { CLAWRUN_BASE_URL: url }, subProgress);
 
     // 17. Start sandbox
     progress("start-sandbox", "Starting sandbox...");

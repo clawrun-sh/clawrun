@@ -52,8 +52,14 @@ describe("sanitizeConfig", () => {
 });
 
 describe("toEnvVars", () => {
-  it("includes core secrets as env vars", () => {
+  const baseConfig = {
+    instance: { deployedUrl: "https://test.vercel.app" },
+    secrets: { cronSecret: "c", jwtSecret: "j", sandboxSecret: "s" },
+  };
+
+  it("includes core secrets and CLAWRUN_BASE_URL", () => {
     const config = {
+      instance: { deployedUrl: "https://my-instance.vercel.app" },
       secrets: {
         cronSecret: "cron-secret-value",
         jwtSecret: "jwt-secret-value",
@@ -66,14 +72,14 @@ describe("toEnvVars", () => {
     expect(vars["CLAWRUN_CRON_SECRET"]).toBe("cron-secret-value");
     expect(vars["CLAWRUN_JWT_SECRET"]).toBe("jwt-secret-value");
     expect(vars["CLAWRUN_SANDBOX_SECRET"]).toBe("sandbox-secret-value");
+    expect(vars["CLAWRUN_BASE_URL"]).toBe("https://my-instance.vercel.app");
   });
 
   it("includes per-channel webhook secrets", () => {
     const config = {
+      ...baseConfig,
       secrets: {
-        cronSecret: "c",
-        jwtSecret: "j",
-        sandboxSecret: "s",
+        ...baseConfig.secrets,
         webhookSecrets: {
           telegram: "tg-secret",
           discord: "dc-secret",
@@ -89,10 +95,9 @@ describe("toEnvVars", () => {
 
   it("uppercases channel names in env var keys", () => {
     const config = {
+      ...baseConfig,
       secrets: {
-        cronSecret: "c",
-        jwtSecret: "j",
-        sandboxSecret: "s",
+        ...baseConfig.secrets,
         webhookSecrets: { slack: "slack-secret" },
       },
     };
@@ -104,7 +109,7 @@ describe("toEnvVars", () => {
 
   it("includes REDIS_URL when state is configured", () => {
     const config = {
-      secrets: { cronSecret: "c", jwtSecret: "j", sandboxSecret: "s" },
+      ...baseConfig,
       state: { redisUrl: "redis://localhost:6379" },
     };
 
@@ -113,11 +118,7 @@ describe("toEnvVars", () => {
   });
 
   it("omits REDIS_URL when state is not configured", () => {
-    const config = {
-      secrets: { cronSecret: "c", jwtSecret: "j", sandboxSecret: "s" },
-    };
-
-    const vars = toEnvVars(config as any);
+    const vars = toEnvVars(baseConfig as any);
     expect(vars).not.toHaveProperty("REDIS_URL");
   });
 });

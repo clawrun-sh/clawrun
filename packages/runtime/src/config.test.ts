@@ -6,7 +6,11 @@ import { SANDBOX_DEFAULTS } from "./schema.js";
 
 function makeValidConfig(overrides: Record<string, unknown> = {}) {
   return {
-    instance: { provider: "vercel", name: "test-instance" },
+    instance: {
+      provider: "vercel",
+      name: "test-instance",
+      deployedUrl: "https://test-instance.vercel.app",
+    },
     agent: { name: "zeroclaw" },
     sandbox: {},
     ...overrides,
@@ -190,7 +194,7 @@ describe("getRuntimeConfig — instance fields", () => {
     expect(config.instance.sandboxRoot).toBe(".clawrun");
   });
 
-  it("uses deployedUrl as baseUrl when provided", async () => {
+  it("maps deployedUrl to baseUrl", async () => {
     const configData = makeValidConfig({
       instance: {
         provider: "vercel",
@@ -204,47 +208,6 @@ describe("getRuntimeConfig — instance fields", () => {
     const { getRuntimeConfig } = await import("./config.js");
     const config = getRuntimeConfig();
     expect(config.instance.baseUrl).toBe("https://example.vercel.app");
-  });
-
-  it("falls back to CLAWRUN_BASE_URL env when deployedUrl is absent", async () => {
-    const configData = makeValidConfig();
-    process.env.CLAWRUN_BASE_URL = "https://env-url.example.com";
-    vi.doMock("node:fs", () => ({
-      readFileSync: () => JSON.stringify(configData),
-    }));
-    const { getRuntimeConfig } = await import("./config.js");
-    const config = getRuntimeConfig();
-    expect(config.instance.baseUrl).toBe("https://env-url.example.com");
-    delete process.env.CLAWRUN_BASE_URL;
-  });
-
-  it("returns undefined baseUrl when both deployedUrl and env are absent", async () => {
-    delete process.env.CLAWRUN_BASE_URL;
-    const configData = makeValidConfig();
-    vi.doMock("node:fs", () => ({
-      readFileSync: () => JSON.stringify(configData),
-    }));
-    const { getRuntimeConfig } = await import("./config.js");
-    const config = getRuntimeConfig();
-    expect(config.instance.baseUrl).toBeUndefined();
-  });
-
-  it("uses deployedUrl over CLAWRUN_BASE_URL when both are set", async () => {
-    process.env.CLAWRUN_BASE_URL = "https://env-url.example.com";
-    const configData = makeValidConfig({
-      instance: {
-        provider: "vercel",
-        name: "test",
-        deployedUrl: "https://deployed.example.com",
-      },
-    });
-    vi.doMock("node:fs", () => ({
-      readFileSync: () => JSON.stringify(configData),
-    }));
-    const { getRuntimeConfig } = await import("./config.js");
-    const config = getRuntimeConfig();
-    expect(config.instance.baseUrl).toBe("https://deployed.example.com");
-    delete process.env.CLAWRUN_BASE_URL;
   });
 });
 

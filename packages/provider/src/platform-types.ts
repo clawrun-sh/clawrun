@@ -103,6 +103,8 @@ export interface PlatformProvider {
   getDefaults(tier: PlatformTier): Record<string, string>;
 
   // --- Project lifecycle ---
+  /** Return the production URL for a project by name (before deploy). */
+  getProjectUrl(name: string): string;
   createProject(name: string, onProgress?: ProgressCallback<PlatformStep>): Promise<ProjectHandle>;
   deleteProject(handle: ProjectHandle): Promise<void>;
   /** Read project link from an instance directory. Returns null if not linked. */
@@ -146,9 +148,6 @@ export interface PlatformProvider {
   // --- Sandbox ---
   /** Wildcard domains for sandbox lifecycle (heartbeat, sidecar traffic). */
   getInfraDomains(): string[];
-
-  /** Env vars that may contain the deployment URL at runtime. Checked in order. */
-  getUrlEnvVars(): string[];
 
   /** SDK packages the provider needs externalized by Next.js at runtime. */
   getServerExternalPackages(): string[];

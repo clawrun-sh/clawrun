@@ -22,7 +22,7 @@ export interface InstanceMetadata {
   preset: string;
   agent: string;
   appVersion: string;
-  deployedUrl?: string;
+  deployedUrl: string;
 }
 
 interface InstancePackageJson {

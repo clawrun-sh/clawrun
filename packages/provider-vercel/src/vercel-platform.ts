@@ -202,6 +202,10 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   // ---- Project lifecycle ------------------------------------------------
 
+  getProjectUrl(name: string): string {
+    return `https://${name}.vercel.app`;
+  }
+
   async createProject(
     name: string,
     onProgress?: ProgressCallback<PlatformStep>,
@@ -535,10 +539,6 @@ export class VercelPlatformProvider implements PlatformProvider {
 
   getInfraDomains(): string[] {
     return ["*.vercel.app", "*.vercel.sh"];
-  }
-
-  getUrlEnvVars(): string[] {
-    return ["VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL"];
   }
 
   getServerExternalPackages(): string[] {

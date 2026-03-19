@@ -40,7 +40,7 @@ export function buildConfig(
     configPaths?: string[];
     tools?: string[];
     serverExternalPackages?: string[];
-    platformUrlEnvVars?: string[];
+    deployedUrl: string;
   },
 ): ClawRunConfigWithSecrets {
   return clawRunConfigSchema.parse({
@@ -49,7 +49,7 @@ export function buildConfig(
       name,
       preset,
       provider: options.provider,
-      platformUrlEnvVars: options.platformUrlEnvVars,
+      deployedUrl: options.deployedUrl,
     },
     agent: {
       name: agentName,
@@ -94,6 +94,9 @@ export function toEnvVars(config: ClawRunConfigWithSecrets): Record<string, stri
       vars[`CLAWRUN_WEBHOOK_SECRET_${channelId.toUpperCase()}`] = secret;
     }
   }
+
+  // Base URL
+  vars["CLAWRUN_BASE_URL"] = config.instance.deployedUrl;
 
   // State store
   if (config.state) {

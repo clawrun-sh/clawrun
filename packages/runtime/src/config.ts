@@ -4,7 +4,7 @@ import { clawRunConfigSchema, type ClawRunConfig } from "./schema.js";
 import type { ProviderId } from "@clawrun/provider";
 
 export interface RuntimeConfig {
-  instance: { name: string; provider: ProviderId; baseUrl?: string; sandboxRoot: string };
+  instance: { name: string; provider: ProviderId; baseUrl: string; sandboxRoot: string };
   agent: {
     name: string;
     config: string;
@@ -50,7 +50,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     instance: {
       name: parsed.instance.name,
       provider: parsed.instance.provider,
-      baseUrl: parsed.instance.deployedUrl ?? process.env.CLAWRUN_BASE_URL,
+      baseUrl: parsed.instance.deployedUrl,
       sandboxRoot: parsed.instance.sandboxRoot,
     },
     agent: {
