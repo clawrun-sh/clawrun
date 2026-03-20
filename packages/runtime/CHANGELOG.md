@@ -1,5 +1,11 @@
 # @clawrun/runtime
 
+## 0.1.5
+
+### Patch Changes
+
+- 268a644: Improve sidecar logs
+
 ## 0.1.4
 
 ### Patch Changes
