@@ -7,7 +7,7 @@ import { openBrowser } from "../open-browser.js";
 
 export const web = command({
   name: "web",
-  description: "Open the web chat interface in your browser",
+  description: "Open the web dashboard in your browser",
   args: {
     instance,
   },
@@ -33,7 +33,7 @@ export const web = command({
       process.exit(1);
     }
 
-    clack.log.success("Opening chat in browser...");
+    clack.log.success("Opening dashboard in browser...");
     clack.log.info(chalk.dim("Link expires in 10 minutes. Session lasts 8 hours."));
     openBrowser(url);
   },

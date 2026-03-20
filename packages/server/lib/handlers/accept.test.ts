@@ -106,7 +106,7 @@ describe("accept handler GET", () => {
     const req = new NextRequest("http://localhost/auth/accept?token=valid-invite");
     const resp = await GET(req);
     expect(resp.status).toBe(307);
-    expect(resp.headers.get("Location")).toContain("/chat");
+    expect(resp.headers.get("Location")).toBe("http://localhost/");
 
     const cookieCalls = (
       resp as unknown as { _cookieCalls: { name: string; value: string; options: unknown }[] }

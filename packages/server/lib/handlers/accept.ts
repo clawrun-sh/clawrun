@@ -8,7 +8,7 @@ import { verifyToken, signSessionToken, SESSION_COOKIE } from "@clawrun/auth";
  * GET /auth/accept?token=<jwt>
  *   → verify JWT signature + expiry
  *   → Set-Cookie: clawrun-session=<jwt>; HttpOnly; Secure; SameSite=Lax
- *   → 302 → /chat
+ *   → 302 → /
  */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   // Sign a fresh session JWT (8h) — decoupled from the short-lived invite token.
   const sessionToken = await signSessionToken(secret);
 
-  const response = NextResponse.redirect(new URL("/chat", req.url));
+  const response = NextResponse.redirect(new URL("/", req.url));
 
   // Prevent the invite URL from leaking via Referer header
   response.headers.set("Referrer-Policy", "no-referrer");
