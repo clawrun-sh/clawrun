@@ -1,5 +1,12 @@
 # @clawrun/server
 
+## 0.1.8
+
+### Patch Changes
+
+- 1e75255: Improve the dashboard page and chat input
+  - @clawrun/sdk@0.1.8
+
 ## 0.1.7
 
 ### Patch Changes
