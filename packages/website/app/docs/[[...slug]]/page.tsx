@@ -10,6 +10,7 @@ import { PackageCommand } from "@/components/docs/package-command";
 import { ClickableCodeBlock } from "@/components/docs/code-block";
 import { CronWakeDiagram } from "@/components/docs/cron-wake-diagram";
 import { LifecycleDiagram } from "@/components/docs/lifecycle-diagram";
+import { YouTube } from "@/components/docs/youtube";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { TypeTable } from "fumadocs-ui/components/type-table";
 
@@ -62,6 +63,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
             PackageCommand,
             CronWakeDiagram,
             LifecycleDiagram,
+            YouTube,
             Steps,
             Step,
             TypeTable,

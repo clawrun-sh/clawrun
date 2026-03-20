@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ArrowRight, Github } from "lucide-react";
+import { DemoVideo } from "./demo-video";
 import Link from "next/link";
 import { TerminalWindow } from "@/components/terminal-window";
 
@@ -119,7 +120,7 @@ function HeroTerminal() {
   );
 }
 
-export function Hero({ version }: { version: string }) {
+export function Hero() {
   return (
     <div className="relative overflow-hidden px-6 py-20 md:py-32">
       {/* Grid background */}
@@ -135,24 +136,8 @@ export function Hero({ version }: { version: string }) {
       />
 
       <div className="relative mx-auto max-w-2xl text-center">
-        {/* Version badge */}
-        <a
-          href="https://github.com/clawrun-sh/clawrun"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mb-6 inline-flex items-center gap-2 border border-border px-3 py-1.5 no-underline transition-colors hover:bg-surface-hover"
-        >
-          <div className="h-2 w-2 rounded-full bg-term-green shadow-[0_0_6px_#22c55e]" />
-          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-            v{version}
-          </span>
-          <span className="text-[8px] text-muted-foreground/50" aria-hidden="true">
-            &#x2022;
-          </span>
-          <span className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-            Public Beta
-          </span>
-        </a>
+        {/* Watch Demo */}
+        <DemoVideo />
 
         {/* Headline */}
         <h1 className="mb-5 text-4xl font-bold leading-[1.05] tracking-tight text-heading md:text-6xl">
