@@ -1,5 +1,12 @@
 # @clawrun/server
 
+## 0.1.9
+
+### Patch Changes
+
+- b61f1cd: Update the default page after invite
+  - @clawrun/sdk@0.1.9
+
 ## 0.1.8
 
 ### Patch Changes

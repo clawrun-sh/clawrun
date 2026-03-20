@@ -1,6 +1,6 @@
 {
   "name": "@clawrun/sdk",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Programmatic API for ClawRun — deploy and manage agent instances",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",
