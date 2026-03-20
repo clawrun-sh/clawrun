@@ -1,5 +1,12 @@
 # @clawrun/sdk
 
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [1e75255]
+  - @clawrun/server@0.1.8
+
 ## 0.1.7
 
 ### Patch Changes

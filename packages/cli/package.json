@@ -1,6 +1,6 @@
 {
   "name": "clawrun",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "CLI for deploying ClawRun AI agent hosting",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",
