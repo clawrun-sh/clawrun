@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  LayoutDashboard,
+  House,
   MessageSquare,
   MessagesSquare,
   Wrench,
@@ -29,7 +29,7 @@ import { NavSecondary } from "./nav-secondary";
 
 const data = {
   navMain: [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Home", url: "/", icon: House },
     { title: "Chat", url: "/chat", icon: MessageSquare },
     { title: "Threads", url: "/threads", icon: MessagesSquare },
     { title: "Memory", url: "/memory", icon: Brain },

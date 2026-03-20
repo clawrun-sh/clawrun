@@ -43,12 +43,14 @@ import { Button } from "@clawrun/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@clawrun/ui/components/ui/tooltip";
 import { Shimmer } from "@clawrun/ui/components/ai-elements/shimmer";
 import { Check, Clipboard, SquarePen, Loader2, MessageSquare } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { defaultRehypePlugins } from "streamdown";
 import { loadThreadId, saveThreadId, loadMessages, saveMessages, clearMessages } from "../chat-db";
 import { useSetHeaderActions } from "./header-actions";
 import { SandboxOfflineGuard } from "./sandbox-offline-guard";
 import { useSandboxState } from "../hooks/use-sandbox-state";
+import { useFocusOnKeydown } from "../hooks/use-focus-on-keydown";
 
 const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
@@ -99,6 +101,11 @@ export default function ChatPage(_props: ChatPageProps) {
   const [text, setText] = useState("");
   const [threadId, setSessionId] = useState(generateThreadId);
   const [loaded, setLoaded] = useState(false);
+  const searchParams = useSearchParams();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useFocusOnKeydown(textareaRef);
+  const router = useRouter();
+  const initialPromptSent = useRef(false);
 
   // Load persisted session ID from Dexie on mount
   useEffect(() => {
@@ -149,6 +156,17 @@ export default function ChatPage(_props: ChatPageProps) {
       cancelled = true;
     };
   }, [loaded, threadId, setMessages]);
+
+  // Auto-send initial prompt from ?prompt= query param (e.g. from home page chat box)
+  useEffect(() => {
+    if (!messagesLoaded || initialPromptSent.current) return;
+    const prompt = searchParams.get("prompt");
+    if (prompt) {
+      initialPromptSent.current = true;
+      router.replace("/chat", { scroll: false });
+      sendMessage({ text: prompt });
+    }
+  }, [messagesLoaded, searchParams, router, sendMessage]);
 
   // Persist messages to Dexie when response is complete
   useEffect(() => {
@@ -354,6 +372,7 @@ export default function ChatPage(_props: ChatPageProps) {
             <PromptInput onSubmit={handleSubmit}>
               <PromptInputBody>
                 <PromptInputTextarea
+                  ref={textareaRef}
                   autoFocus
                   onChange={handleTextChange}
                   placeholder="Type a message..."
@@ -369,7 +388,11 @@ export default function ChatPage(_props: ChatPageProps) {
                     variant="ghost"
                   />
                 </PromptInputTools>
-                <PromptInputSubmit status={status} onStop={stop} />
+                <PromptInputSubmit
+                  status={status}
+                  onStop={stop}
+                  disabled={status === "ready" && !text.trim()}
+                />
               </PromptInputFooter>
             </PromptInput>
           </div>

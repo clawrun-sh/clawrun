@@ -13,22 +13,24 @@ const TOAST_ID = "sse-connection";
 /** Always-mounted component that shows connection status toasts. */
 function ConnectionToast() {
   const { reconnecting, connectionError } = useSandboxState();
-  const wasShowingRef = useRef(false);
+  const wasDisruptedRef = useRef(false);
 
   useEffect(() => {
     if (reconnecting) {
       toast.loading("Reconnecting to server\u2026", { id: TOAST_ID, duration: Infinity });
-      wasShowingRef.current = true;
+      wasDisruptedRef.current = true;
     } else if (connectionError) {
       toast.error("Connection lost", {
         id: TOAST_ID,
         description: "Unable to reach the server. Check your network.",
         duration: Infinity,
       });
-      wasShowingRef.current = true;
-    } else if (wasShowingRef.current) {
-      toast.success("Connected", { id: TOAST_ID, duration: 2_000 });
-      wasShowingRef.current = false;
+      wasDisruptedRef.current = true;
+    } else if (wasDisruptedRef.current) {
+      // Recovered — dismiss the error/reconnecting toast silently.
+      // Don't show "Connected" to avoid toast noise on normal SSE timeout cycles.
+      toast.dismiss(TOAST_ID);
+      wasDisruptedRef.current = false;
     }
   }, [reconnecting, connectionError]);
 
