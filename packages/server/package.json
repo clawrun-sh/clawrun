@@ -1,6 +1,6 @@
 {
   "name": "@clawrun/server",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Next.js server package for ClawRun",
   "license": "Apache-2.0",
   "author": "Afshin Mehrabani",

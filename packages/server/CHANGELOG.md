@@ -1,5 +1,14 @@
 # @clawrun/server
 
+## 0.1.7
+
+### Patch Changes
+
+- 268a644: Improve sidecar logs
+- Updated dependencies [268a644]
+  - @clawrun/runtime@0.1.5
+  - @clawrun/sdk@0.1.7
+
 ## 0.1.6
 
 ### Patch Changes
