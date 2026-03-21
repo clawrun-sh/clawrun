@@ -25,7 +25,11 @@ export class GhCliTool implements Tool {
   readonly name = "GitHub CLI";
   readonly version = GH_VERSION;
   readonly description = "GitHub CLI for managing repos, issues, and PRs";
-  readonly installDomains = ["github.com", "objects.githubusercontent.com", "api.github.com"];
+  readonly installDomains = [
+    "github.com",
+    "release-assets.githubusercontent.com",
+    "api.github.com",
+  ];
   readonly checkCommand = releaseCheckCommand("gh", GH_VERSION);
   readonly installCommands = releaseInstallSteps(GH_SPEC);
   readonly skillContent = readFileSync(join(__dirname, "SKILL.md"), "utf-8");

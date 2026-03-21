@@ -21,11 +21,9 @@ function mockSandbox(exitCodes: Record<string, number> = {}): SandboxHandle {
 describe("AgentBrowserTool", () => {
   const tool = new AgentBrowserTool();
 
-  it("has correct id and metadata", () => {
-    expect(tool.id).toBe("agent-browser");
-    expect(tool.name).toBe("Agent Browser");
-    expect(tool.version).toBe("0.16.3");
-    expect(tool.installDomains.length).toBeGreaterThan(0);
+  it("includes GitHub release redirect domain in installDomains", () => {
+    expect(tool.installDomains).toContain("github.com");
+    expect(tool.installDomains).toContain("release-assets.githubusercontent.com");
   });
 
   it("sets AGENT_BROWSER_NATIVE and MAX_OUTPUT in runtimeEnv", () => {

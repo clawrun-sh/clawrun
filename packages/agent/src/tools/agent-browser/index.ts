@@ -28,7 +28,7 @@ export class AgentBrowserTool implements Tool {
   readonly description = "Headless Chromium browser for web browsing and screenshots";
   readonly installDomains = [
     "github.com",
-    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
     "cdn.playwright.dev",
     "storage.googleapis.com",
     "cdn.amazonlinux.com",
