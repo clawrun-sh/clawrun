@@ -1,0 +1,29 @@
+---
+title: Find Skills
+description: Discover and install agent skills from the skills.sh registry.
+---
+
+Discover and install agent skills from the [skills.sh](https://skills.sh) registry. Skills are pre-built capabilities (API integrations, workflows, templates) that the agent can learn and use.
+
+| Property | Value                   |
+| -------- | ----------------------- |
+| ID       | `find-skills`           |
+| Version  | `1.4.4`                 |
+| Binary   | `~/.clawrun/bin/skills` |
+
+## Installation
+
+Installed via npm globally, then a wrapper script is placed at `~/.clawrun/bin/skills` that shadows the real binary via PATH ordering. The wrapper enforces default flags for sandbox use.
+
+**Required network domains:**
+
+- `registry.npmjs.org`
+- `github.com`
+
+If your sandbox uses a restricted [network policy](/docs/getting-started/configuration), the deploy CLI will prompt you to add these domains to the allowlist.
+
+## How it works
+
+When the agent needs a new capability, it can use the `skills` command to search the skills.sh registry, browse available skills, and install them into its workspace. Each skill adds a `SKILL.md` file that teaches the agent how to use that capability.
+
+The tool ships a SKILL.md that is seeded into the agent's workspace at `workspace/skills/find-skills/SKILL.md` during deploy. This teaches the agent how to discover and install new skills.

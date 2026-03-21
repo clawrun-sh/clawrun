@@ -25,6 +25,17 @@ After the binary is downloaded from GitHub releases, it runs `agent-browser inst
 
 If your sandbox uses a restricted [network policy](/docs/getting-started/configuration), the deploy CLI will prompt you to add these domains to the allowlist.
 
-## ZeroClaw configuration
+## Environment variables
 
-For ZeroClaw, the browser tool is enabled via `[browser] enabled = true` in the agent's `config.toml`.
+ClawRun automatically injects these environment variables into the agent daemon when Agent Browser is enabled:
+
+| Variable                   | Value   | Purpose                                                                                                                                   |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENT_BROWSER_NATIVE`     | `1`     | Uses the built-in Rust daemon instead of looking for daemon.js from the npm package. Required for the standalone binary in sandboxes.     |
+| `AGENT_BROWSER_MAX_OUTPUT` | `50000` | Caps snapshot output to 50,000 characters. Prevents context overflow on dense pages. The default (unlimited) can produce 64K+ characters. |
+
+These are set via the tool's `runtimeEnv` and do not need manual configuration.
+
+## Skill file
+
+Agent Browser ships a SKILL.md that is seeded into the agent's workspace at `workspace/skills/agent-browser/SKILL.md` during deploy. It contains detailed instructions for browser automation, including navigation, screenshots, form interaction, and output handling.

@@ -5,19 +5,24 @@ description: Tools currently supported by ClawRun for installation inside sandbo
 
 import { TypeTable } from "fumadocs-ui/components/type-table";
 
-ClawRun currently ships two installable tools. Both are selected during [`clawrun deploy`](/docs/cli/deploy) and installed inside the sandbox by the [sidecar](/docs/sandbox/sidecar).
+Your agent comes with its own built-in tools for file operations, shell commands, web requests, and more. These are always available and require no setup.
 
-| Tool                                       | Description                                                |
-| ------------------------------------------ | ---------------------------------------------------------- |
-| [Agent Browser](/docs/tools/agent-browser) | Headless Chromium browser for web browsing and screenshots |
-| [GitHub CLI](/docs/tools/github-cli)       | GitHub CLI for managing repos, issues, and PRs             |
+On top of those, ClawRun can install additional tools into the sandbox that extend what the agent can do. These are external binaries, selected during [`clawrun deploy`](/docs/cli/deploy) and installed by the [sidecar](/docs/sandbox/sidecar) at startup.
+
+## Installable tools
+
+| Tool                                       | Description                                                   |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| [Agent Browser](/docs/tools/agent-browser) | Headless Chromium browser for web browsing and screenshots    |
+| [GitHub CLI](/docs/tools/github-cli)       | GitHub CLI for managing repos, issues, and PRs                |
+| [Find Skills](/docs/tools/find-skills)     | Discover and install agent skills from the skills.sh registry |
 
 ## How installation works
 
 Tools are installed by the sidecar in the background after sandbox startup. This means tool installation does not block the agent from starting.
 
-1. The sidecar checks if the tool is already installed (versioned directory check at `~/.local/opt/{name}-v{version}/bin/{name}`)
-2. If not installed, it downloads the binary, extracts it, and symlinks it to `~/.local/bin`
+1. The sidecar runs the tool's check command to verify if it's already installed
+2. If not installed, it runs the tool's install steps sequentially
 3. Failed installations retry up to 3 times with a 5-second delay between attempts
 4. If all retries fail, the sidecar logs the error and continues without the tool
 
@@ -29,6 +34,10 @@ Tools are installed by the sidecar in the background after sandbox startup. This
     "Versioned path": { type: "string", default: "~/.local/opt/{name}-v{version}" },
   }}
 />
+
+## Skill files
+
+Each tool can ship a `SKILL.md` file that teaches the agent how to use it. When a tool is selected during deploy, its SKILL.md is seeded into the agent's workspace at `workspace/skills/<tool-id>/SKILL.md`. The agent reads these files to learn tool-specific commands and workflows.
 
 ## Network policy
 

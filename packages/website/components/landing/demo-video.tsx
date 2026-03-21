@@ -8,7 +8,7 @@ export function DemoVideo() {
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button className="mb-6 inline-flex cursor-pointer items-center gap-2 border border-border px-3 py-1.5 text-xs uppercase tracking-[0.1em] text-muted-foreground no-underline transition-colors hover:bg-surface-hover">
+        <button className="mb-6 inline-flex cursor-pointer items-center gap-2 border border-border px-3 py-1.5 text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground no-underline transition-colors hover:bg-surface-hover">
           <CirclePlay size={14} className="text-primary" aria-hidden="true" />
           Watch Demo
         </button>
