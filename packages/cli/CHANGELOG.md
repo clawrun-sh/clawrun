@@ -1,5 +1,17 @@
 # clawrun
 
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies [7e2a51b]
+- Updated dependencies [0b3fbda]
+  - @clawrun/server@0.1.10
+  - @clawrun/agent@0.1.4
+  - @clawrun/sdk@0.1.10
+  - @clawrun/agent-zeroclaw@0.1.4
+  - @clawrun/runtime@0.1.6
+
 ## 0.1.9
 
 ### Patch Changes

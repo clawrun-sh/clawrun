@@ -1,5 +1,12 @@
 # @clawrun/agent-zeroclaw
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [0b3fbda]
+  - @clawrun/agent@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
