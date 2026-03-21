@@ -1,5 +1,15 @@
 # @clawrun/server
 
+## 0.1.10
+
+### Patch Changes
+
+- 7e2a51b: Update the Homepage title
+- Updated dependencies [0b3fbda]
+  - @clawrun/agent@0.1.4
+  - @clawrun/sdk@0.1.10
+  - @clawrun/runtime@0.1.6
+
 ## 0.1.9
 
 ### Patch Changes

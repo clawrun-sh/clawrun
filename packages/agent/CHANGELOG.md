@@ -1,5 +1,11 @@
 # @clawrun/agent
 
+## 0.1.4
+
+### Patch Changes
+
+- 0b3fbda: Fix the domains for tools installed via GitHub releases
+
 ## 0.1.3
 
 ### Patch Changes
