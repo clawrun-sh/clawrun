@@ -1,5 +1,13 @@
 # clawrun
 
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [e98560a]
+  - zeroclaw@0.1.4
+  - @clawrun/agent-zeroclaw@0.1.5
+
 ## 0.1.10
 
 ### Patch Changes
