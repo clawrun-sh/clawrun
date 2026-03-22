@@ -1,5 +1,11 @@
 # zeroclaw
 
+## 0.1.4
+
+### Patch Changes
+
+- e98560a: Bump to 0.5.6
+
 ## 0.1.3
 
 ### Patch Changes
