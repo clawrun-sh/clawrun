@@ -31,6 +31,7 @@ export interface Config {
   browser?: BrowserConfig;
   browser_delegate?: BrowserDelegateConfig;
   channels_config?: ChannelsConfig;
+  claude_code?: ClaudeCodeConfig;
   cloud_ops?: CloudOpsConfig;
   composio?: ComposioConfig;
   conversational_ai?: ConversationalAiConfig;
@@ -49,6 +50,7 @@ export interface Config {
    * Default model temperature (0.0–2.0). Default: `0.7`.
    */
   default_temperature?: number;
+  delegate?: DelegateToolConfig;
   /**
    * Embedding routing rules — route `hint:<name>` to specific provider+model combos.
    */
@@ -73,8 +75,20 @@ export interface Config {
   hooks?: HooksConfig;
   http_request?: HttpRequestConfig;
   identity?: IdentityConfig;
+  jira?: JiraConfig;
   knowledge?: KnowledgeConfig;
   linkedin?: LinkedInConfig;
+  /**
+   * Locale for tool descriptions (e.g. `"en"`, `"zh-CN"`).
+   *
+   * When set, tool descriptions shown in system prompts are loaded from
+   * `tool_descriptions/<locale>.toml`. Falls back to English, then to
+   * hardcoded descriptions.
+   *
+   * If omitted or empty, the locale is auto-detected from `ZEROCLAW_LOCALE`,
+   * `LANG`, or `LC_ALL` environment variables (defaulting to `"en"`).
+   */
+  locale?: string | null;
   mcp?: McpConfig;
   memory?: MemoryConfig;
   microsoft365?: Microsoft365Config;
@@ -93,6 +107,7 @@ export interface Config {
   nodes?: NodesConfig;
   notion?: NotionConfig;
   observability?: ObservabilityConfig;
+  pacing?: PacingConfig;
   peripherals?: PeripheralsConfig;
   plugins?: PluginsConfig;
   project_intel?: ProjectIntelConfig;
@@ -119,9 +134,11 @@ export interface Config {
   swarms?: {
     [k: string]: SwarmConfig;
   };
+  text_browser?: TextBrowserConfig;
   transcription?: TranscriptionConfig;
   tts?: TtsConfig;
   tunnel?: TunnelConfig;
+  verifiable_intent?: VerifiableIntentConfig;
   web_fetch?: WebFetchConfig;
   web_search?: WebSearchConfig;
   workspace?: WorkspaceConfig;
@@ -218,6 +235,11 @@ export interface DelegateAgentConfig {
    */
   agentic?: boolean;
   /**
+   * Optional timeout in seconds for agentic sub-agent runs.
+   * When `None`, falls back to `[delegate].agentic_timeout_secs` (default: 300).
+   */
+  agentic_timeout_secs?: number | null;
+  /**
    * Allowlist of tool names available to the sub-agent in agentic mode.
    */
   allowed_tools?: string[];
@@ -242,6 +264,11 @@ export interface DelegateAgentConfig {
    */
   provider: string;
   /**
+   * Optional skills directory path (relative to workspace root) for scoped skill loading.
+   * When unset or empty, the sub-agent falls back to the default workspace `skills/` directory.
+   */
+  skills_directory?: string | null;
+  /**
    * Optional system prompt for the sub-agent
    */
   system_prompt?: string | null;
@@ -249,6 +276,11 @@ export interface DelegateAgentConfig {
    * Temperature override
    */
   temperature?: number | null;
+  /**
+   * Optional timeout in seconds for non-agentic sub-agent provider calls.
+   * When `None`, falls back to `[delegate].timeout_secs` (default: 120).
+   */
+  timeout_secs?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -671,6 +703,11 @@ export interface DingTalkConfig {
    * Client Secret (AppSecret) from DingTalk developer console
    */
   client_secret: string;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -690,6 +727,11 @@ export interface DiscordConfig {
    */
   guild_id?: string | null;
   /**
+   * When true, a newer Discord message from the same sender in the same channel
+   * cancels the in-flight request and starts a fresh response with preserved history.
+   */
+  interrupt_on_new_message?: boolean;
+  /**
    * When true, process messages from other bots (not just humans).
    * The bot still ignores its own messages to prevent feedback loops.
    */
@@ -699,6 +741,11 @@ export interface DiscordConfig {
    * Other messages in the guild are silently ignored.
    */
   mention_only?: boolean;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -781,6 +828,11 @@ export interface FeishuConfig {
    * Not required (and ignored) for websocket mode.
    */
   port?: number | null;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   /**
    * Event receive mode: "websocket" (default) or "webhook"
    */
@@ -879,6 +931,11 @@ export interface LarkConfig {
    */
   port?: number | null;
   /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
+  /**
    * Event receive mode: "websocket" (default) or "webhook"
    */
   receive_mode?: "websocket" | "webhook";
@@ -932,6 +989,10 @@ export interface MatrixConfig {
    */
   homeserver: string;
   /**
+   * Whether to interrupt an in-flight agent response when a new message arrives.
+   */
+  interrupt_on_new_message?: boolean;
+  /**
    * Matrix room ID to listen in (e.g. `"!abc123:matrix.org"`).
    */
   room_id: string;
@@ -958,10 +1019,20 @@ export interface MattermostConfig {
    */
   channel_id?: string | null;
   /**
+   * When true, a newer Mattermost message from the same sender in the same channel
+   * cancels the in-flight request and starts a fresh response with preserved history.
+   */
+  interrupt_on_new_message?: boolean;
+  /**
    * When true, only respond to messages that @-mention the bot.
    * Other messages in the channel are silently ignored.
    */
   mention_only?: boolean | null;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   /**
    * When true (default), replies thread on the original post.
    * When false, replies go to the channel root.
@@ -1012,6 +1083,11 @@ export interface NextcloudTalkConfig {
    */
   base_url: string;
   /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
+  /**
    * Shared secret for webhook signature verification.
    *
    * Can also be set via `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET`.
@@ -1053,6 +1129,11 @@ export interface QQConfig {
    * App Secret from QQ Bot developer console
    */
   app_secret: string;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1110,6 +1191,11 @@ export interface SignalConfig {
    * Skip incoming story messages.
    */
   ignore_stories?: boolean;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1143,12 +1229,28 @@ export interface SlackConfig {
    * Direct messages remain allowed.
    */
   mention_only?: boolean;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
+  /**
+   * When true (default), replies stay in the originating Slack thread.
+   * When false, replies go to the channel root instead.
+   */
+  thread_replies?: boolean | null;
   [k: string]: unknown;
 }
 /**
  * Telegram bot channel configuration.
  */
 export interface TelegramConfig {
+  /**
+   * Override for the top-level `ack_reactions` setting. When `None`, the
+   * channel falls back to `[channels_config].ack_reactions`. When set
+   * explicitly, it takes precedence.
+   */
+  ack_reactions?: boolean | null;
   /**
    * Allowed Telegram user IDs or usernames. Empty = deny all.
    */
@@ -1171,6 +1273,11 @@ export interface TelegramConfig {
    * Direct messages are always processed.
    */
   mention_only?: boolean;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   /**
    * Streaming mode for progressive response delivery via message edits.
    */
@@ -1207,6 +1314,11 @@ export interface WatiConfig {
    * WATI API base URL (default: https://live-mt-server.wati.io).
    */
   api_url?: string;
+  /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
   /**
    * Tenant ID for multi-channel setups (optional).
    */
@@ -1281,6 +1393,22 @@ export interface WhatsAppConfig {
    */
   app_secret?: string | null;
   /**
+   * Policy for direct messages when mode = "personal".
+   * "allowlist" (default) | "ignore" | "all".
+   */
+  dm_policy?: "allowlist" | "ignore" | "all";
+  /**
+   * Policy for group chats when mode = "personal".
+   * "allowlist" (default) | "ignore" | "all".
+   */
+  group_policy?: "allowlist" | "ignore" | "all";
+  /**
+   * Usage mode for WhatsApp Web: "business" (default) or "personal".
+   * In personal mode the bot applies dm_policy, group_policy, and
+   * self_chat_mode to decide which chats to respond in.
+   */
+  mode?: "business" | "personal";
+  /**
    * Custom pair code for linking (Web mode, optional)
    * Leave empty to let WhatsApp generate one
    */
@@ -1296,6 +1424,16 @@ export interface WhatsAppConfig {
    */
   phone_number_id?: string | null;
   /**
+   * Per-channel proxy URL (http, https, socks5, socks5h).
+   * Overrides the global `[proxy]` setting for this channel only.
+   */
+  proxy_url?: string | null;
+  /**
+   * When true and mode = "personal", always respond to messages in the
+   * user's own self-chat (Notes to Self). Defaults to false.
+   */
+  self_chat_mode?: boolean;
+  /**
    * Session database path for WhatsApp Web client (Web mode)
    * When set, enables native WhatsApp Web mode with wa-rs
    */
@@ -1305,6 +1443,36 @@ export interface WhatsAppConfig {
    * Only used in Cloud API mode
    */
   verify_token?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Claude Code tool configuration (`[claude_code]`).
+ */
+export interface ClaudeCodeConfig {
+  /**
+   * Claude Code tools the subprocess is allowed to use
+   */
+  allowed_tools?: string[];
+  /**
+   * Enable the `claude_code` tool
+   */
+  enabled?: boolean;
+  /**
+   * Extra env vars passed to the claude subprocess (e.g. ANTHROPIC_API_KEY for API-key billing)
+   */
+  env_passthrough?: string[];
+  /**
+   * Maximum output size in bytes (2MB default)
+   */
+  max_output_bytes?: number;
+  /**
+   * Optional system prompt appended to Claude Code invocations
+   */
+  system_prompt?: string | null;
+  /**
+   * Maximum execution time in seconds (coding tasks can be long)
+   */
+  timeout_secs?: number;
   [k: string]: unknown;
 }
 /**
@@ -1357,6 +1525,11 @@ export interface ComposioConfig {
 }
 /**
  * Conversational AI agent builder configuration (`[conversational_ai]`).
+ *
+ * Experimental / future feature — not yet wired into the agent runtime.
+ * Omitted from generated config files when disabled (the default).
+ * Existing configs that already contain this section will continue to
+ * deserialize correctly thanks to `#[serde(default)]`.
  */
 export interface ConversationalAiConfig {
   /**
@@ -1448,6 +1621,16 @@ export interface ModelPricing {
  */
 export interface CronConfig {
   /**
+   * Run all overdue jobs at scheduler startup. Default: `true`.
+   *
+   * When the machine boots late or the daemon restarts, jobs whose
+   * `next_run` is in the past are considered "missed". With this
+   * option enabled the scheduler fires them once before entering
+   * the normal polling loop. Disable if you prefer missed jobs to
+   * simply wait for their next scheduled occurrence.
+   */
+  catch_up_on_startup?: boolean;
+  /**
    * Enable the cron subsystem. Default: `true`.
    */
   enabled?: boolean;
@@ -1477,6 +1660,24 @@ export interface DataRetentionConfig {
    * Days of data to retain before purge eligibility.
    */
   retention_days?: number;
+  [k: string]: unknown;
+}
+/**
+ * Delegate tool global default configuration (`[delegate]`).
+ */
+export interface DelegateToolConfig {
+  /**
+   * Default timeout in seconds for agentic sub-agent runs.
+   * Can be overridden per-agent in `[agents.<name>]` config.
+   * Default: 300 seconds.
+   */
+  agentic_timeout_secs?: number;
+  /**
+   * Default timeout in seconds for non-agentic sub-agent provider calls.
+   * Can be overridden per-agent in `[agents.<name>]` config.
+   * Default: 120 seconds.
+   */
+  timeout_secs?: number;
   [k: string]: unknown;
 }
 /**
@@ -1546,6 +1747,12 @@ export interface GatewayConfig {
   paired_tokens?: string[];
   pairing_dashboard?: PairingDashboardConfig;
   /**
+   * Optional URL path prefix for reverse-proxy deployments.
+   * When set, all gateway routes are served under this prefix.
+   * Must start with `/` and must not end with `/`.
+   */
+  path_prefix?: string | null;
+  /**
    * Gateway port (default: 42617)
    */
   port?: number;
@@ -1607,6 +1814,21 @@ export interface PairingDashboardConfig {
  */
 export interface GoogleWorkspaceConfig {
   /**
+   * Restrict which resource/method combinations the agent can access.
+   *
+   * When empty (the default), all methods under `allowed_services` remain
+   * available for backward compatibility. When non-empty, the runtime denies
+   * any `(service, resource, sub_resource, method)` combination that is not
+   * explicitly listed. `sub_resource` is optional per entry: an entry without
+   * it matches only 3-segment `gws` calls; an entry with it matches only calls
+   * that supply that exact sub_resource value.
+   *
+   * Each entry's `service` must appear in `allowed_services` when that list is
+   * non-empty; config validation rejects entries that would never match at
+   * runtime.
+   */
+  allowed_operations?: GoogleWorkspaceAllowedOperation[];
+  /**
    * Restrict which Google Workspace services the agent can access.
    *
    * When empty (the default), the full default service set is allowed (see
@@ -1646,6 +1868,57 @@ export interface GoogleWorkspaceConfig {
    * Command execution timeout in seconds. Default: `30`.
    */
   timeout_secs?: number;
+  [k: string]: unknown;
+}
+/**
+ * Google Workspace CLI (`gws`) tool configuration (`[google_workspace]` section).
+ *
+ * ## Defaults
+ * - `enabled`: `false` (tool is not registered unless explicitly opted-in).
+ * - `allowed_services`: empty vector, which grants access to the full default
+ *   service set: `drive`, `sheets`, `gmail`, `calendar`, `docs`, `slides`,
+ *   `tasks`, `people`, `chat`, `classroom`, `forms`, `keep`, `meet`, `events`.
+ * - `credentials_path`: `None` (uses default `gws` credential discovery).
+ * - `default_account`: `None` (uses the `gws` active account).
+ * - `rate_limit_per_minute`: `60`.
+ * - `timeout_secs`: `30`.
+ * - `audit_log`: `false`.
+ * - `credentials_path`: `None` (uses default `gws` credential discovery).
+ * - `default_account`: `None` (uses the `gws` active account).
+ * - `rate_limit_per_minute`: `60`.
+ * - `timeout_secs`: `30`.
+ * - `audit_log`: `false`.
+ *
+ * ## Compatibility
+ * Configs that omit the `[google_workspace]` section entirely are treated as
+ * `GoogleWorkspaceConfig::default()` (disabled, all defaults allowed). Adding
+ * the section is purely opt-in and does not affect other config sections.
+ *
+ * ## Rollback / Migration
+ * To revert, remove the `[google_workspace]` section from the config file (or
+ * set `enabled = false`). No data migration is required; the tool simply stops
+ * being registered.
+ */
+export interface GoogleWorkspaceAllowedOperation {
+  /**
+   * Allowed methods for the service/resource/sub_resource combination.
+   */
+  methods?: string[];
+  /**
+   * Top-level resource name for the service (for example `users` for Gmail or `files` for Drive).
+   */
+  resource: string;
+  /**
+   * Google Workspace service ID (for example `gmail` or `drive`).
+   */
+  service: string;
+  /**
+   * Optional sub-resource for 4-segment gws commands
+   * (for example `messages` or `drafts` under `gmail users`).
+   * When present, the entry only matches calls that include this exact sub_resource.
+   * When absent, the entry only matches calls with no sub_resource.
+   */
+  sub_resource?: string | null;
   [k: string]: unknown;
 }
 /**
@@ -1706,9 +1979,9 @@ export interface HeartbeatConfig {
    */
   enabled: boolean;
   /**
-   * Interval in minutes between heartbeat pings. Default: `30`.
+   * Interval in minutes between heartbeat pings. Default: `5`.
    */
-  interval_minutes: number;
+  interval_minutes?: number;
   /**
    * Maximum interval in minutes when adaptive mode backs off. Default: `120`.
    */
@@ -1842,6 +2115,38 @@ export interface IdentityConfig {
    * Identity format: "openclaw" (default) or "aieos"
    */
   format?: string;
+  [k: string]: unknown;
+}
+/**
+ * Jira integration configuration (`[jira]`).
+ */
+export interface JiraConfig {
+  /**
+   * Actions the agent is permitted to call.
+   * Valid values: `"get_ticket"`, `"search_tickets"`, `"comment_ticket"`.
+   * Defaults to `["get_ticket"]` (read-only).
+   */
+  allowed_actions?: string[];
+  /**
+   * Jira API token. Encrypted at rest. Falls back to `JIRA_API_TOKEN` env var.
+   */
+  api_token?: string;
+  /**
+   * Atlassian instance base URL, e.g. `https://yourco.atlassian.net`.
+   */
+  base_url?: string;
+  /**
+   * Jira account email used for Basic auth.
+   */
+  email?: string;
+  /**
+   * Enable the `jira` tool. Default: `false`.
+   */
+  enabled?: boolean;
+  /**
+   * Request timeout in seconds. Default: `30`.
+   */
+  timeout_secs?: number;
   [k: string]: unknown;
 }
 /**
@@ -2132,6 +2437,7 @@ export interface MemoryConfig {
    * Weight for keyword BM25 in hybrid search (0.0–1.0)
    */
   keyword_weight?: number;
+  mem0?: Mem0Config;
   /**
    * Minimum hybrid score (0.0–1.0) for a memory to be included in context.
    * Memories scoring below this threshold are dropped to prevent irrelevant
@@ -2176,6 +2482,41 @@ export interface MemoryConfig {
    * Weight for vector similarity in hybrid search (0.0–1.0)
    */
   vector_weight?: number;
+  [k: string]: unknown;
+}
+/**
+ * Configuration for mem0 (OpenMemory) backend.
+ * Only used when `backend = "mem0"`.
+ * Requires `--features memory-mem0` at build time.
+ */
+export interface Mem0Config {
+  /**
+   * Application name registered in mem0.
+   * Falls back to `MEM0_APP_NAME` env var, or default `"zeroclaw"`.
+   */
+  app_name?: string;
+  /**
+   * Custom prompt for guiding LLM-based fact extraction when `infer = true`.
+   * Useful for non-English content (e.g. Cantonese/Chinese).
+   * Falls back to `MEM0_EXTRACTION_PROMPT` env var.
+   * If unset, the mem0 server uses its built-in default prompt.
+   */
+  extraction_prompt?: string | null;
+  /**
+   * Whether mem0 should use its built-in LLM to extract facts from
+   * stored text (`infer = true`) or store raw text as-is (`false`).
+   */
+  infer?: boolean;
+  /**
+   * OpenMemory server URL (e.g. `http://localhost:8765`).
+   * Falls back to `MEM0_URL` env var if not set.
+   */
+  url?: string;
+  /**
+   * User ID for scoping memories within mem0.
+   * Falls back to `MEM0_USER_ID` env var, or default `"zeroclaw"`.
+   */
+  user_id?: string;
   [k: string]: unknown;
 }
 /**
@@ -2435,6 +2776,39 @@ export interface ObservabilityConfig {
    * Runtime trace file path. Relative paths are resolved under workspace_dir.
    */
   runtime_trace_path?: string;
+  [k: string]: unknown;
+}
+/**
+ * Pacing controls for slow/local LLM workloads (`[pacing]`).
+ */
+export interface PacingConfig {
+  /**
+   * Minimum elapsed seconds before loop detection activates.
+   * Tasks completing under this threshold get aggressive loop protection;
+   * longer-running tasks receive a grace period before the detector starts
+   * counting. `None` means loop detection is always active (existing behavior).
+   */
+  loop_detection_min_elapsed_secs?: number | null;
+  /**
+   * Tool names excluded from identical-output / alternating-pattern loop
+   * detection. Useful for browser workflows where `browser_screenshot`
+   * structurally resembles a loop even when making progress.
+   */
+  loop_ignore_tools?: string[];
+  /**
+   * Override for the hardcoded timeout scaling cap (default: 4).
+   * The channel message timeout budget is computed as:
+   *   `message_timeout_secs * min(max_tool_iterations, message_timeout_scale_max)`
+   * Raising this value lets long multi-step tasks with slow local models
+   * receive a proportionally larger budget without inflating the base timeout.
+   */
+  message_timeout_scale_max?: number | null;
+  /**
+   * Per-step timeout in seconds: the maximum time allowed for a single
+   * LLM inference turn, independent of the total message budget.
+   * `None` means no per-step timeout (existing behavior).
+   */
+  step_timeout_secs?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -2868,6 +3242,10 @@ export interface OtpConfig {
    */
   cache_valid_secs?: number;
   /**
+   * Maximum number of OTP challenge attempts before lockout.
+   */
+  challenge_max_attempts?: number;
+  /**
    * Enable OTP gating. Defaults to disabled for backward compatibility.
    */
   enabled?: boolean;
@@ -2972,6 +3350,11 @@ export interface SecurityOpsConfig {
  */
 export interface SkillsConfig {
   /**
+   * Allow script-like files in skills (`.sh`, `.bash`, `.ps1`, shebang shell files).
+   * Default: `false` (secure by default).
+   */
+  allow_scripts?: boolean;
+  /**
    * Optional path to a local open-skills repository.
    * If unset, defaults to `$HOME/open-skills` when enabled.
    */
@@ -2986,6 +3369,28 @@ export interface SkillsConfig {
    * `full` preserves legacy behavior. `compact` keeps context small and loads skills on demand.
    */
   prompt_injection_mode?: "full" | "compact";
+  skill_creation?: SkillCreationConfig;
+  [k: string]: unknown;
+}
+/**
+ * Autonomous skill creation from successful multi-step task executions.
+ */
+export interface SkillCreationConfig {
+  /**
+   * Enable automatic skill creation after successful multi-step tasks.
+   * Default: `false`.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of auto-generated skills to keep.
+   * When exceeded, the oldest auto-generated skill is removed (LRU eviction).
+   */
+  max_skills?: number;
+  /**
+   * Embedding similarity threshold for deduplication.
+   * Skills with descriptions more similar than this value are skipped.
+   */
+  similarity_threshold?: number;
   [k: string]: unknown;
 }
 /**
@@ -3056,6 +3461,24 @@ export interface SwarmConfig {
   [k: string]: unknown;
 }
 /**
+ * Text browser tool configuration (`[text_browser]`).
+ */
+export interface TextBrowserConfig {
+  /**
+   * Enable `text_browser` tool
+   */
+  enabled?: boolean;
+  /**
+   * Preferred text browser ("lynx", "links", or "w3m"). If unset, auto-detects.
+   */
+  preferred_browser?: string | null;
+  /**
+   * Request timeout in seconds (default: 30)
+   */
+  timeout_secs?: number;
+  [k: string]: unknown;
+}
+/**
  * Voice transcription configuration (Whisper API via Groq).
  */
 export interface TranscriptionConfig {
@@ -3099,6 +3522,10 @@ export interface TranscriptionConfig {
    * Optional language hint (ISO-639-1, e.g. "en", "ru") for Groq provider.
    */
   language?: string | null;
+  /**
+   * Local/self-hosted Whisper-compatible STT provider.
+   */
+  local_whisper?: LocalWhisperConfig | null;
   /**
    * Maximum voice duration in seconds (messages longer than this are skipped).
    */
@@ -3149,6 +3576,34 @@ export interface GoogleSttConfig {
    * BCP-47 language code (default: "en-US").
    */
   language_code?: string;
+  [k: string]: unknown;
+}
+/**
+ * Local/self-hosted Whisper-compatible STT endpoint (`[transcription.local_whisper]`).
+ *
+ * Audio is sent over WireGuard; never leaves the platform perimeter.
+ */
+export interface LocalWhisperConfig {
+  /**
+   * Bearer token for endpoint authentication.
+   */
+  bearer_token: string;
+  /**
+   * Maximum audio file size in bytes accepted by this endpoint.
+   * Defaults to 25 MB — matching the cloud API cap for a safe out-of-the-box
+   * experience. Self-hosted endpoints can accept much larger files; raise this
+   * as needed, but note that each transcription call clones the audio buffer
+   * into a multipart payload, so peak memory per request is ~2× this value.
+   */
+  max_audio_bytes?: number;
+  /**
+   * Request timeout in seconds. Defaults to 300 (large files on local GPU).
+   */
+  timeout_secs?: number;
+  /**
+   * HTTP or HTTPS endpoint URL, e.g. `"http://10.10.0.1:8001/v1/transcribe"`.
+   */
+  url: string;
   [k: string]: unknown;
 }
 /**
@@ -3292,7 +3747,11 @@ export interface TunnelConfig {
    */
   openvpn?: OpenVpnTunnelConfig | null;
   /**
-   * Tunnel provider: `"none"`, `"cloudflare"`, `"tailscale"`, `"ngrok"`, `"openvpn"`, or `"custom"`. Default: `"none"`.
+   * Pinggy tunnel configuration (used when `provider = "pinggy"`).
+   */
+  pinggy?: PinggyTunnelConfig | null;
+  /**
+   * Tunnel provider: `"none"`, `"cloudflare"`, `"tailscale"`, `"ngrok"`, `"openvpn"`, `"pinggy"`, or `"custom"`. Default: `"none"`.
    */
   provider: string;
   /**
@@ -3368,6 +3827,17 @@ export interface OpenVpnTunnelConfig {
   extra_args?: string[];
   [k: string]: unknown;
 }
+export interface PinggyTunnelConfig {
+  /**
+   * Server region: `"us"` (USA), `"eu"` (Europe), `"ap"` (Asia), `"br"` (South America), `"au"` (Australia), or omit for auto.
+   */
+  region?: string | null;
+  /**
+   * Pinggy access token (optional — free tier works without one).
+   */
+  token?: string | null;
+  [k: string]: unknown;
+}
 export interface TailscaleTunnelConfig {
   /**
    * Use Tailscale Funnel (public internet) vs Serve (tailnet only)
@@ -3377,6 +3847,22 @@ export interface TailscaleTunnelConfig {
    * Optional hostname override
    */
   hostname?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Verifiable Intent (VI) credential verification and issuance (`[verifiable_intent]`).
+ */
+export interface VerifiableIntentConfig {
+  /**
+   * Enable VI credential verification on commerce tool calls (default: false).
+   */
+  enabled?: boolean;
+  /**
+   * Strictness mode for constraint evaluation: "strict" (fail-closed on unknown
+   * constraint types) or "permissive" (skip unknown types with a warning).
+   * Default: "strict".
+   */
+  strictness?: string;
   [k: string]: unknown;
 }
 /**

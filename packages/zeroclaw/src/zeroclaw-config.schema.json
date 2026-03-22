@@ -8,7 +8,7 @@
       "description": "Agent orchestration settings (`[agent]`).",
       "$ref": "#/$defs/AgentConfig",
       "default": {
-        "compact_context": false,
+        "compact_context": true,
         "max_context_tokens": 32000,
         "max_history_messages": 50,
         "max_tool_iterations": 10,
@@ -70,7 +70,13 @@
         "always_ask": [],
         "auto_approve": [
           "file_read",
-          "memory_recall"
+          "memory_recall",
+          "web_search_tool",
+          "web_fetch",
+          "calculator",
+          "glob_search",
+          "content_search",
+          "image_info"
         ],
         "block_high_risk_commands": true,
         "forbidden_paths": [
@@ -193,6 +199,23 @@
         "whatsapp": null
       }
     },
+    "claude_code": {
+      "description": "Claude Code tool configuration (`[claude_code]`).",
+      "$ref": "#/$defs/ClaudeCodeConfig",
+      "default": {
+        "allowed_tools": [
+          "Read",
+          "Edit",
+          "Bash",
+          "Write"
+        ],
+        "enabled": false,
+        "env_passthrough": [],
+        "max_output_bytes": 2097152,
+        "system_prompt": null,
+        "timeout_secs": 600
+      }
+    },
     "cloud_ops": {
       "description": "Cloud transformation accelerator configuration (`[cloud_ops]`).",
       "$ref": "#/$defs/CloudOpsConfig",
@@ -223,24 +246,8 @@
       }
     },
     "conversational_ai": {
-      "description": "Conversational AI agent builder configuration (`[conversational_ai]`).",
-      "$ref": "#/$defs/ConversationalAiConfig",
-      "default": {
-        "analytics_enabled": false,
-        "auto_detect_language": true,
-        "conversation_timeout_secs": 1800,
-        "default_language": "en",
-        "enabled": false,
-        "escalation_confidence_threshold": 0.3,
-        "knowledge_base_tool": null,
-        "max_conversation_turns": 50,
-        "supported_languages": [
-          "en",
-          "de",
-          "fr",
-          "it"
-        ]
-      }
+      "description": "Conversational AI agent builder configuration (`[conversational_ai]`).\n\nExperimental / future feature — not yet wired into the agent runtime.\nOmitted from generated config files when disabled (the default).\nExisting configs that already contain this section will continue to\ndeserialize correctly thanks to `#[serde(default)]`.",
+      "$ref": "#/$defs/ConversationalAiConfig"
     },
     "cost": {
       "description": "Cost tracking and budget enforcement configuration (`[cost]`).",
@@ -295,6 +302,7 @@
       "description": "Cron job configuration (`[cron]`).",
       "$ref": "#/$defs/CronConfig",
       "default": {
+        "catch_up_on_startup": true,
         "enabled": true,
         "max_run_history": 50
       }
@@ -329,6 +337,14 @@
       "format": "double",
       "default": 0.7
     },
+    "delegate": {
+      "description": "Delegate tool global default configuration (`[delegate]`).",
+      "$ref": "#/$defs/DelegateToolConfig",
+      "default": {
+        "agentic_timeout_secs": 300,
+        "timeout_secs": 120
+      }
+    },
     "embedding_routes": {
       "description": "Embedding routing rules — route `hint:<name>` to specific provider+model combos.",
       "type": "array",
@@ -362,6 +378,7 @@
           "max_failed_attempts": 5,
           "max_pending_codes": 3
         },
+        "path_prefix": null,
         "port": 42617,
         "rate_limit_max_keys": 10000,
         "require_pairing": true,
@@ -375,6 +392,7 @@
       "description": "Google Workspace CLI (`gws`) tool configuration (`[google_workspace]`).",
       "$ref": "#/$defs/GoogleWorkspaceConfig",
       "default": {
+        "allowed_operations": [],
         "allowed_services": [],
         "audit_log": false,
         "credentials_path": null,
@@ -405,7 +423,7 @@
         "deadman_timeout_minutes": 0,
         "deadman_to": null,
         "enabled": false,
-        "interval_minutes": 30,
+        "interval_minutes": 5,
         "max_interval_minutes": 120,
         "max_run_history": 100,
         "message": null,
@@ -450,6 +468,20 @@
         "aieos_inline": null,
         "aieos_path": null,
         "format": "openclaw"
+      }
+    },
+    "jira": {
+      "description": "Jira integration configuration (`[jira]`).",
+      "$ref": "#/$defs/JiraConfig",
+      "default": {
+        "allowed_actions": [
+          "get_ticket"
+        ],
+        "api_token": "",
+        "base_url": "",
+        "email": "",
+        "enabled": false,
+        "timeout_secs": 30
       }
     },
     "knowledge": {
@@ -510,6 +542,14 @@
         }
       }
     },
+    "locale": {
+      "description": "Locale for tool descriptions (e.g. `\"en\"`, `\"zh-CN\"`).\n\nWhen set, tool descriptions shown in system prompts are loaded from\n`tool_descriptions/<locale>.toml`. Falls back to English, then to\nhardcoded descriptions.\n\nIf omitted or empty, the locale is auto-detected from `ZEROCLAW_LOCALE`,\n`LANG`, or `LC_ALL` environment variables (defaulting to `\"en\"`).",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
     "mcp": {
       "description": "External MCP server connections (`[mcp]`).",
       "$ref": "#/$defs/McpConfig",
@@ -535,6 +575,13 @@
         "embedding_provider": "none",
         "hygiene_enabled": true,
         "keyword_weight": 0.3,
+        "mem0": {
+          "app_name": "zeroclaw",
+          "extraction_prompt": null,
+          "infer": true,
+          "url": "http://localhost:8765",
+          "user_id": "zeroclaw"
+        },
         "min_relevance_score": 0.4,
         "purge_after_days": 30,
         "qdrant": {
@@ -642,6 +689,16 @@
         "runtime_trace_max_entries": 200,
         "runtime_trace_mode": "none",
         "runtime_trace_path": "state/runtime-trace.jsonl"
+      }
+    },
+    "pacing": {
+      "description": "Pacing controls for slow/local LLM workloads (`[pacing]`).",
+      "$ref": "#/$defs/PacingConfig",
+      "default": {
+        "loop_detection_min_elapsed_secs": null,
+        "loop_ignore_tools": [],
+        "message_timeout_scale_max": null,
+        "step_timeout_secs": null
       }
     },
     "peripherals": {
@@ -783,6 +840,7 @@
         },
         "otp": {
           "cache_valid_secs": 300,
+          "challenge_max_attempts": 3,
           "enabled": false,
           "gated_actions": [
             "shell",
@@ -826,9 +884,15 @@
       "description": "Skills loading and community repository behavior (`[skills]`).",
       "$ref": "#/$defs/SkillsConfig",
       "default": {
+        "allow_scripts": false,
         "open_skills_dir": null,
         "open_skills_enabled": false,
-        "prompt_injection_mode": "full"
+        "prompt_injection_mode": "full",
+        "skill_creation": {
+          "enabled": false,
+          "max_skills": 500,
+          "similarity_threshold": 0.85
+        }
       }
     },
     "storage": {
@@ -854,6 +918,15 @@
       },
       "default": {}
     },
+    "text_browser": {
+      "description": "Text browser tool configuration (`[text_browser]`).",
+      "$ref": "#/$defs/TextBrowserConfig",
+      "default": {
+        "enabled": false,
+        "preferred_browser": null,
+        "timeout_secs": 30
+      }
+    },
     "transcription": {
       "description": "Voice transcription configuration (Whisper API via Groq).",
       "$ref": "#/$defs/TranscriptionConfig",
@@ -867,6 +940,7 @@
         "google": null,
         "initial_prompt": null,
         "language": null,
+        "local_whisper": null,
         "max_duration_secs": 120,
         "model": "whisper-large-v3-turbo",
         "openai": null
@@ -895,8 +969,17 @@
         "custom": null,
         "ngrok": null,
         "openvpn": null,
+        "pinggy": null,
         "provider": "none",
         "tailscale": null
+      }
+    },
+    "verifiable_intent": {
+      "description": "Verifiable Intent (VI) credential verification and issuance (`[verifiable_intent]`).",
+      "$ref": "#/$defs/VerifiableIntentConfig",
+      "default": {
+        "enabled": false,
+        "strictness": "strict"
       }
     },
     "web_fetch": {
@@ -1085,7 +1168,13 @@
           "type": "array",
           "default": [
             "file_read",
-            "memory_recall"
+            "memory_recall",
+            "web_search_tool",
+            "web_fetch",
+            "calculator",
+            "glob_search",
+            "content_search",
+            "image_info"
           ],
           "items": {
             "type": "string"
@@ -1831,6 +1920,60 @@
         "hint"
       ]
     },
+    "ClaudeCodeConfig": {
+      "description": "Claude Code CLI tool configuration (`[claude_code]` section).\n\nDelegates coding tasks to the `claude -p` CLI. Authentication uses the\nbinary's own OAuth session (Max subscription) by default — no API key\nneeded unless `env_passthrough` includes `ANTHROPIC_API_KEY`.",
+      "type": "object",
+      "properties": {
+        "allowed_tools": {
+          "description": "Claude Code tools the subprocess is allowed to use",
+          "type": "array",
+          "default": [
+            "Read",
+            "Edit",
+            "Bash",
+            "Write"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "description": "Enable the `claude_code` tool",
+          "type": "boolean",
+          "default": false
+        },
+        "env_passthrough": {
+          "description": "Extra env vars passed to the claude subprocess (e.g. ANTHROPIC_API_KEY for API-key billing)",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_output_bytes": {
+          "description": "Maximum output size in bytes (2MB default)",
+          "type": "integer",
+          "format": "uint",
+          "default": 2097152,
+          "minimum": 0
+        },
+        "system_prompt": {
+          "description": "Optional system prompt appended to Claude Code invocations",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "timeout_secs": {
+          "description": "Maximum execution time in seconds (coding tasks can be long)",
+          "type": "integer",
+          "format": "uint64",
+          "default": 600,
+          "minimum": 0
+        }
+      }
+    },
     "ClawdTalkConfig": {
       "description": "Configuration for ClawdTalk channel from config.toml",
       "type": "object",
@@ -1961,7 +2104,7 @@
       }
     },
     "ConversationalAiConfig": {
-      "description": "Conversational AI agent builder configuration (`[conversational_ai]` section).\n\nControls language detection, escalation behavior, conversation limits, and\nanalytics for conversational agent workflows. Disabled by default.",
+      "description": "Conversational AI agent builder configuration (`[conversational_ai]` section).\n\n**Status: Reserved for future use.** This configuration is parsed but not yet\nconsumed by the runtime. Setting `enabled = true` will produce a startup warning.",
       "type": "object",
       "properties": {
         "analytics_enabled": {
@@ -2075,6 +2218,11 @@
       "description": "Cron job configuration (`[cron]` section).",
       "type": "object",
       "properties": {
+        "catch_up_on_startup": {
+          "description": "Run all overdue jobs at scheduler startup. Default: `true`.\n\nWhen the machine boots late or the daemon restarts, jobs whose\n`next_run` is in the past are considered \"missed\". With this\noption enabled the scheduler fires them once before entering\nthe normal polling loop. Disable if you prefer missed jobs to\nsimply wait for their next scheduled occurrence.",
+          "type": "boolean",
+          "default": true
+        },
         "enabled": {
           "description": "Enable the cron subsystem. Default: `true`.",
           "type": "boolean",
@@ -2174,6 +2322,16 @@
           "type": "boolean",
           "default": false
         },
+        "agentic_timeout_secs": {
+          "description": "Optional timeout in seconds for agentic sub-agent runs.\nWhen `None`, falls back to `[delegate].agentic_timeout_secs` (default: 300).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
         "allowed_tools": {
           "description": "Allowlist of tool names available to the sub-agent in agentic mode.",
           "type": "array",
@@ -2212,6 +2370,14 @@
           "description": "Provider name (e.g. \"ollama\", \"openrouter\", \"anthropic\")",
           "type": "string"
         },
+        "skills_directory": {
+          "description": "Optional skills directory path (relative to workspace root) for scoped skill loading.\nWhen unset or empty, the sub-agent falls back to the default workspace `skills/` directory.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "system_prompt": {
           "description": "Optional system prompt for the sub-agent",
           "type": [
@@ -2228,12 +2394,42 @@
           ],
           "format": "double",
           "default": null
+        },
+        "timeout_secs": {
+          "description": "Optional timeout in seconds for non-agentic sub-agent provider calls.\nWhen `None`, falls back to `[delegate].timeout_secs` (default: 120).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
         }
       },
       "required": [
         "provider",
         "model"
       ]
+    },
+    "DelegateToolConfig": {
+      "description": "Global delegate tool configuration for default timeout values.",
+      "type": "object",
+      "properties": {
+        "agentic_timeout_secs": {
+          "description": "Default timeout in seconds for agentic sub-agent runs.\nCan be overridden per-agent in `[agents.<name>]` config.\nDefault: 300 seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 300,
+          "minimum": 0
+        },
+        "timeout_secs": {
+          "description": "Default timeout in seconds for non-agentic sub-agent provider calls.\nCan be overridden per-agent in `[agents.<name>]` config.\nDefault: 120 seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 120,
+          "minimum": 0
+        }
+      }
     },
     "DingTalkConfig": {
       "description": "DingTalk configuration for Stream Mode messaging",
@@ -2254,6 +2450,14 @@
         "client_secret": {
           "description": "Client Secret (AppSecret) from DingTalk developer console",
           "type": "string"
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -2284,6 +2488,11 @@
             "null"
           ]
         },
+        "interrupt_on_new_message": {
+          "description": "When true, a newer Discord message from the same sender in the same channel\ncancels the in-flight request and starts a fresh response with preserved history.",
+          "type": "boolean",
+          "default": false
+        },
         "listen_to_bots": {
           "description": "When true, process messages from other bots (not just humans).\nThe bot still ignores its own messages to prevent feedback loops.",
           "type": "boolean",
@@ -2293,6 +2502,14 @@
           "description": "When true, only respond to messages that @-mention the bot.\nOther messages in the guild are silently ignored.",
           "type": "boolean",
           "default": false
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -2575,6 +2792,14 @@
           "maximum": 65535,
           "minimum": 0
         },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "receive_mode": {
           "description": "Event receive mode: \"websocket\" (default) or \"webhook\"",
           "$ref": "#/$defs/LarkReceiveMode",
@@ -2647,6 +2872,14 @@
             "max_failed_attempts": 5,
             "max_pending_codes": 3
           }
+        },
+        "path_prefix": {
+          "description": "Optional URL path prefix for reverse-proxy deployments.\nWhen set, all gateway routes are served under this prefix.\nMust start with `/` and must not end with `/`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "port": {
           "description": "Gateway port (default: 42617)",
@@ -2732,10 +2965,52 @@
         }
       }
     },
-    "GoogleWorkspaceConfig": {
+    "GoogleWorkspaceAllowedOperation": {
       "description": "Google Workspace CLI (`gws`) tool configuration (`[google_workspace]` section).\n\n## Defaults\n- `enabled`: `false` (tool is not registered unless explicitly opted-in).\n- `allowed_services`: empty vector, which grants access to the full default\n  service set: `drive`, `sheets`, `gmail`, `calendar`, `docs`, `slides`,\n  `tasks`, `people`, `chat`, `classroom`, `forms`, `keep`, `meet`, `events`.\n- `credentials_path`: `None` (uses default `gws` credential discovery).\n- `default_account`: `None` (uses the `gws` active account).\n- `rate_limit_per_minute`: `60`.\n- `timeout_secs`: `30`.\n- `audit_log`: `false`.\n- `credentials_path`: `None` (uses default `gws` credential discovery).\n- `default_account`: `None` (uses the `gws` active account).\n- `rate_limit_per_minute`: `60`.\n- `timeout_secs`: `30`.\n- `audit_log`: `false`.\n\n## Compatibility\nConfigs that omit the `[google_workspace]` section entirely are treated as\n`GoogleWorkspaceConfig::default()` (disabled, all defaults allowed). Adding\nthe section is purely opt-in and does not affect other config sections.\n\n## Rollback / Migration\nTo revert, remove the `[google_workspace]` section from the config file (or\nset `enabled = false`). No data migration is required; the tool simply stops\nbeing registered.",
       "type": "object",
       "properties": {
+        "methods": {
+          "description": "Allowed methods for the service/resource/sub_resource combination.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "resource": {
+          "description": "Top-level resource name for the service (for example `users` for Gmail or `files` for Drive).",
+          "type": "string"
+        },
+        "service": {
+          "description": "Google Workspace service ID (for example `gmail` or `drive`).",
+          "type": "string"
+        },
+        "sub_resource": {
+          "description": "Optional sub-resource for 4-segment gws commands\n(for example `messages` or `drafts` under `gmail users`).\nWhen present, the entry only matches calls that include this exact sub_resource.\nWhen absent, the entry only matches calls with no sub_resource.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "service",
+        "resource"
+      ]
+    },
+    "GoogleWorkspaceConfig": {
+      "description": "Google Workspace CLI (`gws`) tool configuration (`[google_workspace]` section).\n\n## Defaults\n- `enabled`: `false` (tool is not registered unless explicitly opted-in).\n- `allowed_services`: empty vector, which grants access to the full default\n  service set: `drive`, `sheets`, `gmail`, `calendar`, `docs`, `slides`,\n  `tasks`, `people`, `chat`, `classroom`, `forms`, `keep`, `meet`, `events`.\n- `allowed_operations`: empty vector, which preserves the legacy behavior of\n  allowing any resource/method under the allowed service set.\n- `credentials_path`: `None` (uses default `gws` credential discovery).\n- `default_account`: `None` (uses the `gws` active account).\n- `rate_limit_per_minute`: `60`.\n- `timeout_secs`: `30`.\n- `audit_log`: `false`.\n\n## Compatibility\nConfigs that omit the `[google_workspace]` section entirely are treated as\n`GoogleWorkspaceConfig::default()` (disabled, all defaults allowed). Adding\nthe section is purely opt-in and does not affect other config sections.\n\n## Rollback / Migration\nTo revert, remove the `[google_workspace]` section from the config file (or\nset `enabled = false`). No data migration is required; the tool simply stops\nbeing registered.",
+      "type": "object",
+      "properties": {
+        "allowed_operations": {
+          "description": "Restrict which resource/method combinations the agent can access.\n\nWhen empty (the default), all methods under `allowed_services` remain\navailable for backward compatibility. When non-empty, the runtime denies\nany `(service, resource, sub_resource, method)` combination that is not\nexplicitly listed. `sub_resource` is optional per entry: an entry without\nit matches only 3-segment `gws` calls; an entry with it matches only calls\nthat supply that exact sub_resource value.\n\nEach entry's `service` must appear in `allowed_services` when that list is\nnon-empty; config validation rejects entries that would never match at\nruntime.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/GoogleWorkspaceAllowedOperation"
+          }
+        },
         "allowed_services": {
           "description": "Restrict which Google Workspace services the agent can access.\n\nWhen empty (the default), the full default service set is allowed (see\nstruct-level docs). When non-empty, only the listed service IDs are\npermitted. Each entry must be non-empty, lowercase alphanumeric with\noptional underscores/hyphens, and unique.",
           "type": "array",
@@ -2877,9 +3152,10 @@
           "type": "boolean"
         },
         "interval_minutes": {
-          "description": "Interval in minutes between heartbeat pings. Default: `30`.",
+          "description": "Interval in minutes between heartbeat pings. Default: `5`.",
           "type": "integer",
           "format": "uint32",
+          "default": 5,
           "minimum": 0
         },
         "max_interval_minutes": {
@@ -2934,8 +3210,7 @@
         }
       },
       "required": [
-        "enabled",
-        "interval_minutes"
+        "enabled"
       ]
     },
     "HooksConfig": {
@@ -3195,6 +3470,49 @@
         "nickname"
       ]
     },
+    "JiraConfig": {
+      "description": "Jira integration configuration (`[jira]`).\n\nWhen `enabled = true`, registers the `jira` tool which can get tickets,\nsearch with JQL, and add comments. Requires `base_url` and `api_token`\n(or the `JIRA_API_TOKEN` env var).\n\n## Defaults\n- `enabled`: `false`\n- `allowed_actions`: `[\"get_ticket\"]` — read-only by default.\n  Add `\"search_tickets\"` or `\"comment_ticket\"` to unlock them.\n- `timeout_secs`: `30`\n\n## Auth\nJira Cloud uses HTTP Basic auth: `email` + `api_token`.\n`api_token` is stored encrypted at rest; set it here or via `JIRA_API_TOKEN`.",
+      "type": "object",
+      "properties": {
+        "allowed_actions": {
+          "description": "Actions the agent is permitted to call.\nValid values: `\"get_ticket\"`, `\"search_tickets\"`, `\"comment_ticket\"`.\nDefaults to `[\"get_ticket\"]` (read-only).",
+          "type": "array",
+          "default": [
+            "get_ticket"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "api_token": {
+          "description": "Jira API token. Encrypted at rest. Falls back to `JIRA_API_TOKEN` env var.",
+          "type": "string",
+          "default": ""
+        },
+        "base_url": {
+          "description": "Atlassian instance base URL, e.g. `https://yourco.atlassian.net`.",
+          "type": "string",
+          "default": ""
+        },
+        "email": {
+          "description": "Jira account email used for Basic auth.",
+          "type": "string",
+          "default": ""
+        },
+        "enabled": {
+          "description": "Enable the `jira` tool. Default: `false`.",
+          "type": "boolean",
+          "default": false
+        },
+        "timeout_secs": {
+          "description": "Request timeout in seconds. Default: `30`.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 30,
+          "minimum": 0
+        }
+      }
+    },
     "KnowledgeConfig": {
       "description": "Knowledge graph configuration for capturing and reusing expertise.",
       "type": "object",
@@ -3276,6 +3594,14 @@
           "default": null,
           "maximum": 65535,
           "minimum": 0
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "receive_mode": {
           "description": "Event receive mode: \"websocket\" (default) or \"webhook\"",
@@ -3525,6 +3851,38 @@
         "from_phone"
       ]
     },
+    "LocalWhisperConfig": {
+      "description": "Local/self-hosted Whisper-compatible STT endpoint (`[transcription.local_whisper]`).\n\nAudio is sent over WireGuard; never leaves the platform perimeter.",
+      "type": "object",
+      "properties": {
+        "bearer_token": {
+          "description": "Bearer token for endpoint authentication.",
+          "type": "string"
+        },
+        "max_audio_bytes": {
+          "description": "Maximum audio file size in bytes accepted by this endpoint.\nDefaults to 25 MB — matching the cloud API cap for a safe out-of-the-box\nexperience. Self-hosted endpoints can accept much larger files; raise this\nas needed, but note that each transcription call clones the audio buffer\ninto a multipart payload, so peak memory per request is ~2× this value.",
+          "type": "integer",
+          "format": "uint",
+          "default": 26214400,
+          "minimum": 0
+        },
+        "timeout_secs": {
+          "description": "Request timeout in seconds. Defaults to 300 (large files on local GPU).",
+          "type": "integer",
+          "format": "uint64",
+          "default": 300,
+          "minimum": 0
+        },
+        "url": {
+          "description": "HTTP or HTTPS endpoint URL, e.g. `\"http://10.10.0.1:8001/v1/transcribe\"`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "bearer_token"
+      ]
+    },
     "MatrixConfig": {
       "description": "Matrix channel configuration.",
       "type": "object",
@@ -3551,6 +3909,11 @@
         "homeserver": {
           "description": "Matrix homeserver URL (e.g. `\"https://matrix.org\"`).",
           "type": "string"
+        },
+        "interrupt_on_new_message": {
+          "description": "Whether to interrupt an in-flight agent response when a new message arrives.",
+          "type": "boolean",
+          "default": false
         },
         "room_id": {
           "description": "Matrix room ID to listen in (e.g. `\"!abc123:matrix.org\"`).",
@@ -3595,10 +3958,23 @@
             "null"
           ]
         },
+        "interrupt_on_new_message": {
+          "description": "When true, a newer Mattermost message from the same sender in the same channel\ncancels the in-flight request and starts a fresh response with preserved history.",
+          "type": "boolean",
+          "default": false
+        },
         "mention_only": {
           "description": "When true, only respond to messages that @-mention the bot.\nOther messages in the channel are silently ignored.",
           "type": [
             "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
             "null"
           ],
           "default": null
@@ -3730,6 +4106,40 @@
         }
       ]
     },
+    "Mem0Config": {
+      "description": "Configuration for the mem0 (OpenMemory) memory backend.\n\nConnects to a self-hosted OpenMemory server via its REST API.\nDeploy OpenMemory with `docker compose up` from the mem0 repo,\nthen point `url` at the API (default `http://localhost:8765`).\n\n```toml\n[memory]\nbackend = \"mem0\"\n\n[memory.mem0]\nurl = \"http://localhost:8765\"\nuser_id = \"zeroclaw\"\napp_name = \"zeroclaw\"\n```",
+      "type": "object",
+      "properties": {
+        "app_name": {
+          "description": "Application name registered in mem0.\nFalls back to `MEM0_APP_NAME` env var, or default `\"zeroclaw\"`.",
+          "type": "string",
+          "default": "zeroclaw"
+        },
+        "extraction_prompt": {
+          "description": "Custom prompt for guiding LLM-based fact extraction when `infer = true`.\nUseful for non-English content (e.g. Cantonese/Chinese).\nFalls back to `MEM0_EXTRACTION_PROMPT` env var.\nIf unset, the mem0 server uses its built-in default prompt.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "infer": {
+          "description": "Whether mem0 should use its built-in LLM to extract facts from\nstored text (`infer = true`) or store raw text as-is (`false`).",
+          "type": "boolean",
+          "default": true
+        },
+        "url": {
+          "description": "OpenMemory server URL (e.g. `http://localhost:8765`).\nFalls back to `MEM0_URL` env var if not set.",
+          "type": "string",
+          "default": "http://localhost:8765"
+        },
+        "user_id": {
+          "description": "User ID for scoping memories within mem0.\nFalls back to `MEM0_USER_ID` env var, or default `\"zeroclaw\"`.",
+          "type": "string",
+          "default": "zeroclaw"
+        }
+      }
+    },
     "MemoryConfig": {
       "type": "object",
       "properties": {
@@ -3801,6 +4211,17 @@
           "type": "number",
           "format": "double",
           "default": 0.3
+        },
+        "mem0": {
+          "description": "Configuration for mem0 (OpenMemory) backend.\nOnly used when `backend = \"mem0\"`.\nRequires `--features memory-mem0` at build time.",
+          "$ref": "#/$defs/Mem0Config",
+          "default": {
+            "app_name": "zeroclaw",
+            "extraction_prompt": null,
+            "infer": true,
+            "url": "http://localhost:8765",
+            "user_id": "zeroclaw"
+          }
         },
         "min_relevance_score": {
           "description": "Minimum hybrid score (0.0–1.0) for a memory to be included in context.\nMemories scoring below this threshold are dropped to prevent irrelevant\ncontext from bleeding into conversations. Default: 0.4",
@@ -4233,6 +4654,14 @@
           "description": "Nextcloud base URL (e.g. \"https://cloud.example.com\").",
           "type": "string"
         },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "webhook_secret": {
           "description": "Shared secret for webhook signature verification.\n\nCan also be set via `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET`.",
           "type": [
@@ -4580,6 +5009,13 @@
           "default": 300,
           "minimum": 0
         },
+        "challenge_max_attempts": {
+          "description": "Maximum number of OTP challenge attempts before lockout.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 3,
+          "minimum": 0
+        },
         "enabled": {
           "description": "Enable OTP gating. Defaults to disabled for backward compatibility.",
           "type": "boolean",
@@ -4649,6 +5085,50 @@
           "const": "cli-prompt"
         }
       ]
+    },
+    "PacingConfig": {
+      "description": "Pacing controls for slow/local LLM workloads (`[pacing]` section).\n\nAll fields are optional and default to values that preserve existing\nbehavior. When set, they extend — not replace — the existing timeout\nand loop-detection subsystems.",
+      "type": "object",
+      "properties": {
+        "loop_detection_min_elapsed_secs": {
+          "description": "Minimum elapsed seconds before loop detection activates.\nTasks completing under this threshold get aggressive loop protection;\nlonger-running tasks receive a grace period before the detector starts\ncounting. `None` means loop detection is always active (existing behavior).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
+        "loop_ignore_tools": {
+          "description": "Tool names excluded from identical-output / alternating-pattern loop\ndetection. Useful for browser workflows where `browser_screenshot`\nstructurally resembles a loop even when making progress.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "message_timeout_scale_max": {
+          "description": "Override for the hardcoded timeout scaling cap (default: 4).\nThe channel message timeout budget is computed as:\n  `message_timeout_secs * min(max_tool_iterations, message_timeout_scale_max)`\nRaising this value lets long multi-step tasks with slow local models\nreceive a proportionally larger budget without inflating the base timeout.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
+        "step_timeout_secs": {
+          "description": "Per-step timeout in seconds: the maximum time allowed for a single\nLLM inference turn, independent of the total message budget.\n`None` means no per-step timeout (existing behavior).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        }
+      }
     },
     "PairingDashboardConfig": {
       "description": "Pairing dashboard configuration (`[gateway.pairing_dashboard]`).",
@@ -4748,6 +5228,27 @@
           "description": "Enable peripheral support (boards become agent tools)",
           "type": "boolean",
           "default": false
+        }
+      }
+    },
+    "PinggyTunnelConfig": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "description": "Server region: `\"us\"` (USA), `\"eu\"` (Europe), `\"ap\"` (Asia), `\"br\"` (South America), `\"au\"` (Australia), or omit for auto.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "token": {
+          "description": "Pinggy access token (optional — free tier works without one).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       }
     },
@@ -4926,6 +5427,14 @@
         "app_secret": {
           "description": "App Secret from QQ Bot developer console",
           "type": "string"
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -5304,6 +5813,7 @@
           "$ref": "#/$defs/OtpConfig",
           "default": {
             "cache_valid_secs": 300,
+            "challenge_max_attempts": 3,
             "enabled": false,
             "gated_actions": [
               "shell",
@@ -5419,6 +5929,14 @@
           "description": "Skip incoming story messages.",
           "type": "boolean",
           "default": false
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -5426,10 +5944,39 @@
         "account"
       ]
     },
+    "SkillCreationConfig": {
+      "description": "Autonomous skill creation configuration (`[skills.skill_creation]` section).",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable automatic skill creation after successful multi-step tasks.\nDefault: `false`.",
+          "type": "boolean",
+          "default": false
+        },
+        "max_skills": {
+          "description": "Maximum number of auto-generated skills to keep.\nWhen exceeded, the oldest auto-generated skill is removed (LRU eviction).",
+          "type": "integer",
+          "format": "uint",
+          "default": 500,
+          "minimum": 0
+        },
+        "similarity_threshold": {
+          "description": "Embedding similarity threshold for deduplication.\nSkills with descriptions more similar than this value are skipped.",
+          "type": "number",
+          "format": "double",
+          "default": 0.85
+        }
+      }
+    },
     "SkillsConfig": {
       "description": "Skills loading configuration (`[skills]` section).",
       "type": "object",
       "properties": {
+        "allow_scripts": {
+          "description": "Allow script-like files in skills (`.sh`, `.bash`, `.ps1`, shebang shell files).\nDefault: `false` (secure by default).",
+          "type": "boolean",
+          "default": false
+        },
         "open_skills_dir": {
           "description": "Optional path to a local open-skills repository.\nIf unset, defaults to `$HOME/open-skills` when enabled.",
           "type": [
@@ -5447,6 +5994,15 @@
           "description": "Controls how skills are injected into the system prompt.\n`full` preserves legacy behavior. `compact` keeps context small and loads skills on demand.",
           "$ref": "#/$defs/SkillsPromptInjectionMode",
           "default": "full"
+        },
+        "skill_creation": {
+          "description": "Autonomous skill creation from successful multi-step task executions.",
+          "$ref": "#/$defs/SkillCreationConfig",
+          "default": {
+            "enabled": false,
+            "max_skills": 500,
+            "similarity_threshold": 0.85
+          }
         }
       }
     },
@@ -5504,6 +6060,22 @@
           "description": "When true, only respond to messages that @-mention the bot in groups.\nDirect messages remain allowed.",
           "type": "boolean",
           "default": false
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "thread_replies": {
+          "description": "When true (default), replies stay in the originating Slack thread.\nWhen false, replies go to the channel root instead.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
         }
       },
       "required": [
@@ -5683,6 +6255,14 @@
       "description": "Telegram bot channel configuration.",
       "type": "object",
       "properties": {
+        "ack_reactions": {
+          "description": "Override for the top-level `ack_reactions` setting. When `None`, the\nchannel falls back to `[channels_config].ack_reactions`. When set\nexplicitly, it takes precedence.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
         "allowed_users": {
           "description": "Allowed Telegram user IDs or usernames. Empty = deny all.",
           "type": "array",
@@ -5711,6 +6291,14 @@
           "type": "boolean",
           "default": false
         },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "stream_mode": {
           "description": "Streaming mode for progressive response delivery via message edits.",
           "$ref": "#/$defs/StreamMode",
@@ -5721,6 +6309,32 @@
         "bot_token",
         "allowed_users"
       ]
+    },
+    "TextBrowserConfig": {
+      "description": "Text browser tool configuration (`[text_browser]` section).\n\nUses text-based browsers (lynx, links, w3m) to render web pages as plain\ntext. Designed for headless/SSH environments without graphical browsers.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable `text_browser` tool",
+          "type": "boolean",
+          "default": false
+        },
+        "preferred_browser": {
+          "description": "Preferred text browser (\"lynx\", \"links\", or \"w3m\"). If unset, auto-detects.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "timeout_secs": {
+          "description": "Request timeout in seconds (default: 30)",
+          "type": "integer",
+          "format": "uint64",
+          "default": 30,
+          "minimum": 0
+        }
+      }
     },
     "ToolFilterGroup": {
       "description": "A named group of MCP tool patterns with an activation mode.\n\nEach group lists glob patterns for MCP tool names (prefix `mcp_`) and an\noptional set of keywords that trigger inclusion in `dynamic` mode.\nBuilt-in (non-MCP) tools always pass through and are never affected by\n`tool_filter_groups`.\n\n# Example\n```toml\n[[agent.tool_filter_groups]]\nmode = \"always\"\ntools = [\"mcp_filesystem_*\"]\nkeywords = []\n\n[[agent.tool_filter_groups]]\nmode = \"dynamic\"\ntools = [\"mcp_browser_*\"]\nkeywords = [\"browse\", \"website\", \"url\", \"search\"]\n```",
@@ -5843,6 +6457,18 @@
           ],
           "default": null
         },
+        "local_whisper": {
+          "description": "Local/self-hosted Whisper-compatible STT provider.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalWhisperConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "max_duration_secs": {
           "description": "Maximum voice duration in seconds (messages longer than this are skipped).",
           "type": "integer",
@@ -5951,7 +6577,7 @@
       }
     },
     "TunnelConfig": {
-      "description": "Tunnel configuration for exposing the gateway publicly (`[tunnel]` section).\n\nSupported providers: `\"none\"` (default), `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, `\"custom\"`.",
+      "description": "Tunnel configuration for exposing the gateway publicly (`[tunnel]` section).\n\nSupported providers: `\"none\"` (default), `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, `\"pinggy\"`, `\"custom\"`.",
       "type": "object",
       "properties": {
         "cloudflare": {
@@ -6002,8 +6628,20 @@
           ],
           "default": null
         },
+        "pinggy": {
+          "description": "Pinggy tunnel configuration (used when `provider = \"pinggy\"`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PinggyTunnelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "provider": {
-          "description": "Tunnel provider: `\"none\"`, `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, or `\"custom\"`. Default: `\"none\"`.",
+          "description": "Tunnel provider: `\"none\"`, `\"cloudflare\"`, `\"tailscale\"`, `\"ngrok\"`, `\"openvpn\"`, `\"pinggy\"`, or `\"custom\"`. Default: `\"none\"`.",
           "type": "string"
         },
         "tailscale": {
@@ -6044,6 +6682,22 @@
         "bearer_token"
       ]
     },
+    "VerifiableIntentConfig": {
+      "description": "Verifiable Intent (VI) credential verification and issuance (`[verifiable_intent]` section).",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable VI credential verification on commerce tool calls (default: false).",
+          "type": "boolean",
+          "default": false
+        },
+        "strictness": {
+          "description": "Strictness mode for constraint evaluation: \"strict\" (fail-closed on unknown\nconstraint types) or \"permissive\" (skip unknown types with a warning).\nDefault: \"strict\".",
+          "type": "string",
+          "default": "strict"
+        }
+      }
+    },
     "WatiConfig": {
       "description": "WATI WhatsApp Business API channel configuration.",
       "type": "object",
@@ -6064,6 +6718,14 @@
           "description": "WATI API base URL (default: https://live-mt-server.wati.io).",
           "type": "string",
           "default": "https://live-mt-server.wati.io"
+        },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         },
         "tenant_id": {
           "description": "Tenant ID for multi-channel setups (optional).",
@@ -6271,6 +6933,26 @@
         "port"
       ]
     },
+    "WhatsAppChatPolicy": {
+      "description": "Policy for a particular WhatsApp chat type (DMs or groups) when\n`mode = \"personal\"`.",
+      "oneOf": [
+        {
+          "description": "Only respond to senders on the `allowed_numbers` list (default).",
+          "type": "string",
+          "const": "allowlist"
+        },
+        {
+          "description": "Ignore all messages in this chat type.",
+          "type": "string",
+          "const": "ignore"
+        },
+        {
+          "description": "Respond to every message regardless of allowlist.",
+          "type": "string",
+          "const": "all"
+        }
+      ]
+    },
     "WhatsAppConfig": {
       "description": "WhatsApp channel configuration (Cloud API or Web mode).\n\nSet `phone_number_id` for Cloud API mode, or `session_path` for Web mode.",
       "type": "object",
@@ -6299,6 +6981,21 @@
           ],
           "default": null
         },
+        "dm_policy": {
+          "description": "Policy for direct messages when mode = \"personal\".\n\"allowlist\" (default) | \"ignore\" | \"all\".",
+          "$ref": "#/$defs/WhatsAppChatPolicy",
+          "default": "allowlist"
+        },
+        "group_policy": {
+          "description": "Policy for group chats when mode = \"personal\".\n\"allowlist\" (default) | \"ignore\" | \"all\".",
+          "$ref": "#/$defs/WhatsAppChatPolicy",
+          "default": "allowlist"
+        },
+        "mode": {
+          "description": "Usage mode for WhatsApp Web: \"business\" (default) or \"personal\".\nIn personal mode the bot applies dm_policy, group_policy, and\nself_chat_mode to decide which chats to respond in.",
+          "$ref": "#/$defs/WhatsAppWebMode",
+          "default": "business"
+        },
         "pair_code": {
           "description": "Custom pair code for linking (Web mode, optional)\nLeave empty to let WhatsApp generate one",
           "type": [
@@ -6323,6 +7020,19 @@
           ],
           "default": null
         },
+        "proxy_url": {
+          "description": "Per-channel proxy URL (http, https, socks5, socks5h).\nOverrides the global `[proxy]` setting for this channel only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "self_chat_mode": {
+          "description": "When true and mode = \"personal\", always respond to messages in the\nuser's own self-chat (Notes to Self). Defaults to false.",
+          "type": "boolean",
+          "default": false
+        },
         "session_path": {
           "description": "Session database path for WhatsApp Web client (Web mode)\nWhen set, enables native WhatsApp Web mode with wa-rs",
           "type": [
@@ -6340,6 +7050,21 @@
           "default": null
         }
       }
+    },
+    "WhatsAppWebMode": {
+      "description": "WhatsApp Web usage mode.\n\n`Personal` treats the account as a personal phone — the bot only responds to\nincoming messages that pass the DM/group/self-chat policy filters.\n`Business` (default) responds to all incoming messages, subject only to the\n`allowed_numbers` allowlist.",
+      "oneOf": [
+        {
+          "description": "Respond to all messages passing the allowlist (default).",
+          "type": "string",
+          "const": "business"
+        },
+        {
+          "description": "Apply per-chat-type policies (dm_policy, group_policy, self_chat_mode).",
+          "type": "string",
+          "const": "personal"
+        }
+      ]
     },
     "WorkspaceConfig": {
       "description": "Multi-client workspace isolation configuration.\n\nWhen enabled, each client engagement gets an isolated workspace with\nseparate memory, audit, secrets, and tool restrictions.",

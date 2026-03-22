@@ -258,9 +258,10 @@ fn build_ws_system_prompt(
         bootstrap_max_chars,
         native_tools,
         config.skills.prompt_injection_mode,
+        crate::security::AutonomyLevel::Full,
     );
     if !native_tools {
-        prompt.push_str(&build_tool_instructions(tools_registry));
+        prompt.push_str(&build_tool_instructions(tools_registry, None));
     }
 
     prompt
@@ -340,7 +341,7 @@ async fn build_first_turn_memory_context(
     let fetch_limit = MEMORY_CONTEXT_MAX_ENTRIES + 1;
     let entries = match state
         .mem
-        .recall(user_msg, fetch_limit, Some(thread_id))
+        .recall(user_msg, fetch_limit, Some(thread_id), None, None)
         .await
     {
         Ok(entries) => entries,
@@ -906,6 +907,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
         });
 
         // Run tool loop — matches native channel calling convention.
+        let pacing = state.config.lock().pacing.clone();
+        let model_switch_callback = crate::agent::loop_::get_model_switch_state();
         let tool_loop_future = run_tool_call_loop(
             state.provider.as_ref(),
             &mut llm_history,
@@ -916,7 +919,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             state.temperature,
             true,                                   // silent
             None,                                   // approval (full autonomy)
-            "ws_clawrun",
+            "ws_clawrun",                           // channel_name
+            None,                                   // channel_reply_target
             &multimodal_config,
             max_tool_iterations,
             Some(cancellation_token.clone()),        // cancellation token
@@ -925,6 +929,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, thread_id: String) {
             &excluded_tools,                         // excluded tools
             &dedup_exempt_tools,                     // dedup exempt tools
             None,                                   // activated_tools
+            Some(model_switch_callback.clone()),    // model_switch_callback
+            &pacing,                                // pacing
         );
 
         // Scope cost tracking task-local around the tool loop.
